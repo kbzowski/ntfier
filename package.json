@@ -1,0 +1,22 @@
+{
+  "name": "ntfy-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:debug": "tauri build --debug",
+    "build:msi": "tauri build --bundles msi",
+    "build:nsis": "tauri build --bundles nsis",
+    "release": "tauri build --bundles msi,nsis",
+    "clean": "rimraf src-tauri/target ui/dist",
+    "ui:dev": "pnpm --filter ui dev",
+    "ui:build": "pnpm --filter ui build",
+    "ui:test": "pnpm --filter ui test",
+    "ui:lint": "pnpm --filter ui lint"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "rimraf": "^6"
+  }
+}
