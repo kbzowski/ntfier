@@ -1,0 +1,5 @@
+# Format Rust code
+cargo fmt --manifest-path src-tauri/Cargo.toml
+
+# Lint UI code
+pnpm --filter ui check

@@ -13,10 +13,12 @@
     "ui:dev": "pnpm --filter ui dev",
     "ui:build": "pnpm --filter ui build",
     "ui:test": "pnpm --filter ui test",
-    "ui:lint": "pnpm --filter ui lint"
+    "ui:lint": "pnpm --filter ui lint",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "husky": "^9.1.7",
     "rimraf": "^6"
   }
 }
