@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useState } from "react";
+import { getErrorMessage } from "@/lib/tauri";
 import type { ServerConfig } from "@/types/ntfy";
 
 interface ServerFormData {
@@ -94,13 +95,7 @@ export function useServerForm({
 			setIsAdding(false);
 		} catch (err) {
 			console.error("Failed to add server:", err);
-			const message =
-				err instanceof Error
-					? err.message
-					: typeof err === "string"
-						? err
-						: "Failed to connect to server";
-			setError(message);
+			setError(getErrorMessage(err));
 		} finally {
 			setIsLoading(false);
 		}

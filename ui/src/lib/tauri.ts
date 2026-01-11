@@ -14,12 +14,48 @@ import {
 	enable as autostartEnable,
 	isEnabled as autostartIsEnabled,
 } from "@tauri-apps/plugin-autostart";
+import type { AppError } from "@/types/bindings";
 import type {
 	AppSettings,
 	Notification,
 	ServerConfig,
 	Subscription,
 } from "@/types/ntfy";
+
+// ===== Error Handling =====
+
+/**
+ * Extracts a human-readable message from an AppError discriminated union.
+ *
+ * AppError from Rust is serialized as: { Database: "message" } | { Connection: "message" } | ...
+ */
+export function getErrorMessage(error: unknown): string {
+	// Handle standard Error objects
+	if (error instanceof Error) {
+		return error.message;
+	}
+
+	// Handle string errors
+	if (typeof error === "string") {
+		return error;
+	}
+
+	// Handle AppError discriminated union: { VariantName: "message" }
+	if (error && typeof error === "object") {
+		const appError = error as AppError;
+		// Extract the first (and only) key's value
+		const keys = Object.keys(appError) as (keyof AppError)[];
+		if (keys.length === 1) {
+			const key = keys[0];
+			const value = (appError as Record<string, unknown>)[key];
+			if (typeof value === "string") {
+				return value;
+			}
+		}
+	}
+
+	return "An unknown error occurred";
+}
 
 // ===== Subscriptions API =====
 
