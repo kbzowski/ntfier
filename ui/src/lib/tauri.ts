@@ -3,24 +3,39 @@
  *
  * Tauri backend API bindings.
  *
- * Provides typed wrappers around Tauri's invoke function for calling
- * backend commands. Falls back gracefully when not running in Tauri.
+ * Provides typed wrappers around generated bindings that convert Result pattern
+ * to exceptions for easier use in async/await code. Falls back gracefully when
+ * not running in Tauri.
  */
 
-import { invoke, isTauri as isTauriCore } from "@tauri-apps/api/core";
+import { isTauri as isTauriCore } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
 	disable as autostartDisable,
 	enable as autostartEnable,
 	isEnabled as autostartIsEnabled,
 } from "@tauri-apps/plugin-autostart";
-import type { AppError } from "@/types/bindings";
-import type {
-	AppSettings,
-	Notification,
+
+import {
+	type AppError,
+	type AppSettings,
+	type CreateSubscription,
+	commands,
+	type Notification,
+	type Result,
+	type ServerConfig,
+	type Subscription,
+} from "@/types/bindings";
+
+// Re-export types for consumers
+export type {
+	AppError,
+	CreateSubscription,
 	ServerConfig,
 	Subscription,
-} from "@/types/ntfy";
+	Notification,
+	AppSettings,
+};
 
 // ===== Error Handling =====
 
@@ -57,67 +72,106 @@ export function getErrorMessage(error: unknown): string {
 	return "An unknown error occurred";
 }
 
+/**
+ * Unwraps a Result from generated bindings, throwing on error.
+ *
+ * This allows using the Result-based generated commands with try/catch syntax.
+ */
+function unwrap<T>(result: Result<T, AppError>): T {
+	if (result.status === "ok") {
+		return result.data;
+	}
+	throw new Error(getErrorMessage(result.error));
+}
+
 // ===== Subscriptions API =====
 
 export const subscriptionsApi = {
-	getAll: () => invoke<Subscription[]>("get_subscriptions"),
+	getAll: async () => unwrap(await commands.getSubscriptions()),
 
-	add: (subscription: {
+	add: async (subscription: {
 		topic: string;
 		serverUrl: string;
 		displayName?: string;
-	}) => invoke<Subscription>("add_subscription", { subscription }),
+	}) =>
+		unwrap(
+			await commands.addSubscription({
+				topic: subscription.topic,
+				serverUrl: subscription.serverUrl,
+				displayName: subscription.displayName ?? null,
+			}),
+		),
 
-	remove: (id: string) => invoke<void>("remove_subscription", { id }),
+	remove: async (id: string) => {
+		unwrap(await commands.removeSubscription(id));
+	},
 
-	toggleMute: (id: string) => invoke<Subscription>("toggle_mute", { id }),
+	toggleMute: async (id: string) => unwrap(await commands.toggleMute(id)),
 };
 
 // ===== Notifications API =====
 
 export const notificationsApi = {
-	getBySubscription: (subscriptionId: string) =>
-		invoke<Notification[]>("get_notifications", { subscriptionId }),
+	getBySubscription: async (subscriptionId: string) =>
+		unwrap(await commands.getNotifications(subscriptionId)),
 
-	markAsRead: (id: string) => invoke<void>("mark_as_read", { id }),
+	markAsRead: async (id: string) => {
+		unwrap(await commands.markAsRead(id));
+	},
 
-	markAllAsRead: (subscriptionId: string) =>
-		invoke<void>("mark_all_as_read", { subscriptionId }),
+	markAllAsRead: async (subscriptionId: string) => {
+		unwrap(await commands.markAllAsRead(subscriptionId));
+	},
 
-	delete: (id: string) => invoke<void>("delete_notification", { id }),
+	delete: async (id: string) => {
+		unwrap(await commands.deleteNotification(id));
+	},
 
-	getUnreadCount: (subscriptionId: string) =>
-		invoke<number>("get_unread_count", { subscriptionId }),
+	getUnreadCount: async (subscriptionId: string) =>
+		unwrap(await commands.getUnreadCount(subscriptionId)),
 };
 
 // ===== Settings API =====
 
 export const settingsApi = {
-	get: () => invoke<AppSettings>("get_settings"),
+	get: async () => unwrap(await commands.getSettings()),
 
-	setTheme: (theme: string) => invoke<void>("set_theme", { theme }),
+	setTheme: async (theme: string) => {
+		unwrap(await commands.setTheme(theme));
+	},
 
-	addServer: (server: Omit<ServerConfig, "isDefault">) =>
-		invoke<void>("add_server", { server: { ...server, isDefault: false } }),
+	addServer: async (server: Omit<ServerConfig, "isDefault">) => {
+		unwrap(
+			await commands.addServer({
+				...server,
+				isDefault: false,
+			}),
+		);
+	},
 
-	removeServer: (url: string) => invoke<void>("remove_server", { url }),
+	removeServer: async (url: string) => {
+		unwrap(await commands.removeServer(url));
+	},
 
-	setDefaultServer: (url: string) =>
-		invoke<void>("set_default_server", { url }),
+	setDefaultServer: async (url: string) => {
+		unwrap(await commands.setDefaultServer(url));
+	},
 
-	setMinimizeToTray: (enabled: boolean) =>
-		invoke<void>("set_minimize_to_tray", { enabled }),
+	setMinimizeToTray: async (enabled: boolean) => {
+		unwrap(await commands.setMinimizeToTray(enabled));
+	},
 
-	setStartMinimized: (enabled: boolean) =>
-		invoke<void>("set_start_minimized", { enabled }),
+	setStartMinimized: async (enabled: boolean) => {
+		unwrap(await commands.setStartMinimized(enabled));
+	},
 };
 
 // ===== Sync API =====
 
 export const syncApi = {
 	/** Sync subscriptions from a server with credentials */
-	syncSubscriptions: (serverUrl: string) =>
-		invoke<Subscription[]>("sync_subscriptions", { serverUrl }),
+	syncSubscriptions: async (serverUrl: string) =>
+		unwrap(await commands.syncSubscriptions(serverUrl)),
 };
 
 // ===== Event Listeners =====
@@ -148,7 +202,6 @@ export const autostartApi = {
 };
 
 // ===== Utility to check if running in Tauri =====
-// Uses the official Tauri 2.x API for detection
 
 export const isTauri = (): boolean => {
 	return isTauriCore();
