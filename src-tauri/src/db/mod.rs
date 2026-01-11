@@ -13,7 +13,7 @@ use crate::error::AppError;
 
 impl<T> From<PoisonError<T>> for AppError {
     fn from(err: PoisonError<T>) -> Self {
-        AppError::Database(format!("Mutex poisoned: {}", err))
+        Self::Database(format!("Mutex poisoned: {err}"))
     }
 }
 use crate::models::{
@@ -22,10 +22,10 @@ use crate::models::{
 };
 use crate::services::credential_manager;
 
-/// SQLite database wrapper with thread-safe access.
+/// `SQLite` database wrapper with thread-safe access.
 ///
 /// Manages all persistent data including subscriptions, notifications, and settings.
-/// Server credentials are stored securely in the OS keychain rather than in SQLite.
+/// Server credentials are stored securely in the OS keychain rather than in `SQLite`.
 pub struct Database {
     conn: Mutex<Connection>,
 }
@@ -143,7 +143,7 @@ impl Database {
         for (i, migration) in schema::MIGRATIONS.iter().enumerate() {
             let migration_id = (i + 1) as i32;
             if migration_id > last_migration {
-                log::info!("Applying migration {}", migration_id);
+                log::info!("Applying migration {migration_id}");
                 conn.execute(migration, [])?;
                 conn.execute(
                     "INSERT INTO migrations (id, applied_at) VALUES (?1, ?2)",
@@ -235,20 +235,17 @@ impl Database {
         let conn = self.lock_conn()?;
 
         // Get or create server
-        let server_id: String = match conn.query_row(
+        let server_id: String = if let Ok(id) = conn.query_row(
             "SELECT id FROM servers WHERE url = ?1",
             [&sub.server_url],
             |row| row.get(0),
-        ) {
-            Ok(id) => id,
-            Err(_) => {
-                let id = uuid::Uuid::new_v4().to_string();
-                conn.execute(
-                    "INSERT INTO servers (id, url, is_default) VALUES (?1, ?2, 0)",
-                    [&id, &sub.server_url],
-                )?;
-                id
-            }
+        ) { id } else {
+            let id = uuid::Uuid::new_v4().to_string();
+            conn.execute(
+                "INSERT INTO servers (id, url, is_default) VALUES (?1, ?2, 0)",
+                [&id, &sub.server_url],
+            )?;
+            id
         };
 
         let id = uuid::Uuid::new_v4().to_string();
@@ -294,7 +291,7 @@ impl Database {
         let subs = self.get_all_subscriptions()?;
         subs.into_iter()
             .find(|s| s.id == id)
-            .ok_or_else(|| AppError::NotFound(format!("Subscription {} not found", id)))
+            .ok_or_else(|| AppError::NotFound(format!("Subscription {id} not found")))
     }
 
     // ===== Notifications =====

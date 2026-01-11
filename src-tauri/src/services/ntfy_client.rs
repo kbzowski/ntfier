@@ -30,15 +30,15 @@ impl NtfyClient {
     pub fn new() -> Result<Self, AppError> {
         let client = Client::builder()
             .build()
-            .map_err(|e| AppError::Connection(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| AppError::Connection(format!("Failed to create HTTP client: {e}")))?;
 
         Ok(Self { client })
     }
 
     fn create_auth_header(username: &str, password: &str) -> String {
-        let credentials = format!("{}:{}", username, password);
+        let credentials = format!("{username}:{password}");
         let encoded = STANDARD.encode(credentials.as_bytes());
-        format!("Basic {}", encoded)
+        format!("Basic {encoded}")
     }
 
     /// Fetch account info including subscriptions from ntfy server
@@ -49,7 +49,7 @@ impl NtfyClient {
         password: &str,
     ) -> Result<NtfyAccount, AppError> {
         let url = format!("{}/v1/account", normalize_url(server_url));
-        log::info!("Fetching account from: {}", url);
+        log::info!("Fetching account from: {url}");
 
         let auth_header = Self::create_auth_header(username, password);
 
@@ -68,30 +68,29 @@ impl NtfyClient {
                     e.is_request()
                 );
                 if let Some(source) = e.source() {
-                    log::error!("Error source: {:?}", source);
+                    log::error!("Error source: {source:?}");
                 }
-                AppError::Connection(format!("Failed to connect to {}: {}", server_url, e))
+                AppError::Connection(format!("Failed to connect to {server_url}: {e}"))
             })?;
 
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            log::error!("Server returned {}: {}", status, body);
+            log::error!("Server returned {status}: {body}");
             return Err(AppError::Connection(format!(
-                "Server returned {}: {}",
-                status, body
+                "Server returned {status}: {body}"
             )));
         }
 
         let text = response
             .text()
             .await
-            .map_err(|e| AppError::Connection(format!("Failed to read response: {}", e)))?;
+            .map_err(|e| AppError::Connection(format!("Failed to read response: {e}")))?;
 
-        log::info!("ntfy account API response: {}", text);
+        log::info!("ntfy account API response: {text}");
 
         let account: NtfyAccount = serde_json::from_str(&text).map_err(|e| {
-            AppError::Connection(format!("Failed to parse response: {} - body: {}", e, text))
+            AppError::Connection(format!("Failed to parse response: {e} - body: {text}"))
         })?;
 
         log::info!(
@@ -118,11 +117,11 @@ impl NtfyClient {
         // since=<timestamp> gets messages since that Unix timestamp
         // poll=1 returns immediately instead of keeping connection open
         let url = match since {
-            Some(ts) => format!("{}/{}/json?poll=1&since={}", base, topic, ts),
-            None => format!("{}/{}/json?poll=1&since=all", base, topic),
+            Some(ts) => format!("{base}/{topic}/json?poll=1&since={ts}"),
+            None => format!("{base}/{topic}/json?poll=1&since=all"),
         };
 
-        log::info!("Fetching messages from: {}", url);
+        log::info!("Fetching messages from: {url}");
 
         let mut request = self.client.get(&url);
 
@@ -134,27 +133,25 @@ impl NtfyClient {
         }
 
         let response = request.send().await.map_err(|e| {
-            log::error!("Failed to fetch messages: {}", e);
+            log::error!("Failed to fetch messages: {e}");
             AppError::Connection(format!(
-                "Failed to fetch messages from {}: {}",
-                server_url, e
+                "Failed to fetch messages from {server_url}: {e}"
             ))
         })?;
 
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            log::error!("Server returned {}: {}", status, body);
+            log::error!("Server returned {status}: {body}");
             return Err(AppError::Connection(format!(
-                "Failed to fetch messages: {} - {}",
-                status, body
+                "Failed to fetch messages: {status} - {body}"
             )));
         }
 
         let text = response
             .text()
             .await
-            .map_err(|e| AppError::Connection(format!("Failed to read response: {}", e)))?;
+            .map_err(|e| AppError::Connection(format!("Failed to read response: {e}")))?;
 
         // ntfy returns newline-delimited JSON
         let mut messages = Vec::new();
@@ -170,7 +167,7 @@ impl NtfyClient {
                     }
                 }
                 Err(e) => {
-                    log::warn!("Failed to parse message: {} - line: {}", e, line);
+                    log::warn!("Failed to parse message: {e} - line: {line}");
                 }
             }
         }

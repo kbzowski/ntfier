@@ -13,7 +13,7 @@ pub async fn sync_subscriptions(
     conn_manager: State<'_, ConnectionManager>,
     server_url: String,
 ) -> Result<Vec<Subscription>, AppError> {
-    log::info!("sync_subscriptions called for server: {}", server_url);
+    log::info!("sync_subscriptions called for server: {server_url}");
 
     // Get server credentials from database
     let settings = db.get_settings()?;
@@ -24,8 +24,8 @@ pub async fn sync_subscriptions(
         .iter()
         .find(|s| s.url == server_url)
         .ok_or_else(|| {
-            log::error!("Server {} not found in settings", server_url);
-            AppError::NotFound(format!("Server {} not found", server_url))
+            log::error!("Server {server_url} not found in settings");
+            AppError::NotFound(format!("Server {server_url} not found"))
         })?;
 
     log::info!(
@@ -72,9 +72,7 @@ pub async fn sync_subscriptions(
 
         if ntfy_base != our_base {
             log::info!(
-                "Skipping subscription - base_url mismatch: {} vs {}",
-                ntfy_base,
-                our_base
+                "Skipping subscription - base_url mismatch: {ntfy_base} vs {our_base}"
             );
             continue;
         }
@@ -123,7 +121,7 @@ pub async fn sync_subscriptions(
         .await;
     }
 
-    log::info!("Notification sync completed for server {}", server_url);
+    log::info!("Notification sync completed for server {server_url}");
 
     Ok(synced_subscriptions)
 }

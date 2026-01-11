@@ -4,7 +4,7 @@ pub const SCHEMA_VERSION: i32 = 1;
 
 /// Core database schema.
 /// All tables and columns needed for the application.
-pub const SCHEMA: &str = r#"
+pub const SCHEMA: &str = r"
 -- Servers table: ntfy server configurations
 CREATE TABLE IF NOT EXISTS servers (
     id TEXT PRIMARY KEY,
@@ -62,7 +62,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_ntfy_id ON notifications(ntfy_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_subscription_read ON notifications(subscription_id, read);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_server ON subscriptions(server_id);
 CREATE INDEX IF NOT EXISTS idx_servers_default ON servers(is_default);
-"#;
+";
 
 /// Database migrations.
 /// Each migration is applied once and tracked in the migrations table.

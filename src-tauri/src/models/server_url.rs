@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 /// Normalizes a URL by removing trailing slashes.
 ///
-/// This is useful for consistent URL comparison since "https://ntfy.sh"
-/// and "https://ntfy.sh/" should be treated as equivalent.
+/// This is useful for consistent URL comparison since "<https://ntfy.sh>"
+/// and "<https://ntfy.sh>/" should be treated as equivalent.
 pub fn normalize_url(url: &str) -> &str {
     url.trim_end_matches('/')
 }
@@ -26,7 +26,7 @@ pub struct ServerUrl(String);
 
 #[allow(dead_code)]
 impl ServerUrl {
-    /// Creates a new ServerUrl, normalizing the input by removing trailing slashes.
+    /// Creates a new `ServerUrl`, normalizing the input by removing trailing slashes.
     pub fn new(url: impl Into<String>) -> Self {
         let url = url.into();
         Self(url.trim_end_matches('/').to_string())

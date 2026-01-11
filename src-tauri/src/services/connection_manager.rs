@@ -92,9 +92,9 @@ impl ConnectionManager {
             return None;
         }
 
-        let credentials = format!("{}:{}", username, password);
+        let credentials = format!("{username}:{password}");
         let encoded = STANDARD.encode(credentials.as_bytes());
-        Some(format!("Basic {}", encoded))
+        Some(format!("Basic {encoded}"))
     }
 
     /// Establishes a WebSocket connection for a subscription.
@@ -102,7 +102,7 @@ impl ConnectionManager {
     /// If a connection already exists for this subscription, it will be closed first.
     /// The connection runs in a background task and automatically reconnects on failure.
     /// Uses connection IDs to detect and handle race conditions where multiple
-    /// connect() calls happen in quick succession.
+    /// `connect()` calls happen in quick succession.
     pub async fn connect(&self, subscription: &Subscription) -> Result<(), AppError> {
         let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
         let connection_id = self.generate_connection_id();
@@ -138,22 +138,20 @@ impl ConnectionManager {
                     let conns = connections.read().await;
                     let is_current = conns
                         .get(&sub_id)
-                        .map_or(false, |entry| entry.id == connection_id);
+                        .is_some_and(|entry| entry.id == connection_id);
                     if !is_current {
                         log::info!(
-                            "Connection {} for {} is no longer current, stopping",
-                            connection_id,
-                            sub_id
+                            "Connection {connection_id} for {sub_id} is no longer current, stopping"
                         );
                         return;
                     }
                 }
 
-                log::info!("Connecting to WebSocket: {}", ws_url);
+                log::info!("Connecting to WebSocket: {ws_url}");
 
                 let connect_result = if let Some(ref auth) = auth_header {
                     let Ok(mut request) = ws_url.as_str().into_client_request() else {
-                        log::error!("Failed to create WebSocket request for URL: {}", ws_url);
+                        log::error!("Failed to create WebSocket request for URL: {ws_url}");
                         continue;
                     };
                     let Ok(header_value) = HeaderValue::from_str(auth) else {
@@ -170,7 +168,7 @@ impl ConnectionManager {
 
                 match connect_result {
                     Ok((ws_stream, _)) => {
-                        log::info!("Connected to {}", ws_url);
+                        log::info!("Connected to {ws_url}");
                         // Reset backoff on successful connection
                         reconnect_attempt = 0;
                         let (_write, mut read) = ws_stream.split();
@@ -192,7 +190,7 @@ impl ConnectionManager {
                                             }
                                         }
                                         Some(Err(e)) => {
-                                            log::error!("WebSocket error: {}", e);
+                                            log::error!("WebSocket error: {e}");
                                             break;
                                         }
                                         None => {
@@ -203,14 +201,14 @@ impl ConnectionManager {
                                     }
                                 }
                                 _ = shutdown_rx.recv() => {
-                                    log::info!("Shutting down connection for {}", sub_id);
+                                    log::info!("Shutting down connection for {sub_id}");
                                     return;
                                 }
                             }
                         }
                     }
                     Err(e) => {
-                        log::error!("Failed to connect to {}: {}", ws_url, e);
+                        log::error!("Failed to connect to {ws_url}: {e}");
                     }
                 }
 
@@ -274,7 +272,7 @@ impl ConnectionManager {
         } else if base_url.starts_with("http://") {
             format!("ws://{}/{}/ws", &base_url[7..], topic)
         } else {
-            format!("wss://{}/{}/ws", base_url, topic)
+            format!("wss://{base_url}/{topic}/ws")
         };
 
         Ok(ws_url)
@@ -304,11 +302,11 @@ impl ConnectionManager {
         let notification = ntfy_msg.into_notification(subscription_id.to_string());
 
         if let Err(e) = db.insert_notification_with_ntfy_id(&notification, &ntfy_id) {
-            log::error!("Failed to save notification: {}", e);
+            log::error!("Failed to save notification: {e}");
         }
 
         if let Err(e) = app_handle.emit("notification:new", &notification) {
-            log::error!("Failed to emit notification event: {}", e);
+            log::error!("Failed to emit notification event: {e}");
         }
 
         // Update tray icon to show unread badge

@@ -225,7 +225,7 @@ pub fn run() {
 
                 // Load tray icons
                 if let Err(e) = tray_manager.load_icons(&handle).await {
-                    log::warn!("Failed to load tray icons: {}", e);
+                    log::warn!("Failed to load tray icons: {e}");
                 }
 
                 // 1. First sync subscriptions from all servers (creates new subscriptions)

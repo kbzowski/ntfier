@@ -37,13 +37,13 @@ pub enum AppError {
 // Conversion from rusqlite::Error
 impl From<rusqlite::Error> for AppError {
     fn from(err: rusqlite::Error) -> Self {
-        AppError::Database(err.to_string())
+        Self::Database(err.to_string())
     }
 }
 
 // Conversion from serde_json::Error
 impl From<serde_json::Error> for AppError {
     fn from(err: serde_json::Error) -> Self {
-        AppError::Serialization(err.to_string())
+        Self::Serialization(err.to_string())
     }
 }

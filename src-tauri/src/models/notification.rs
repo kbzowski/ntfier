@@ -20,18 +20,18 @@ pub enum Priority {
 
 impl Default for Priority {
     fn default() -> Self {
-        Priority::Default
+        Self::Default
     }
 }
 
 impl From<i8> for Priority {
     fn from(value: i8) -> Self {
         match value {
-            1 => Priority::Min,
-            2 => Priority::Low,
-            4 => Priority::High,
-            5 => Priority::Max,
-            _ => Priority::Default,
+            1 => Self::Min,
+            2 => Self::Low,
+            4 => Self::High,
+            5 => Self::Max,
+            _ => Self::Default,
         }
     }
 }

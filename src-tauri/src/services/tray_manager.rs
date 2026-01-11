@@ -10,6 +10,7 @@ use tokio::sync::RwLock;
 use crate::db::Database;
 
 /// Internal state for tray icon management.
+#[derive(Default)]
 struct TrayState {
     tray_icon: Option<TrayIcon>,
     icon_normal: Option<Image<'static>>,
@@ -17,16 +18,6 @@ struct TrayState {
     has_unread: bool,
 }
 
-impl Default for TrayState {
-    fn default() -> Self {
-        Self {
-            tray_icon: None,
-            icon_normal: None,
-            icon_unread: None,
-            has_unread: false,
-        }
-    }
-}
 
 /// Manages system tray icon state and appearance.
 ///
@@ -58,7 +49,7 @@ impl TrayManager {
         // Try to load tray.png, fall back to 32x32.png
         let normal_icon = Self::load_icon_from_dir(&icons_dir, "tray.png")
             .or_else(|_| Self::load_icon_from_dir(&icons_dir, "32x32.png"))
-            .map_err(|e| format!("Failed to load normal icon: {}", e))?;
+            .map_err(|e| format!("Failed to load normal icon: {e}"))?;
 
         // Try to load tray-unread.png, fall back to normal icon if not found
         let unread_icon = Self::load_icon_from_dir(&icons_dir, "tray-unread.png")
@@ -78,7 +69,7 @@ impl TrayManager {
         if let Ok(resource_dir) = app_handle.path().resource_dir() {
             let icons_path = resource_dir.join("icons");
             if icons_path.exists() {
-                log::info!("Found icons at: {:?}", icons_path);
+                log::info!("Found icons at: {}", icons_path.display());
                 return Ok(icons_path);
             }
         }
@@ -88,7 +79,7 @@ impl TrayManager {
             if let Some(exe_dir) = exe_path.parent() {
                 let icons_path = exe_dir.join("icons");
                 if icons_path.exists() {
-                    log::info!("Found icons at: {:?}", icons_path);
+                    log::info!("Found icons at: {}", icons_path.display());
                     return Ok(icons_path);
                 }
 
@@ -101,7 +92,7 @@ impl TrayManager {
 
                 if let Some(icons_path) = dev_icons {
                     if icons_path.exists() {
-                        log::info!("Found icons at (dev): {:?}", icons_path);
+                        log::info!("Found icons at (dev): {}", icons_path.display());
                         return Ok(icons_path);
                     }
                 }
@@ -118,7 +109,7 @@ impl TrayManager {
         let icon_path = icons_dir.join(filename);
 
         let img = image::open(&icon_path)
-            .map_err(|e| format!("Failed to open image {:?}: {}", icon_path, e))?;
+            .map_err(|e| format!("Failed to open image {}: {e}", icon_path.display()))?;
 
         let rgba = img.to_rgba8();
         let (width, height) = rgba.dimensions();
@@ -161,12 +152,12 @@ impl TrayManager {
         };
 
         if let Some(icon) = icon {
-            log::info!("Setting tray icon (has_unread: {})", has_unread);
+            log::info!("Setting tray icon (has_unread: {has_unread})");
             if let Err(e) = tray.set_icon(Some(icon.clone())) {
-                log::error!("Failed to set tray icon: {}", e);
+                log::error!("Failed to set tray icon: {e}");
             }
         } else {
-            log::warn!("Icon not loaded for has_unread: {}", has_unread);
+            log::warn!("Icon not loaded for has_unread: {has_unread}");
         }
     }
 
@@ -189,7 +180,7 @@ impl TrayManager {
             .map(|count| count > 0)
             .unwrap_or(false);
 
-        log::info!("Initial tray refresh, has_unread: {}", has_unread);
+        log::info!("Initial tray refresh, has_unread: {has_unread}");
         self.force_update_icon(has_unread).await;
     }
 }

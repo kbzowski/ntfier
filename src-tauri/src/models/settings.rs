@@ -85,7 +85,7 @@ pub struct AppSettings {
     pub start_minimized: bool,
 }
 
-fn default_true() -> bool {
+const fn default_true() -> bool {
     true
 }
 

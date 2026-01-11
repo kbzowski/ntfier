@@ -25,7 +25,7 @@ impl SyncService {
         let settings = match db.get_settings() {
             Ok(s) => s,
             Err(e) => {
-                log::error!("Failed to get settings for subscription sync: {}", e);
+                log::error!("Failed to get settings for subscription sync: {e}");
                 return;
             }
         };
@@ -41,7 +41,7 @@ impl SyncService {
             let client = match NtfyClient::new() {
                 Ok(c) => c,
                 Err(e) => {
-                    log::error!("Failed to create ntfy client: {}", e);
+                    log::error!("Failed to create ntfy client: {e}");
                     continue;
                 }
             };
@@ -63,7 +63,7 @@ impl SyncService {
             let existing = match db.get_all_subscriptions() {
                 Ok(s) => s,
                 Err(e) => {
-                    log::error!("Failed to get existing subscriptions: {}", e);
+                    log::error!("Failed to get existing subscriptions: {e}");
                     continue;
                 }
             };
@@ -111,7 +111,7 @@ impl SyncService {
         let settings = match db.get_settings() {
             Ok(s) => s,
             Err(e) => {
-                log::error!("Failed to get settings for notification sync: {}", e);
+                log::error!("Failed to get settings for notification sync: {e}");
                 return;
             }
         };
@@ -119,7 +119,7 @@ impl SyncService {
         let subscriptions = match db.get_all_subscriptions() {
             Ok(s) => s,
             Err(e) => {
-                log::error!("Failed to get subscriptions for notification sync: {}", e);
+                log::error!("Failed to get subscriptions for notification sync: {e}");
                 return;
             }
         };
@@ -127,7 +127,7 @@ impl SyncService {
         let client = match NtfyClient::new() {
             Ok(c) => c,
             Err(e) => {
-                log::error!("Failed to create ntfy client: {}", e);
+                log::error!("Failed to create ntfy client: {e}");
                 return;
             }
         };
@@ -221,7 +221,7 @@ impl SyncService {
             let notification = msg.into_notification(sub.id.clone());
 
             if let Err(e) = db.insert_notification_with_ntfy_id(&notification, &ntfy_id) {
-                log::error!("Failed to insert notification: {}", e);
+                log::error!("Failed to insert notification: {e}");
             } else {
                 log::info!(
                     "Inserted notification: {} - {}",
