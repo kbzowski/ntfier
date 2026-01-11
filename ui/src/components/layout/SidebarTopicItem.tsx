@@ -6,6 +6,7 @@ import {
 	Trash2,
 	VolumeX,
 } from "lucide-react";
+import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +26,7 @@ interface SidebarTopicItemProps {
 	onRemove: () => void;
 }
 
-export function SidebarTopicItem({
+export const SidebarTopicItem = memo(function SidebarTopicItem({
 	subscription,
 	isSelected,
 	onSelect,
@@ -94,4 +95,4 @@ export function SidebarTopicItem({
 			</DropdownMenu>
 		</button>
 	);
-}
+});

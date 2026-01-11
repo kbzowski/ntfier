@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PRIORITY_CONFIG } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -13,7 +14,7 @@ interface NotificationCardProps {
 	onClick?: () => void;
 }
 
-export function NotificationCard({
+export const NotificationCard = memo(function NotificationCard({
 	notification,
 	onClick,
 }: NotificationCardProps) {
@@ -46,4 +47,4 @@ export function NotificationCard({
 			</CardContent>
 		</Card>
 	);
-}
+});
