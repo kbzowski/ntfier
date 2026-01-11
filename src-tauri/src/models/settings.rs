@@ -2,6 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use url::Url;
+
+use crate::error::AppError;
 
 /// Configuration for a single ntfy server.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -14,6 +17,34 @@ pub struct ServerConfig {
 }
 
 impl ServerConfig {
+    /// Validates the server configuration.
+    ///
+    /// Checks that the URL is valid and uses http or https scheme.
+    pub fn validate(&self) -> Result<(), AppError> {
+        // Check URL is not empty
+        if self.url.trim().is_empty() {
+            return Err(AppError::InvalidUrl("Server URL cannot be empty".to_string()));
+        }
+
+        // Parse and validate URL
+        let parsed = Url::parse(&self.url)
+            .map_err(|e| AppError::InvalidUrl(format!("Invalid URL: {e}")))?;
+
+        // Check scheme is http or https
+        if !["http", "https"].contains(&parsed.scheme()) {
+            return Err(AppError::InvalidUrl(
+                "URL must use http or https scheme".to_string(),
+            ));
+        }
+
+        // Check host is present
+        if parsed.host().is_none() {
+            return Err(AppError::InvalidUrl("URL must have a host".to_string()));
+        }
+
+        Ok(())
+    }
+
     /// Returns the URL without trailing slashes for consistent comparison.
     pub fn normalized_url(&self) -> &str {
         self.url.trim_end_matches('/')
