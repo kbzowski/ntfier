@@ -1,0 +1,10 @@
+{
+  "extends": ["@commitlint/config-conventional"],
+  "rules": {
+    "scope-enum": [
+      2,
+      "always",
+      ["ui", "tauri", "sync", "db", "tray", "notifications", "settings", "deps", "ci", "release"]
+    ]
+  }
+}

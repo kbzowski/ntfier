@@ -1,3 +1,8 @@
+//! WebSocket connection management for real-time notifications.
+//!
+//! Maintains persistent WebSocket connections to ntfy servers for each subscription.
+//! Handles automatic reconnection with exponential backoff on connection failures.
+
 use base64::{engine::general_purpose::STANDARD, Engine};
 use futures_util::StreamExt;
 use std::collections::HashMap;
@@ -9,17 +14,24 @@ use tokio_tungstenite::{
     tungstenite::{client::IntoClientRequest, http::HeaderValue, Message},
 };
 
+use crate::config::connection::{JITTER_MAX_SECS, RETRY_BACKOFF_SECS};
 use crate::db::Database;
 use crate::error::AppError;
-use crate::models::{Attachment, Notification, NotificationAction, NtfyMessage, Priority, Subscription};
+use crate::models::{normalize_url, Notification, NtfyMessage, Subscription};
 use crate::services::TrayManager;
 
+/// Manages WebSocket connections to ntfy servers.
+///
+/// Each subscription gets its own WebSocket connection that receives
+/// real-time notifications. Connections automatically reconnect on failure
+/// using exponential backoff with jitter.
 pub struct ConnectionManager {
     app_handle: AppHandle,
     connections: Arc<RwLock<HashMap<String, mpsc::Sender<()>>>>,
 }
 
 impl ConnectionManager {
+    /// Creates a new connection manager.
     pub fn new(app_handle: AppHandle) -> Self {
         Self {
             app_handle,
@@ -27,13 +39,17 @@ impl ConnectionManager {
         }
     }
 
+    /// Builds HTTP Basic auth header for the given server URL if credentials exist.
     fn get_auth_header(&self, server_url: &str) -> Option<String> {
         let db: tauri::State<Database> = self.app_handle.state();
         let settings = db.get_settings().ok()?;
 
         // Normalize URLs for comparison (remove trailing slash)
-        let normalized_url = server_url.trim_end_matches('/');
-        let server = settings.servers.iter().find(|s| s.url.trim_end_matches('/') == normalized_url);
+        let normalized_url = normalize_url(server_url);
+        let server = settings
+            .servers
+            .iter()
+            .find(|s| s.url_matches(normalized_url));
 
         if server.is_none() {
             log::debug!(
@@ -72,6 +88,10 @@ impl ConnectionManager {
         Some(format!("Basic {}", encoded))
     }
 
+    /// Establishes a WebSocket connection for a subscription.
+    ///
+    /// If a connection already exists for this subscription, it will be closed first.
+    /// The connection runs in a background task and automatically reconnects on failure.
     pub async fn connect(&self, subscription: &Subscription) -> Result<(), AppError> {
         let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
 
@@ -91,7 +111,6 @@ impl ConnectionManager {
         let auth_header = self.get_auth_header(&subscription.server_url);
 
         tokio::spawn(async move {
-            const BACKOFF_SECS: [u64; 4] = [5, 10, 20, 30];
             let mut reconnect_attempt: usize = 0;
 
             loop {
@@ -99,10 +118,9 @@ impl ConnectionManager {
 
                 let connect_result = if let Some(ref auth) = auth_header {
                     let mut request = ws_url.as_str().into_client_request().unwrap();
-                    request.headers_mut().insert(
-                        "Authorization",
-                        HeaderValue::from_str(auth).unwrap(),
-                    );
+                    request
+                        .headers_mut()
+                        .insert("Authorization", HeaderValue::from_str(auth).unwrap());
                     log::info!("Using auth header for WebSocket connection");
                     connect_async(request).await
                 } else {
@@ -157,20 +175,24 @@ impl ConnectionManager {
                 }
 
                 // Exponential backoff with jitter
-                let delay = BACKOFF_SECS[reconnect_attempt.min(BACKOFF_SECS.len() - 1)];
-                // Add jitter (0-2 seconds) to prevent thundering herd
-                let jitter = rand::random::<u64>() % 3;
+                let delay = RETRY_BACKOFF_SECS[reconnect_attempt.min(RETRY_BACKOFF_SECS.len() - 1)];
+                let jitter = rand::random::<u64>() % JITTER_MAX_SECS;
                 let total_delay = delay + jitter;
 
-                log::info!("Reconnecting in {} seconds (attempt {})...", total_delay, reconnect_attempt + 1);
+                log::info!(
+                    "Reconnecting in {} seconds (attempt {})...",
+                    total_delay,
+                    reconnect_attempt + 1
+                );
                 tokio::time::sleep(std::time::Duration::from_secs(total_delay)).await;
-                reconnect_attempt = (reconnect_attempt + 1).min(BACKOFF_SECS.len() - 1);
+                reconnect_attempt = (reconnect_attempt + 1).min(RETRY_BACKOFF_SECS.len() - 1);
             }
         });
 
         Ok(())
     }
 
+    /// Closes the WebSocket connection for a subscription.
     pub async fn disconnect(&self, subscription_id: &str) {
         let mut conns = self.connections.write().await;
         if let Some(tx) = conns.remove(subscription_id) {
@@ -178,18 +200,19 @@ impl ConnectionManager {
         }
     }
 
+    /// Closes all WebSocket connections for subscriptions on a given server.
     pub async fn disconnect_server(&self, server_url: &str) {
         let db: tauri::State<Database> = self.app_handle.state();
-        let normalized_url = server_url.trim_end_matches('/');
         if let Ok(subs) = db.get_all_subscriptions() {
             for sub in subs {
-                if sub.server_url.trim_end_matches('/') == normalized_url {
+                if sub.server_url_matches(server_url) {
                     self.disconnect(&sub.id).await;
                 }
             }
         }
     }
 
+    /// Establishes WebSocket connections for all subscriptions.
     pub async fn connect_all(&self) {
         let db: tauri::State<Database> = self.app_handle.state();
         if let Ok(subscriptions) = db.get_all_subscriptions() {
@@ -201,6 +224,7 @@ impl ConnectionManager {
         }
     }
 
+    /// Converts HTTP(S) URL to WebSocket URL for the subscription's topic.
     fn build_ws_url(subscription: &Subscription) -> Result<String, AppError> {
         let base_url = &subscription.server_url;
         let topic = &subscription.topic;
@@ -225,53 +249,21 @@ impl ConnectionManager {
         let db: tauri::State<Database> = app_handle.state();
 
         // Check if notification already exists by ntfy_id to prevent duplicates
-        if db.notification_exists_by_ntfy_id(&ntfy_msg.id).unwrap_or(false) {
-            log::debug!("Notification {} already exists, skipping", ntfy_msg.id);
+        if db
+            .notification_exists_by_ntfy_id(ntfy_msg.ntfy_id())
+            .unwrap_or(false)
+        {
+            log::debug!(
+                "Notification {} already exists, skipping",
+                ntfy_msg.ntfy_id()
+            );
             return;
         }
 
-        // Convert ntfy actions to our NotificationAction format
-        let actions: Vec<NotificationAction> = ntfy_msg
-            .actions
-            .unwrap_or_default()
-            .into_iter()
-            .map(|a| NotificationAction {
-                id: a.id,
-                label: a.label,
-                url: a.url,
-                method: a.method,
-                clear: a.clear.unwrap_or(false),
-            })
-            .collect();
+        let ntfy_id = ntfy_msg.ntfy_id().to_string();
+        let notification = ntfy_msg.into_notification(subscription_id.to_string());
 
-        // Convert ntfy attachment to our Attachment format (ntfy sends single attachment)
-        let attachments: Vec<Attachment> = ntfy_msg
-            .attachment
-            .map(|a| {
-                vec![Attachment {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    name: a.name,
-                    attachment_type: a.mime_type.unwrap_or_else(|| "application/octet-stream".to_string()),
-                    url: a.url,
-                    size: a.size,
-                }]
-            })
-            .unwrap_or_default();
-
-        let notification = Notification {
-            id: uuid::Uuid::new_v4().to_string(),
-            topic_id: subscription_id.to_string(),
-            title: ntfy_msg.title.clone().unwrap_or_default(),
-            message: ntfy_msg.message.clone().unwrap_or_default(),
-            priority: Priority::from(ntfy_msg.priority.unwrap_or(3)),
-            tags: ntfy_msg.tags.unwrap_or_default(),
-            timestamp: ntfy_msg.time * 1000,
-            actions,
-            attachments,
-            read: false,
-        };
-
-        if let Err(e) = db.insert_notification_with_ntfy_id(&notification, &ntfy_msg.id) {
+        if let Err(e) = db.insert_notification_with_ntfy_id(&notification, &ntfy_id) {
             log::error!("Failed to save notification: {}", e);
         }
 

@@ -1,3 +1,8 @@
+//! Database layer for persistent storage.
+//!
+//! Provides SQLite-based storage for subscriptions, notifications, and settings.
+//! Uses Mutex-protected connection for thread-safe access from Tauri commands.
+
 mod schema;
 
 use rusqlite::Connection;
@@ -6,16 +11,24 @@ use std::sync::Mutex;
 
 use crate::error::AppError;
 use crate::models::{
-    Attachment, CreateSubscription, NotificationAction, Notification, Priority,
-    ServerConfig, Subscription, AppSettings,
+    AppSettings, Attachment, CreateSubscription, Notification, NotificationAction, Priority,
+    ServerConfig, Subscription,
 };
 use crate::services::credential_manager;
 
+/// SQLite database wrapper with thread-safe access.
+///
+/// Manages all persistent data including subscriptions, notifications, and settings.
+/// Server credentials are stored securely in the OS keychain rather than in SQLite.
 pub struct Database {
     conn: Mutex<Connection>,
 }
 
 impl Database {
+    /// Creates a new database connection and initializes the schema.
+    ///
+    /// If the database file doesn't exist, it will be created.
+    /// Runs schema initialization and any pending migrations.
     pub fn new(path: &Path) -> Result<Self, AppError> {
         let conn = Connection::open(path)?;
         let db = Self {
@@ -30,12 +43,43 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         conn.execute_batch(schema::SCHEMA)?;
 
+        // Check and store schema version
+        let stored_version: Option<i32> = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'schema_version'",
+                [],
+                |row| {
+                    let val: String = row.get(0)?;
+                    Ok(val.parse().ok())
+                },
+            )
+            .unwrap_or(None);
+
+        match stored_version {
+            Some(version) if version != schema::SCHEMA_VERSION => {
+                log::warn!(
+                    "Database schema version mismatch: stored={}, expected={}. \
+                     Consider deleting the database file to recreate with the new schema.",
+                    version,
+                    schema::SCHEMA_VERSION
+                );
+            }
+            None => {
+                // First run - store the schema version
+                conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES ('schema_version', ?1)",
+                    [&schema::SCHEMA_VERSION.to_string()],
+                )?;
+                log::info!(
+                    "Initialized database with schema version {}",
+                    schema::SCHEMA_VERSION
+                );
+            }
+            _ => {}
+        }
+
         // Insert default server if no servers exist
-        let count: i32 = conn.query_row(
-            "SELECT COUNT(*) FROM servers",
-            [],
-            |row| row.get(0),
-        )?;
+        let count: i32 = conn.query_row("SELECT COUNT(*) FROM servers", [], |row| row.get(0))?;
 
         if count == 0 {
             conn.execute(
@@ -47,29 +91,26 @@ impl Database {
         Ok(())
     }
 
+    /// Applies pending database migrations.
+    /// Migrations are tracked in the migrations table to ensure each runs only once.
     fn run_migrations(&self) -> Result<(), AppError> {
+        if schema::MIGRATIONS.is_empty() {
+            return Ok(());
+        }
+
         let conn = self.conn.lock().unwrap();
 
-        // Create migrations table if not exists
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS migrations (id INTEGER PRIMARY KEY, applied_at INTEGER)",
-            [],
-        )?;
-
-        // Get last applied migration
         let last_migration: i32 = conn
-            .query_row("SELECT COALESCE(MAX(id), 0) FROM migrations", [], |row| row.get(0))
+            .query_row("SELECT COALESCE(MAX(id), 0) FROM migrations", [], |row| {
+                row.get(0)
+            })
             .unwrap_or(0);
 
-        // Apply new migrations
         for (i, migration) in schema::MIGRATIONS.iter().enumerate() {
             let migration_id = (i + 1) as i32;
             if migration_id > last_migration {
-                log::info!("Applying migration {}: {}", migration_id, migration);
-                // Ignore errors for ALTER TABLE (column might already exist)
-                if let Err(e) = conn.execute(migration, []) {
-                    log::warn!("Migration {} warning (may be ok): {}", migration_id, e);
-                }
+                log::info!("Applying migration {}", migration_id);
+                conn.execute(migration, [])?;
                 conn.execute(
                     "INSERT INTO migrations (id, applied_at) VALUES (?1, ?2)",
                     rusqlite::params![migration_id, chrono::Utc::now().timestamp()],
@@ -82,6 +123,7 @@ impl Database {
 
     // ===== Subscriptions =====
 
+    /// Returns all subscriptions ordered by most recent notification.
     pub fn get_all_subscriptions(&self) -> Result<Vec<Subscription>, AppError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
@@ -93,23 +135,27 @@ impl Database {
              ORDER BY last_notif DESC NULLS LAST"
         )?;
 
-        let subscriptions = stmt.query_map([], |row| {
-            Ok(Subscription {
-                id: row.get(0)?,
-                topic: row.get(1)?,
-                server_url: row.get(2)?,
-                display_name: row.get(3)?,
-                muted: row.get::<_, i32>(4)? == 1,
-                last_notification: row.get(6)?,
-                unread_count: row.get(7)?,
-            })
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
+        let subscriptions = stmt
+            .query_map([], |row| {
+                Ok(Subscription {
+                    id: row.get(0)?,
+                    topic: row.get(1)?,
+                    server_url: row.get(2)?,
+                    display_name: row.get(3)?,
+                    muted: row.get::<_, i32>(4)? == 1,
+                    last_notification: row.get(6)?,
+                    unread_count: row.get(7)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(subscriptions)
     }
 
-    pub fn get_subscription_with_last_sync(&self, id: &str) -> Result<Option<(Subscription, Option<i64>)>, AppError> {
+    pub fn get_subscription_with_last_sync(
+        &self,
+        id: &str,
+    ) -> Result<Option<(Subscription, Option<i64>)>, AppError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT s.id, s.topic, srv.url, s.display_name, s.muted, s.last_sync,
@@ -174,7 +220,12 @@ impl Database {
         conn.execute(
             "INSERT INTO subscriptions (id, server_id, topic, display_name, muted)
              VALUES (?1, ?2, ?3, ?4, 0)",
-            [&id, &server_id, &sub.topic, &sub.display_name.clone().unwrap_or_default()],
+            [
+                &id,
+                &server_id,
+                &sub.topic,
+                &sub.display_name.clone().unwrap_or_default(),
+            ],
         )?;
 
         Ok(Subscription {
@@ -213,7 +264,10 @@ impl Database {
 
     // ===== Notifications =====
 
-    pub fn get_notifications_by_subscription(&self, subscription_id: &str) -> Result<Vec<Notification>, AppError> {
+    pub fn get_notifications_by_subscription(
+        &self,
+        subscription_id: &str,
+    ) -> Result<Vec<Notification>, AppError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, subscription_id, title, message, priority, tags, timestamp, read, actions, attachments
@@ -222,30 +276,35 @@ impl Database {
              ORDER BY timestamp DESC"
         )?;
 
-        let notifications = stmt.query_map([subscription_id], |row| {
-            let tags_json: String = row.get::<_, String>(5).unwrap_or_default();
-            let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+        let notifications = stmt
+            .query_map([subscription_id], |row| {
+                let tags_json: String = row.get::<_, String>(5).unwrap_or_default();
+                let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
 
-            let actions_json: String = row.get::<_, String>(8).unwrap_or_else(|_| "[]".to_string());
-            let actions: Vec<NotificationAction> = serde_json::from_str(&actions_json).unwrap_or_default();
+                let actions_json: String =
+                    row.get::<_, String>(8).unwrap_or_else(|_| "[]".to_string());
+                let actions: Vec<NotificationAction> =
+                    serde_json::from_str(&actions_json).unwrap_or_default();
 
-            let attachments_json: String = row.get::<_, String>(9).unwrap_or_else(|_| "[]".to_string());
-            let attachments: Vec<Attachment> = serde_json::from_str(&attachments_json).unwrap_or_default();
+                let attachments_json: String =
+                    row.get::<_, String>(9).unwrap_or_else(|_| "[]".to_string());
+                let attachments: Vec<Attachment> =
+                    serde_json::from_str(&attachments_json).unwrap_or_default();
 
-            Ok(Notification {
-                id: row.get(0)?,
-                topic_id: row.get(1)?,
-                title: row.get::<_, String>(2).unwrap_or_default(),
-                message: row.get(3)?,
-                priority: Priority::from(row.get::<_, i8>(4)?),
-                tags,
-                timestamp: row.get(6)?,
-                actions,
-                attachments,
-                read: row.get::<_, i32>(7)? == 1,
-            })
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
+                Ok(Notification {
+                    id: row.get(0)?,
+                    topic_id: row.get(1)?,
+                    title: row.get::<_, String>(2).unwrap_or_default(),
+                    message: row.get(3)?,
+                    priority: Priority::from(row.get::<_, i8>(4)?),
+                    tags,
+                    timestamp: row.get(6)?,
+                    actions,
+                    attachments,
+                    read: row.get::<_, i32>(7)? == 1,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(notifications)
     }
@@ -287,7 +346,11 @@ impl Database {
         Ok(())
     }
 
-    pub fn insert_notification_with_ntfy_id(&self, notification: &Notification, ntfy_id: &str) -> Result<(), AppError> {
+    pub fn insert_notification_with_ntfy_id(
+        &self,
+        notification: &Notification,
+        ntfy_id: &str,
+    ) -> Result<(), AppError> {
         let conn = self.conn.lock().unwrap();
         let tags_json = serde_json::to_string(&notification.tags)?;
         let actions_json = serde_json::to_string(&notification.actions)?;
@@ -367,29 +430,34 @@ impl Database {
 
             // Get theme
             let theme: String = conn
-                .query_row("SELECT value FROM settings WHERE key = 'theme'", [], |row| row.get(0))
+                .query_row(
+                    "SELECT value FROM settings WHERE key = 'theme'",
+                    [],
+                    |row| row.get(0),
+                )
                 .unwrap_or_else(|_| "system".to_string());
 
             // Get servers (password may be in DB for legacy data, or in OS keychain for new data)
-            let mut stmt = conn.prepare("SELECT url, username, password, is_default FROM servers")?;
-            let servers_from_db: Vec<(String, Option<String>, Option<String>, bool)> = stmt.query_map([], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, Option<String>>(1)?,
-                    row.get::<_, Option<String>>(2)?,
-                    row.get::<_, i32>(3)? == 1,
-                ))
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
+            let mut stmt =
+                conn.prepare("SELECT url, username, password, is_default FROM servers")?;
+            let servers_from_db: Vec<(String, Option<String>, Option<String>, bool)> = stmt
+                .query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, i32>(3)? == 1,
+                    ))
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
 
             (theme, servers_from_db)
-        }; // conn is dropped here
+        };
 
-        // Try to get passwords from OS keychain first, fall back to DB (for migration)
+        // Try to get passwords from OS keychain first
         let servers: Vec<ServerConfig> = servers_from_db
             .into_iter()
             .map(|(url, username, db_password, is_default)| {
-                // Try keyring first (only if we have a username), then fall back to DB password
                 let password = username
                     .as_ref()
                     .and_then(|u| credential_manager::get_password(u, &url).ok().flatten())
@@ -408,23 +476,33 @@ impl Database {
 
         // Get default server
         let default_server: String = conn
-            .query_row("SELECT url FROM servers WHERE is_default = 1", [], |row| row.get(0))
+            .query_row("SELECT url FROM servers WHERE is_default = 1", [], |row| {
+                row.get(0)
+            })
             .unwrap_or_else(|_| "https://ntfy.sh".to_string());
 
         // Get minimize_to_tray setting
         let minimize_to_tray: bool = conn
-            .query_row("SELECT value FROM settings WHERE key = 'minimize_to_tray'", [], |row| {
-                let val: String = row.get(0)?;
-                Ok(val == "true")
-            })
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'minimize_to_tray'",
+                [],
+                |row| {
+                    let val: String = row.get(0)?;
+                    Ok(val == "true")
+                },
+            )
             .unwrap_or(true); // Default to true
 
         // Get start_minimized setting
         let start_minimized: bool = conn
-            .query_row("SELECT value FROM settings WHERE key = 'start_minimized'", [], |row| {
-                let val: String = row.get(0)?;
-                Ok(val == "true")
-            })
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'start_minimized'",
+                [],
+                |row| {
+                    let val: String = row.get(0)?;
+                    Ok(val == "true")
+                },
+            )
             .unwrap_or(false); // Default to false
 
         Ok(AppSettings {

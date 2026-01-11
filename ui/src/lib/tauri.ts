@@ -1,15 +1,24 @@
+/**
+ * @module lib/tauri
+ *
+ * Tauri backend API bindings.
+ *
+ * Provides typed wrappers around Tauri's invoke function for calling
+ * backend commands. Falls back gracefully when not running in Tauri.
+ */
+
 import { invoke, isTauri as isTauriCore } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
-	enable as autostartEnable,
 	disable as autostartDisable,
+	enable as autostartEnable,
 	isEnabled as autostartIsEnabled,
 } from "@tauri-apps/plugin-autostart";
 import type {
-	Notification,
-	Subscription,
 	AppSettings,
+	Notification,
 	ServerConfig,
+	Subscription,
 } from "@/types/ntfy";
 
 // ===== Subscriptions API =====
@@ -57,11 +66,14 @@ export const settingsApi = {
 
 	removeServer: (url: string) => invoke<void>("remove_server", { url }),
 
-	setDefaultServer: (url: string) => invoke<void>("set_default_server", { url }),
+	setDefaultServer: (url: string) =>
+		invoke<void>("set_default_server", { url }),
 
-	setMinimizeToTray: (enabled: boolean) => invoke<void>("set_minimize_to_tray", { enabled }),
+	setMinimizeToTray: (enabled: boolean) =>
+		invoke<void>("set_minimize_to_tray", { enabled }),
 
-	setStartMinimized: (enabled: boolean) => invoke<void>("set_start_minimized", { enabled }),
+	setStartMinimized: (enabled: boolean) =>
+		invoke<void>("set_start_minimized", { enabled }),
 };
 
 // ===== Sync API =====
@@ -88,9 +100,7 @@ export const events = {
 	onNavigateSubscription: (
 		callback: (subscriptionId: string) => void,
 	): Promise<UnlistenFn> =>
-		listen<string>("navigate:subscription", (event) =>
-			callback(event.payload),
-		),
+		listen<string>("navigate:subscription", (event) => callback(event.payload)),
 };
 
 // ===== Autostart API =====

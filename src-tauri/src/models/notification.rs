@@ -1,8 +1,13 @@
+//! Notification data structures and ntfy message conversion.
+//!
+//! Defines the internal notification format and provides conversion
+//! from ntfy's wire format to the application's internal representation.
+
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use specta::Type;
 
-/// Notification priority levels (1-5)
+/// Notification priority levels matching ntfy's 1-5 scale.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, Type)]
 #[repr(u8)]
 pub enum Priority {
@@ -31,6 +36,7 @@ impl From<i8> for Priority {
     }
 }
 
+/// A notification stored in the local database.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Notification {
@@ -40,12 +46,14 @@ pub struct Notification {
     pub message: String,
     pub priority: Priority,
     pub tags: Vec<String>,
+    /// Unix timestamp in milliseconds.
     pub timestamp: i64,
     pub actions: Vec<NotificationAction>,
     pub attachments: Vec<Attachment>,
     pub read: bool,
 }
 
+/// An action button attached to a notification.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotificationAction {
@@ -56,6 +64,7 @@ pub struct NotificationAction {
     pub clear: bool,
 }
 
+/// A file attachment on a notification.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Attachment {
@@ -68,7 +77,10 @@ pub struct Attachment {
     pub size: Option<i64>,
 }
 
-/// Message from ntfy WebSocket
+/// Raw message from ntfy WebSocket or HTTP API.
+///
+/// This is the wire format used by ntfy servers. Use `into_notification()`
+/// to convert to the internal `Notification` format.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 pub struct NtfyMessage {
@@ -103,4 +115,70 @@ pub struct NtfyAttachment {
     pub mime_type: Option<String>,
     pub url: String,
     pub size: Option<i64>,
+}
+
+// ===== Conversions from ntfy format to internal format =====
+
+impl From<NtfyAction> for NotificationAction {
+    fn from(action: NtfyAction) -> Self {
+        Self {
+            id: action.id,
+            label: action.label,
+            url: action.url,
+            method: action.method,
+            clear: action.clear.unwrap_or(false),
+        }
+    }
+}
+
+impl From<NtfyAttachment> for Attachment {
+    fn from(attachment: NtfyAttachment) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: attachment.name,
+            attachment_type: attachment
+                .mime_type
+                .unwrap_or_else(|| "application/octet-stream".to_string()),
+            url: attachment.url,
+            size: attachment.size,
+        }
+    }
+}
+
+impl NtfyMessage {
+    /// Converts ntfy message to internal Notification format.
+    ///
+    /// # Arguments
+    /// * `topic_id` - The subscription ID this notification belongs to
+    pub fn into_notification(self, topic_id: String) -> Notification {
+        let actions = self
+            .actions
+            .unwrap_or_default()
+            .into_iter()
+            .map(NotificationAction::from)
+            .collect();
+
+        let attachments = self
+            .attachment
+            .map(|a| vec![Attachment::from(a)])
+            .unwrap_or_default();
+
+        Notification {
+            id: uuid::Uuid::new_v4().to_string(),
+            topic_id,
+            title: self.title.unwrap_or_default(),
+            message: self.message.unwrap_or_default(),
+            priority: Priority::from(self.priority.unwrap_or(3)),
+            tags: self.tags.unwrap_or_default(),
+            timestamp: self.time * 1000, // Convert to milliseconds
+            actions,
+            attachments,
+            read: false,
+        }
+    }
+
+    /// Returns the ntfy message ID (used for deduplication).
+    pub fn ntfy_id(&self) -> &str {
+        &self.id
+    }
 }

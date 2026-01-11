@@ -1,10 +1,15 @@
+//! System tray icon management.
+//!
+//! Handles dynamic tray icon updates to show unread notification status.
+//! Loads custom icons from the application's icons directory.
+
 use std::sync::Arc;
 use tauri::{image::Image, tray::TrayIcon, AppHandle, Manager};
 use tokio::sync::RwLock;
 
 use crate::db::Database;
 
-/// Consolidated tray state to reduce lock contention
+/// Internal state for tray icon management.
 struct TrayState {
     tray_icon: Option<TrayIcon>,
     icon_normal: Option<Image<'static>>,
@@ -23,6 +28,10 @@ impl Default for TrayState {
     }
 }
 
+/// Manages system tray icon state and appearance.
+///
+/// Supports two icon states: normal and unread (notification badge).
+/// Icon updates are debounced to prevent flickering.
 #[derive(Clone)]
 pub struct TrayManager {
     state: Arc<RwLock<TrayState>>,
@@ -102,7 +111,10 @@ impl TrayManager {
         Err("Icons directory not found".to_string())
     }
 
-    fn load_icon_from_dir(icons_dir: &std::path::Path, filename: &str) -> Result<Image<'static>, String> {
+    fn load_icon_from_dir(
+        icons_dir: &std::path::Path,
+        filename: &str,
+    ) -> Result<Image<'static>, String> {
         let icon_path = icons_dir.join(filename);
 
         let img = image::open(&icon_path)

@@ -165,17 +165,70 @@ async syncSubscriptions(serverUrl: string) : Promise<Result<Subscription[], AppE
 /** user-defined types **/
 
 export type AppError = { Database: string } | { WebSocket: string } | { Serialization: string } | { NotFound: string } | { InvalidUrl: string } | { Connection: string } | { Credential: string }
-export type AppSettings = { theme: string; servers: ServerConfig[]; defaultServer: string; minimizeToTray?: boolean; startMinimized?: boolean }
+/**
+ * Application-wide settings.
+ */
+export type AppSettings = { 
+/**
+ * Theme ID or "system" for automatic.
+ */
+theme: string; 
+/**
+ * Configured ntfy servers.
+ */
+servers: ServerConfig[]; 
+/**
+ * URL of the default server for new subscriptions.
+ */
+defaultServer: string; 
+/**
+ * Minimize to tray instead of closing.
+ */
+minimizeToTray?: boolean; 
+/**
+ * Start application minimized to tray.
+ */
+startMinimized?: boolean }
+/**
+ * A file attachment on a notification.
+ */
 export type Attachment = { id: string; name: string; type: string; url: string; size: number | null }
+/**
+ * Data required to create a new subscription.
+ */
 export type CreateSubscription = { topic: string; serverUrl: string; displayName: string | null }
-export type Notification = { id: string; topicId: string; title: string; message: string; priority: Priority; tags: string[]; timestamp: number; actions: NotificationAction[]; attachments: Attachment[]; read: boolean }
+/**
+ * A notification stored in the local database.
+ */
+export type Notification = { id: string; topicId: string; title: string; message: string; priority: Priority; tags: string[]; 
+/**
+ * Unix timestamp in milliseconds.
+ */
+timestamp: number; actions: NotificationAction[]; attachments: Attachment[]; read: boolean }
+/**
+ * An action button attached to a notification.
+ */
 export type NotificationAction = { id: string; label: string; url: string | null; method: string | null; clear: boolean }
 /**
- * Notification priority levels (1-5)
+ * Notification priority levels matching ntfy's 1-5 scale.
  */
 export type Priority = "Min" | "Low" | "Default" | "High" | "Max"
+/**
+ * Configuration for a single ntfy server.
+ */
 export type ServerConfig = { url: string; username: string | null; password: string | null; isDefault: boolean }
-export type Subscription = { id: string; topic: string; serverUrl: string; displayName: string | null; unreadCount: number; lastNotification: number | null; muted: boolean }
+/**
+ * A subscription to a topic on an ntfy server.
+ */
+export type Subscription = { id: string; topic: string; serverUrl: string; displayName: string | null; unreadCount: number; 
+/**
+ * Timestamp of the most recent notification (milliseconds).
+ */
+lastNotification: number | null; 
+/**
+ * Whether notifications from this subscription are muted.
+ */
+muted: boolean }
 
 /** tauri-specta globals **/
 

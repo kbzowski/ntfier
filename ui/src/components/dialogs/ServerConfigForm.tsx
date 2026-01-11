@@ -1,5 +1,11 @@
-import { AlertCircle, Eye, EyeOff, Loader2, Server, Trash2 } from "lucide-react";
-import { useState } from "react";
+import {
+	AlertCircle,
+	Eye,
+	EyeOff,
+	Loader2,
+	Server,
+	Trash2,
+} from "lucide-react";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -13,13 +19,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useServerForm } from "@/hooks";
 import type { ServerConfig } from "@/types/ntfy";
 
 interface ServerConfigFormProps {
 	servers: ServerConfig[];
 	onAddServer: (
 		server: Omit<ServerConfig, "isDefault">,
-	) => Promise<unknown> | void;
+	) => Promise<unknown> | undefined;
 	onRemoveServer: (url: string) => void;
 	onSetDefault: (url: string) => void;
 }
@@ -30,48 +37,30 @@ export function ServerConfigForm({
 	onRemoveServer,
 	onSetDefault,
 }: ServerConfigFormProps) {
-	const [url, setUrl] = useState("");
-	const [username, setUsername] = useState("");
-	const [password, setPassword] = useState("");
-	const [showPassword, setShowPassword] = useState(false);
-	const [isAdding, setIsAdding] = useState(false);
-	const [isLoading, setIsLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-
-	const handleAdd = async () => {
-		if (!url.trim()) return;
-
-		setIsLoading(true);
-		setError(null);
-
-		try {
-			await onAddServer({
-				url: url.trim(),
-				username: username.trim() || undefined,
-				password: password || undefined,
-			});
-
-			setUrl("");
-			setUsername("");
-			setPassword("");
-			setIsAdding(false);
-		} catch (err) {
-			console.error("Failed to add server:", err);
-			const message =
-				err instanceof Error
-					? err.message
-					: typeof err === "string"
-						? err
-						: "Failed to connect to server";
-			setError(message);
-		} finally {
-			setIsLoading(false);
-		}
-	};
+	const {
+		formData,
+		setUrl,
+		setUsername,
+		setPassword,
+		showPassword,
+		toggleShowPassword,
+		isAdding,
+		startAdding,
+		cancelAdding,
+		isLoading,
+		error,
+		clearError,
+		handleSubmit,
+		canSubmit,
+	} = useServerForm({
+		onSubmit: async (server) => {
+			await onAddServer(server);
+		},
+	});
 
 	return (
 		<>
-			<AlertDialog open={!!error} onOpenChange={() => setError(null)}>
+			<AlertDialog open={!!error} onOpenChange={clearError}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle className="flex items-center gap-2">
@@ -146,7 +135,7 @@ export function ServerConfigForm({
 							<Input
 								id="server-url"
 								placeholder="https://ntfy.sh"
-								value={url}
+								value={formData.url}
 								onChange={(e) => setUrl(e.target.value)}
 								disabled={isLoading}
 							/>
@@ -156,7 +145,7 @@ export function ServerConfigForm({
 							<Input
 								id="server-username"
 								placeholder="username"
-								value={username}
+								value={formData.username}
 								onChange={(e) => setUsername(e.target.value)}
 								disabled={isLoading}
 							/>
@@ -168,7 +157,7 @@ export function ServerConfigForm({
 									id="server-password"
 									type={showPassword ? "text" : "password"}
 									placeholder="password"
-									value={password}
+									value={formData.password}
 									onChange={(e) => setPassword(e.target.value)}
 									disabled={isLoading}
 								/>
@@ -177,7 +166,7 @@ export function ServerConfigForm({
 									variant="ghost"
 									size="icon"
 									className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-									onClick={() => setShowPassword(!showPassword)}
+									onClick={toggleShowPassword}
 									disabled={isLoading}
 								>
 									{showPassword ? (
@@ -189,10 +178,7 @@ export function ServerConfigForm({
 							</div>
 						</div>
 						<div className="flex gap-2 pt-2">
-							<Button
-								onClick={handleAdd}
-								disabled={!url.trim() || isLoading}
-							>
+							<Button onClick={handleSubmit} disabled={!canSubmit}>
 								{isLoading ? (
 									<>
 										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -204,7 +190,7 @@ export function ServerConfigForm({
 							</Button>
 							<Button
 								variant="ghost"
-								onClick={() => setIsAdding(false)}
+								onClick={cancelAdding}
 								disabled={isLoading}
 							>
 								Cancel
@@ -212,11 +198,7 @@ export function ServerConfigForm({
 						</div>
 					</div>
 				) : (
-					<Button
-						variant="outline"
-						className="w-full"
-						onClick={() => setIsAdding(true)}
-					>
+					<Button variant="outline" className="w-full" onClick={startAdding}>
 						Add Server
 					</Button>
 				)}

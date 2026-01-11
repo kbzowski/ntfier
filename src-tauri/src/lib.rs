@@ -1,269 +1,42 @@
+//! Ntfier - Desktop notification client for ntfy.
+//!
+//! This is the main entry point for the Tauri application. It handles:
+//! - Application initialization and plugin setup
+//! - Database and connection manager initialization
+//! - System tray icon and menu configuration
+//! - Startup synchronization of subscriptions and notifications
+//!
+//! # Startup Sequence
+//! 1. Initialize database and managed state
+//! 2. Set up system tray with menu
+//! 3. Configure window close behavior (minimize to tray)
+//! 4. Spawn async task for:
+//!    - Syncing subscriptions from configured servers
+//!    - Fetching missed notifications
+//!    - Establishing WebSocket connections for real-time updates
+
 mod commands;
+mod config;
 mod db;
 mod error;
 mod models;
 mod services;
 
 use db::Database;
-use models::{Attachment, CreateSubscription, Notification, NotificationAction, Priority};
-use services::{ConnectionManager, NtfyClient, TrayManager};
+use services::{ConnectionManager, SyncService, TrayManager};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
     Emitter, Manager,
 };
 
-/// Sync subscriptions from all configured servers
-async fn sync_all_servers(handle: &tauri::AppHandle) {
-    let db: tauri::State<Database> = handle.state();
-    let conn_manager: tauri::State<ConnectionManager> = handle.state();
-
-    let settings = match db.get_settings() {
-        Ok(s) => s,
-        Err(e) => {
-            log::error!("Failed to get settings on startup: {}", e);
-            return;
-        }
-    };
-
-    for server in &settings.servers {
-        let username = match &server.username {
-            Some(u) if !u.is_empty() => u,
-            _ => continue, // Skip servers without credentials
-        };
-        let password = match &server.password {
-            Some(p) => p,
-            None => continue,
-        };
-
-        log::info!("Syncing subscriptions from: {}", server.url);
-
-        let client = match NtfyClient::new() {
-            Ok(c) => c,
-            Err(e) => {
-                log::error!("Failed to create ntfy client: {}", e);
-                continue;
-            }
-        };
-
-        let account = match client.get_account(&server.url, username, password).await {
-            Ok(a) => a,
-            Err(e) => {
-                log::error!("Failed to sync from {}: {}", server.url, e);
-                continue;
-            }
-        };
-
-        log::info!(
-            "Got {} subscriptions from {}",
-            account.subscriptions.len(),
-            server.url
-        );
-
-        for ntfy_sub in account.subscriptions {
-            let ntfy_base = ntfy_sub.base_url.trim_end_matches('/');
-            let our_base = server.url.trim_end_matches('/');
-
-            if ntfy_base != our_base {
-                continue;
-            }
-
-            // Check if already exists
-            let existing = match db.get_all_subscriptions() {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-
-            let already_exists = existing.iter().any(|s| {
-                s.server_url.trim_end_matches('/') == our_base && s.topic == ntfy_sub.topic
-            });
-
-            if already_exists {
-                continue;
-            }
-
-            // Create new subscription
-            log::info!("Creating subscription on startup: {}", ntfy_sub.topic);
-            if let Ok(new_sub) = db.create_subscription(CreateSubscription {
-                topic: ntfy_sub.topic,
-                server_url: server.url.clone(),
-                display_name: ntfy_sub.display_name,
-            }) {
-                if let Err(e) = conn_manager.connect(&new_sub).await {
-                    log::error!("Failed to connect to {}: {}", new_sub.id, e);
-                }
-            }
-        }
-    }
-}
-
-/// Sync notifications for all subscriptions from their respective servers
-async fn sync_all_notifications(handle: &tauri::AppHandle) {
-    let db: tauri::State<Database> = handle.state();
-
-    let settings = match db.get_settings() {
-        Ok(s) => s,
-        Err(e) => {
-            log::error!("Failed to get settings for notification sync: {}", e);
-            return;
-        }
-    };
-
-    let subscriptions = match db.get_all_subscriptions() {
-        Ok(s) => s,
-        Err(e) => {
-            log::error!("Failed to get subscriptions for notification sync: {}", e);
-            return;
-        }
-    };
-
-    let client = match NtfyClient::new() {
-        Ok(c) => c,
-        Err(e) => {
-            log::error!("Failed to create ntfy client: {}", e);
-            return;
-        }
-    };
-
-    for sub in subscriptions {
-        // Get last_sync timestamp for this subscription
-        let last_sync = match db.get_subscription_with_last_sync(&sub.id) {
-            Ok(Some((_, last_sync))) => last_sync,
-            Ok(None) => {
-                log::warn!("Subscription {} not found", sub.id);
-                continue;
-            }
-            Err(e) => {
-                log::error!("Failed to get last_sync for {}: {}", sub.id, e);
-                continue;
-            }
-        };
-
-        // Find server credentials
-        let server = settings
-            .servers
-            .iter()
-            .find(|s| s.url.trim_end_matches('/') == sub.server_url.trim_end_matches('/'));
-
-        let (username, password) = match server {
-            Some(s) => (s.username.as_deref(), s.password.as_deref()),
-            None => (None, None),
-        };
-
-        log::info!(
-            "Syncing notifications for {}/{} (since: {:?})",
-            sub.server_url,
-            sub.topic,
-            last_sync
-        );
-
-        // Fetch messages from server
-        let messages = match client
-            .get_messages(&sub.server_url, &sub.topic, last_sync, username, password)
-            .await
-        {
-            Ok(m) => m,
-            Err(e) => {
-                log::error!(
-                    "Failed to fetch messages for {}/{}: {}",
-                    sub.server_url,
-                    sub.topic,
-                    e
-                );
-                continue;
-            }
-        };
-
-        if messages.is_empty() {
-            log::info!("No new messages for {}/{}", sub.server_url, sub.topic);
-        } else {
-            log::info!(
-                "Found {} new messages for {}/{}",
-                messages.len(),
-                sub.server_url,
-                sub.topic
-            );
-        }
-
-        let mut max_timestamp: i64 = last_sync.unwrap_or(0);
-
-        // Insert new messages
-        for msg in messages {
-            // Check if already exists by ntfy_id
-            if db.notification_exists_by_ntfy_id(&msg.id).unwrap_or(false) {
-                continue;
-            }
-
-            // Convert ntfy actions to our NotificationAction format
-            let actions: Vec<NotificationAction> = msg
-                .actions
-                .unwrap_or_default()
-                .into_iter()
-                .map(|a| NotificationAction {
-                    id: a.id,
-                    label: a.label,
-                    url: a.url,
-                    method: a.method,
-                    clear: a.clear.unwrap_or(false),
-                })
-                .collect();
-
-            // Convert ntfy attachment to our Attachment format
-            let attachments: Vec<Attachment> = msg
-                .attachment
-                .map(|a| {
-                    vec![Attachment {
-                        id: uuid::Uuid::new_v4().to_string(),
-                        name: a.name,
-                        attachment_type: a.mime_type.unwrap_or_else(|| "application/octet-stream".to_string()),
-                        url: a.url,
-                        size: a.size,
-                    }]
-                })
-                .unwrap_or_default();
-
-            let notification = Notification {
-                id: uuid::Uuid::new_v4().to_string(),
-                topic_id: sub.id.clone(),
-                title: msg.title.unwrap_or_default(),
-                message: msg.message.unwrap_or_default(),
-                priority: Priority::from(msg.priority.unwrap_or(3)),
-                tags: msg.tags.unwrap_or_default(),
-                timestamp: msg.time * 1000, // Convert to milliseconds
-                actions,
-                attachments,
-                read: false,
-            };
-
-            if let Err(e) = db.insert_notification_with_ntfy_id(&notification, &msg.id) {
-                log::error!("Failed to insert notification: {}", e);
-            } else {
-                log::info!("Inserted notification: {} - {}", notification.title, notification.message);
-            }
-
-            // Track max timestamp
-            if msg.time > max_timestamp {
-                max_timestamp = msg.time;
-            }
-        }
-
-        // Update last_sync to current time (or max message time + 1 to avoid duplicates)
-        let new_sync_time = std::cmp::max(max_timestamp + 1, chrono::Utc::now().timestamp());
-        if let Err(e) = db.update_subscription_last_sync(&sub.id, new_sync_time) {
-            log::error!("Failed to update last_sync for {}: {}", sub.id, e);
-        }
-    }
-
-    log::info!("Notification sync completed");
-}
-
 /// Generate TypeScript bindings for all commands and types
 #[cfg(debug_assertions)]
 pub fn export_bindings() {
     use specta_typescript::{BigIntExportBehavior, Typescript};
 
-    let builder = tauri_specta::Builder::<tauri::Wry>::new()
-        .commands(tauri_specta::collect_commands![
+    let builder =
+        tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
             commands::get_subscriptions,
             commands::add_subscription,
             commands::remove_subscription,
@@ -285,8 +58,7 @@ pub fn export_bindings() {
         ]);
 
     // Configure TypeScript export to handle i64 as number (safe for timestamps up to year 285,616)
-    let ts_config = Typescript::default()
-        .bigint(BigIntExportBehavior::Number);
+    let ts_config = Typescript::default().bigint(BigIntExportBehavior::Number);
 
     builder
         .export(ts_config, "../ui/src/types/bindings.ts")
@@ -295,6 +67,10 @@ pub fn export_bindings() {
     println!("TypeScript bindings exported to ../ui/src/types/bindings.ts");
 }
 
+/// Main application entry point.
+///
+/// Initializes the Tauri application with all required plugins and state,
+/// then starts the event loop.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Export TypeScript bindings in debug mode
@@ -368,7 +144,10 @@ pub fn run() {
                         // Find first subscription with unread notifications
                         let db = app_handle.state::<Database>();
                         if let Ok(subscriptions) = db.get_all_subscriptions() {
-                            if let Some(sub) = subscriptions.iter().find(|s| !s.muted && s.unread_count > 0) {
+                            if let Some(sub) = subscriptions
+                                .iter()
+                                .find(|s| !s.muted && s.unread_count > 0)
+                            {
                                 let _ = app_handle.emit("navigate:subscription", &sub.id);
                             }
                         }
@@ -436,14 +215,14 @@ pub fn run() {
                 }
 
                 // 1. First sync subscriptions from all servers (creates new subscriptions)
-                sync_all_servers(&handle).await;
+                SyncService::sync_subscriptions(&handle).await;
 
                 // Notify frontend that subscriptions are synced
                 log::info!("Emitting subscriptions:synced event");
                 let _ = handle.emit("subscriptions:synced", ());
 
                 // 2. Then sync notifications for all subscriptions (fetches missed messages)
-                sync_all_notifications(&handle).await;
+                SyncService::sync_notifications(&handle).await;
 
                 // 3. Finally connect WebSocket for all subscriptions (real-time updates)
                 let conn_manager: tauri::State<ConnectionManager> = handle.state();

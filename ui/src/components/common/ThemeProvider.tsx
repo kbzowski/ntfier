@@ -32,6 +32,18 @@ function getInitialState() {
 	return loadThemePreferences();
 }
 
+// Determine the effective theme based on system mode
+function resolveTheme(
+	systemMode: boolean,
+	selectedThemeId: string,
+): ThemeDefinition {
+	if (systemMode) {
+		const systemPref = getSystemPreference();
+		return getThemeById(systemPref) ?? themes[1]; // fallback to dark
+	}
+	return getThemeById(selectedThemeId) ?? themes[1]; // fallback to dark
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
 	const [themeId, setThemeIdState] = useState<string>(
 		() => getInitialState().themeId,
@@ -40,21 +52,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 		() => getInitialState().isSystemMode,
 	);
 
-	// Determine the effective theme based on system mode
-	const getEffectiveTheme = (): ThemeDefinition => {
-		if (isSystemMode) {
-			const systemPref = getSystemPreference();
-			return getThemeById(systemPref) ?? themes[1]; // fallback to dark
-		}
-		return getThemeById(themeId) ?? themes[1]; // fallback to dark
-	};
-
-	const [currentTheme, setCurrentTheme] =
-		useState<ThemeDefinition>(getEffectiveTheme);
+	const [currentTheme, setCurrentTheme] = useState<ThemeDefinition>(() =>
+		resolveTheme(isSystemMode, themeId),
+	);
 
 	// Apply theme when it changes
 	useEffect(() => {
-		const theme = getEffectiveTheme();
+		const theme = resolveTheme(isSystemMode, themeId);
 		setCurrentTheme(theme);
 		applyTheme(theme);
 	}, [themeId, isSystemMode]);
@@ -65,14 +69,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
 		const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 		const handler = () => {
-			const theme = getEffectiveTheme();
+			const theme = resolveTheme(true, themeId);
 			setCurrentTheme(theme);
 			applyTheme(theme);
 		};
 
 		mediaQuery.addEventListener("change", handler);
 		return () => mediaQuery.removeEventListener("change", handler);
-	}, [isSystemMode]);
+	}, [isSystemMode, themeId]);
 
 	// Persist preferences
 	useEffect(() => {

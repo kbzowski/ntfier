@@ -1,32 +1,21 @@
-import { useState, useRef, useEffect } from "react";
 import { Download, FileText, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLazyImage } from "@/hooks";
 import type { Attachment } from "@/types/ntfy";
 
-function LazyImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
-	const [isInView, setIsInView] = useState(false);
-	const imgRef = useRef<HTMLDivElement>(null);
-
-	useEffect(() => {
-		const container = imgRef.current;
-		if (!container) return;
-
-		const observer = new IntersectionObserver(
-			([entry]) => {
-				if (entry.isIntersecting) {
-					setIsInView(true);
-					observer.disconnect();
-				}
-			},
-			{ rootMargin: "100px" },
-		);
-
-		observer.observe(container);
-		return () => observer.disconnect();
-	}, []);
+function LazyImage({
+	src,
+	alt,
+	className,
+}: {
+	src: string;
+	alt: string;
+	className?: string;
+}) {
+	const { ref, isInView } = useLazyImage();
 
 	return (
-		<div ref={imgRef}>
+		<div ref={ref as React.RefObject<HTMLDivElement>}>
 			{isInView ? (
 				<img src={src} alt={alt} className={className} />
 			) : (

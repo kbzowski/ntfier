@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::db::Database;
 use crate::error::AppError;
-use crate::models::{Attachment, Notification, NotificationAction, Priority, Subscription};
+use crate::models::{normalize_url, Subscription};
 use crate::services::{ConnectionManager, NtfyClient};
 
 /// Sync notifications for a single subscription
@@ -63,55 +63,19 @@ async fn sync_subscription_notifications(
 
     let mut max_timestamp: i64 = last_sync.unwrap_or(0);
 
-    // Insert new messages
     for msg in messages {
-        // Check if already exists by ntfy_id
-        if db.notification_exists_by_ntfy_id(&msg.id).unwrap_or(false) {
+        if db
+            .notification_exists_by_ntfy_id(msg.ntfy_id())
+            .unwrap_or(false)
+        {
             continue;
         }
 
-        // Convert ntfy actions to our NotificationAction format
-        let actions: Vec<NotificationAction> = msg
-            .actions
-            .unwrap_or_default()
-            .into_iter()
-            .map(|a| NotificationAction {
-                id: a.id,
-                label: a.label,
-                url: a.url,
-                method: a.method,
-                clear: a.clear.unwrap_or(false),
-            })
-            .collect();
+        let ntfy_id = msg.ntfy_id().to_string();
+        let msg_time = msg.time;
+        let notification = msg.into_notification(sub.id.clone());
 
-        // Convert ntfy attachment to our Attachment format (ntfy sends single attachment)
-        let attachments: Vec<Attachment> = msg
-            .attachment
-            .map(|a| {
-                vec![Attachment {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    name: a.name,
-                    attachment_type: a.mime_type.unwrap_or_else(|| "application/octet-stream".to_string()),
-                    url: a.url,
-                    size: a.size,
-                }]
-            })
-            .unwrap_or_default();
-
-        let notification = Notification {
-            id: uuid::Uuid::new_v4().to_string(),
-            topic_id: sub.id.clone(),
-            title: msg.title.unwrap_or_default(),
-            message: msg.message.unwrap_or_default(),
-            priority: Priority::from(msg.priority.unwrap_or(3)),
-            tags: msg.tags.unwrap_or_default(),
-            timestamp: msg.time * 1000, // Convert to milliseconds
-            actions,
-            attachments,
-            read: false,
-        };
-
-        if let Err(e) = db.insert_notification_with_ntfy_id(&notification, &msg.id) {
+        if let Err(e) = db.insert_notification_with_ntfy_id(&notification, &ntfy_id) {
             log::error!("Failed to insert notification: {}", e);
         } else {
             log::info!(
@@ -121,9 +85,8 @@ async fn sync_subscription_notifications(
             );
         }
 
-        // Track max timestamp
-        if msg.time > max_timestamp {
-            max_timestamp = msg.time;
+        if msg_time > max_timestamp {
+            max_timestamp = msg_time;
         }
     }
 
@@ -183,9 +146,12 @@ pub async fn sync_subscriptions(
         account.subscriptions.len()
     );
 
+    // Load existing subscriptions once (avoid N+1 query)
+    let existing = db.get_all_subscriptions()?;
+    let our_base = normalize_url(&server_url);
+
     let mut synced_subscriptions = Vec::new();
 
-    // Add each subscription from the server
     for ntfy_sub in account.subscriptions {
         log::info!(
             "Processing subscription: {} @ {}",
@@ -194,8 +160,7 @@ pub async fn sync_subscriptions(
         );
 
         // Skip if base_url doesn't match (subscription might be for a different server)
-        let ntfy_base = ntfy_sub.base_url.trim_end_matches('/');
-        let our_base = server_url.trim_end_matches('/');
+        let ntfy_base = normalize_url(&ntfy_sub.base_url);
 
         if ntfy_base != our_base {
             log::info!(
@@ -207,19 +172,12 @@ pub async fn sync_subscriptions(
         }
 
         // Check if subscription already exists
-        let existing = db.get_all_subscriptions()?;
-        let already_exists = existing.iter().any(|s| {
-            s.server_url.trim_end_matches('/') == our_base && s.topic == ntfy_sub.topic
-        });
-
-        if already_exists {
+        if let Some(existing_sub) = existing
+            .iter()
+            .find(|s| s.server_url_matches(our_base) && s.topic == ntfy_sub.topic)
+        {
             log::info!("Subscription already exists: {}", ntfy_sub.topic);
-            // Find and return the existing subscription
-            if let Some(existing_sub) = existing.into_iter().find(|s| {
-                s.server_url.trim_end_matches('/') == our_base && s.topic == ntfy_sub.topic
-            }) {
-                synced_subscriptions.push(existing_sub);
-            }
+            synced_subscriptions.push(existing_sub.clone());
             continue;
         }
 
@@ -242,7 +200,10 @@ pub async fn sync_subscriptions(
     log::info!("Synced {} subscriptions total", synced_subscriptions.len());
 
     // Now sync notifications for all synced subscriptions
-    log::info!("Syncing notifications for {} subscriptions...", synced_subscriptions.len());
+    log::info!(
+        "Syncing notifications for {} subscriptions...",
+        synced_subscriptions.len()
+    );
     for sub in &synced_subscriptions {
         sync_subscription_notifications(
             &db,

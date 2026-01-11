@@ -1,0 +1,27 @@
+# Rustfmt configuration for Ntfier
+# https://rust-lang.github.io/rustfmt/
+# Only stable options are used (compatible with stable Rust)
+
+# Use the 2021 edition style
+edition = "2021"
+
+# Maximum line width
+max_width = 100
+
+# Use spaces for indentation
+hard_tabs = false
+tab_spaces = 4
+
+# Function formatting
+fn_params_layout = "Tall"
+
+# Imports reordering
+reorder_imports = true
+reorder_modules = true
+
+# Misc
+newline_style = "Auto"
+use_small_heuristics = "Default"
+use_field_init_shorthand = true
+use_try_shorthand = true
+force_explicit_abi = true

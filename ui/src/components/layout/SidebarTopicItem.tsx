@@ -33,9 +33,10 @@ export function SidebarTopicItem({
 	onRemove,
 }: SidebarTopicItemProps) {
 	return (
-		<div
+		<button
+			type="button"
 			className={cn(
-				"group flex items-center gap-2 px-3 py-2 mx-2 rounded-md cursor-pointer transition-colors",
+				"group flex items-center gap-2 px-3 py-2 mx-2 rounded-md cursor-pointer transition-colors w-full text-left",
 				isSelected
 					? "bg-sidebar-accent text-sidebar-accent-foreground"
 					: "hover:bg-sidebar-accent/50 text-sidebar-foreground",
@@ -91,6 +92,6 @@ export function SidebarTopicItem({
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
-		</div>
+		</button>
 	);
 }

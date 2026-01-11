@@ -1,0 +1,14 @@
+# Cargo configuration for Ntfier
+# https://doc.rust-lang.org/cargo/reference/config.html
+
+[alias]
+# Linting
+lint = "clippy --all-targets --all-features"
+lint-fix = "clippy --all-targets --all-features --fix --allow-dirty --allow-staged"
+
+# Combined check (format + lint)
+ci = ["fmt --all -- --check", "clippy --all-targets --all-features"]
+
+# Build aliases
+dev = "build --features tauri/devtools"
+prod = "build --release"

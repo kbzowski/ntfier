@@ -4,7 +4,7 @@ use serde::Deserialize;
 use std::error::Error as StdError;
 
 use crate::error::AppError;
-use crate::models::NtfyMessage;
+use crate::models::{normalize_url, NtfyMessage};
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
@@ -48,7 +48,7 @@ impl NtfyClient {
         username: &str,
         password: &str,
     ) -> Result<NtfyAccount, AppError> {
-        let url = format!("{}/v1/account", server_url.trim_end_matches('/'));
+        let url = format!("{}/v1/account", normalize_url(server_url));
         log::info!("Fetching account from: {}", url);
 
         let auth_header = Self::create_auth_header(username, password);
@@ -90,10 +90,14 @@ impl NtfyClient {
 
         log::info!("ntfy account API response: {}", text);
 
-        let account: NtfyAccount = serde_json::from_str(&text)
-            .map_err(|e| AppError::Connection(format!("Failed to parse response: {} - body: {}", e, text)))?;
+        let account: NtfyAccount = serde_json::from_str(&text).map_err(|e| {
+            AppError::Connection(format!("Failed to parse response: {} - body: {}", e, text))
+        })?;
 
-        log::info!("Parsed account with {} subscriptions", account.subscriptions.len());
+        log::info!(
+            "Parsed account with {} subscriptions",
+            account.subscriptions.len()
+        );
 
         Ok(account)
     }
@@ -108,7 +112,7 @@ impl NtfyClient {
         username: Option<&str>,
         password: Option<&str>,
     ) -> Result<Vec<NtfyMessage>, AppError> {
-        let base = server_url.trim_end_matches('/');
+        let base = normalize_url(server_url);
 
         // Build URL with poll parameter to get historical messages
         // since=<timestamp> gets messages since that Unix timestamp
@@ -131,7 +135,10 @@ impl NtfyClient {
 
         let response = request.send().await.map_err(|e| {
             log::error!("Failed to fetch messages: {}", e);
-            AppError::Connection(format!("Failed to fetch messages from {}: {}", server_url, e))
+            AppError::Connection(format!(
+                "Failed to fetch messages from {}: {}",
+                server_url, e
+            ))
         })?;
 
         if !response.status().is_success() {
@@ -168,7 +175,12 @@ impl NtfyClient {
             }
         }
 
-        log::info!("Fetched {} messages from {}/{}", messages.len(), server_url, topic);
+        log::info!(
+            "Fetched {} messages from {}/{}",
+            messages.len(),
+            server_url,
+            topic
+        );
         Ok(messages)
     }
 }

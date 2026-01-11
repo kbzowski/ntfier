@@ -67,7 +67,12 @@ function App() {
 			}
 		}
 		setConfirmDialog({ open: false, topicId: null });
-	}, [confirmDialog.topicId, removeSubscription, currentTopicId, setCurrentTopicId]);
+	}, [
+		confirmDialog.topicId,
+		removeSubscription,
+		currentTopicId,
+		setCurrentTopicId,
+	]);
 
 	const handleAddSubscription = useCallback(
 		async (topic: string, serverUrl: string, displayName?: string) => {
