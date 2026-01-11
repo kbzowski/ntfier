@@ -210,6 +210,7 @@ impl Database {
     }
 
     pub fn create_subscription(&self, sub: CreateSubscription) -> Result<Subscription, AppError> {
+        sub.validate()?;
         let conn = self.lock_conn()?;
 
         // Get or create server
@@ -537,6 +538,7 @@ impl Database {
     }
 
     pub fn add_server(&self, server: ServerConfig) -> Result<(), AppError> {
+        server.validate()?;
         // Store password in OS keychain if we have both username and password
         if let (Some(ref username), Some(ref password)) = (&server.username, &server.password) {
             credential_manager::store_password(username, &server.url, password)?;
