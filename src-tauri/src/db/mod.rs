@@ -7,9 +7,15 @@ mod schema;
 
 use rusqlite::Connection;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use crate::error::AppError;
+
+impl<T> From<PoisonError<T>> for AppError {
+    fn from(err: PoisonError<T>) -> Self {
+        AppError::Database(format!("Mutex poisoned: {}", err))
+    }
+}
 use crate::models::{
     AppSettings, Attachment, CreateSubscription, Notification, NotificationAction, Priority,
     ServerConfig, Subscription,
@@ -25,6 +31,13 @@ pub struct Database {
 }
 
 impl Database {
+    /// Acquires a lock on the database connection.
+    ///
+    /// Returns an error if the mutex is poisoned (another thread panicked while holding the lock).
+    fn lock_conn(&self) -> Result<MutexGuard<'_, Connection>, AppError> {
+        Ok(self.conn.lock()?)
+    }
+
     /// Creates a new database connection and initializes the schema.
     ///
     /// If the database file doesn't exist, it will be created.
@@ -40,7 +53,7 @@ impl Database {
     }
 
     fn init(&self) -> Result<(), AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute_batch(schema::SCHEMA)?;
 
         // Check and store schema version
@@ -98,7 +111,7 @@ impl Database {
             return Ok(());
         }
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
 
         let last_migration: i32 = conn
             .query_row("SELECT COALESCE(MAX(id), 0) FROM migrations", [], |row| {
@@ -125,7 +138,7 @@ impl Database {
 
     /// Returns all subscriptions ordered by most recent notification.
     pub fn get_all_subscriptions(&self) -> Result<Vec<Subscription>, AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         let mut stmt = conn.prepare(
             "SELECT s.id, s.topic, srv.url, s.display_name, s.muted, s.last_sync,
                     (SELECT MAX(n.timestamp) FROM notifications n WHERE n.subscription_id = s.id) as last_notif,
@@ -156,7 +169,7 @@ impl Database {
         &self,
         id: &str,
     ) -> Result<Option<(Subscription, Option<i64>)>, AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         let mut stmt = conn.prepare(
             "SELECT s.id, s.topic, srv.url, s.display_name, s.muted, s.last_sync,
                     (SELECT MAX(n.timestamp) FROM notifications n WHERE n.subscription_id = s.id) as last_notif,
@@ -188,7 +201,7 @@ impl Database {
     }
 
     pub fn update_subscription_last_sync(&self, id: &str, timestamp: i64) -> Result<(), AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute(
             "UPDATE subscriptions SET last_sync = ?1 WHERE id = ?2",
             rusqlite::params![timestamp, id],
@@ -197,7 +210,7 @@ impl Database {
     }
 
     pub fn create_subscription(&self, sub: CreateSubscription) -> Result<Subscription, AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
 
         // Get or create server
         let server_id: String = match conn.query_row(
@@ -240,7 +253,7 @@ impl Database {
     }
 
     pub fn delete_subscription(&self, id: &str) -> Result<(), AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         // Delete notifications first (cascade)
         conn.execute("DELETE FROM notifications WHERE subscription_id = ?1", [id])?;
         conn.execute("DELETE FROM subscriptions WHERE id = ?1", [id])?;
@@ -248,7 +261,7 @@ impl Database {
     }
 
     pub fn toggle_subscription_mute(&self, id: &str) -> Result<Subscription, AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute(
             "UPDATE subscriptions SET muted = NOT muted WHERE id = ?1",
             [id],
@@ -268,7 +281,7 @@ impl Database {
         &self,
         subscription_id: &str,
     ) -> Result<Vec<Notification>, AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         let mut stmt = conn.prepare(
             "SELECT id, subscription_id, title, message, priority, tags, timestamp, read, actions, attachments
              FROM notifications
@@ -310,7 +323,7 @@ impl Database {
     }
 
     pub fn notification_exists_by_ntfy_id(&self, ntfy_id: &str) -> Result<bool, AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         let count: i32 = conn.query_row(
             "SELECT COUNT(*) FROM notifications WHERE ntfy_id = ?1",
             [ntfy_id],
@@ -321,7 +334,7 @@ impl Database {
 
     #[allow(dead_code)]
     pub fn insert_notification(&self, notification: &Notification) -> Result<(), AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         let tags_json = serde_json::to_string(&notification.tags)?;
         let actions_json = serde_json::to_string(&notification.actions)?;
         let attachments_json = serde_json::to_string(&notification.attachments)?;
@@ -351,7 +364,7 @@ impl Database {
         notification: &Notification,
         ntfy_id: &str,
     ) -> Result<(), AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         let tags_json = serde_json::to_string(&notification.tags)?;
         let actions_json = serde_json::to_string(&notification.actions)?;
         let attachments_json = serde_json::to_string(&notification.attachments)?;
@@ -378,13 +391,13 @@ impl Database {
     }
 
     pub fn mark_notification_read(&self, id: &str) -> Result<(), AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute("UPDATE notifications SET read = 1 WHERE id = ?1", [id])?;
         Ok(())
     }
 
     pub fn mark_all_notifications_read(&self, subscription_id: &str) -> Result<(), AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute(
             "UPDATE notifications SET read = 1 WHERE subscription_id = ?1",
             [subscription_id],
@@ -393,13 +406,13 @@ impl Database {
     }
 
     pub fn delete_notification(&self, id: &str) -> Result<(), AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute("DELETE FROM notifications WHERE id = ?1", [id])?;
         Ok(())
     }
 
     pub fn get_unread_count(&self, subscription_id: &str) -> Result<i32, AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         let count: i32 = conn.query_row(
             "SELECT COUNT(*) FROM notifications WHERE subscription_id = ?1 AND read = 0",
             [subscription_id],
@@ -410,7 +423,7 @@ impl Database {
 
     /// Get total unread count across all non-muted subscriptions
     pub fn get_total_unread_count(&self) -> Result<i32, AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         let count: i32 = conn.query_row(
             "SELECT COUNT(*) FROM notifications n
              JOIN subscriptions s ON n.subscription_id = s.id
@@ -426,7 +439,7 @@ impl Database {
     pub fn get_settings(&self) -> Result<AppSettings, AppError> {
         // First, get theme and servers data from DB
         let (theme, servers_from_db) = {
-            let conn = self.conn.lock().unwrap();
+            let conn = self.lock_conn()?;
 
             // Get theme
             let theme: String = conn
@@ -472,7 +485,7 @@ impl Database {
             .collect();
 
         // Re-acquire connection for remaining queries
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
 
         // Get default server
         let default_server: String = conn
@@ -515,7 +528,7 @@ impl Database {
     }
 
     pub fn set_setting(&self, key: &str, value: &str) -> Result<(), AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
             [key, value],
@@ -529,7 +542,7 @@ impl Database {
             credential_manager::store_password(username, &server.url, password)?;
         }
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         let id = uuid::Uuid::new_v4().to_string();
         // Don't store password in database - it's in keychain
         conn.execute(
@@ -547,7 +560,7 @@ impl Database {
 
     pub fn remove_server(&self, url: &str) -> Result<(), AppError> {
         // Get username before deleting to clean up keychain
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         let username: Option<String> = conn
             .query_row(
                 "SELECT username FROM servers WHERE url = ?1",
@@ -562,7 +575,7 @@ impl Database {
             let _ = credential_manager::delete_password(username, url);
         }
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         // First delete all subscriptions for this server
         conn.execute(
             "DELETE FROM subscriptions WHERE server_id IN (SELECT id FROM servers WHERE url = ?1)",
@@ -573,7 +586,7 @@ impl Database {
     }
 
     pub fn set_default_server(&self, url: &str) -> Result<(), AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute("UPDATE servers SET is_default = 0", [])?;
         conn.execute("UPDATE servers SET is_default = 1 WHERE url = ?1", [url])?;
         Ok(())

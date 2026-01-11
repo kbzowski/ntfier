@@ -30,8 +30,12 @@ use tauri::{
     Emitter, Manager,
 };
 
-/// Generate TypeScript bindings for all commands and types
+/// Generate TypeScript bindings for all commands and types.
+///
+/// This only runs in debug builds. If binding export fails, we want to
+/// crash immediately to alert the developer.
 #[cfg(debug_assertions)]
+#[allow(clippy::expect_used)]
 pub fn export_bindings() {
     use specta_typescript::{BigIntExportBehavior, Typescript};
 
@@ -71,7 +75,12 @@ pub fn export_bindings() {
 ///
 /// Initializes the Tauri application with all required plugins and state,
 /// then starts the event loop.
+///
+/// # Panics
+/// Panics if Tauri fails to initialize. This is the standard pattern for
+/// Tauri applications - if the app can't start, there's nothing to recover.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[allow(clippy::expect_used)]
 pub fn run() {
     // Export TypeScript bindings in debug mode
     #[cfg(debug_assertions)]
@@ -120,8 +129,13 @@ pub fn run() {
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;
 
+            let default_icon = app
+                .default_window_icon()
+                .ok_or("No default window icon configured")?
+                .clone();
+
             let tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(default_icon)
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {

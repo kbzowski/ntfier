@@ -185,8 +185,3 @@ impl NtfyClient {
     }
 }
 
-impl Default for NtfyClient {
-    fn default() -> Self {
-        Self::new().expect("Failed to create NtfyClient")
-    }
-}

@@ -51,7 +51,7 @@ impl ConnectionManager {
             .iter()
             .find(|s| s.url_matches(normalized_url));
 
-        if server.is_none() {
+        let Some(server) = server else {
             log::debug!(
                 "No server found for URL '{}' (normalized: '{}'). Available servers: {:?}",
                 server_url,
@@ -59,24 +59,18 @@ impl ConnectionManager {
                 settings.servers.iter().map(|s| &s.url).collect::<Vec<_>>()
             );
             return None;
-        }
-        let server = server.unwrap();
+        };
 
-        let username = server.username.as_ref();
-        let password = server.password.as_ref();
-
-        if username.is_none() || password.is_none() {
+        let (Some(username), Some(password)) = (server.username.as_ref(), server.password.as_ref())
+        else {
             log::debug!(
                 "Server '{}' has no credentials (username: {}, password: {})",
                 server.url,
-                username.is_some(),
-                password.is_some()
+                server.username.is_some(),
+                server.password.is_some()
             );
             return None;
-        }
-
-        let username = username.unwrap();
-        let password = password.unwrap();
+        };
 
         if username.is_empty() {
             log::debug!("Server '{}' has empty username", server.url);
@@ -117,10 +111,15 @@ impl ConnectionManager {
                 log::info!("Connecting to WebSocket: {}", ws_url);
 
                 let connect_result = if let Some(ref auth) = auth_header {
-                    let mut request = ws_url.as_str().into_client_request().unwrap();
-                    request
-                        .headers_mut()
-                        .insert("Authorization", HeaderValue::from_str(auth).unwrap());
+                    let Ok(mut request) = ws_url.as_str().into_client_request() else {
+                        log::error!("Failed to create WebSocket request for URL: {}", ws_url);
+                        continue;
+                    };
+                    let Ok(header_value) = HeaderValue::from_str(auth) else {
+                        log::error!("Failed to create Authorization header value");
+                        continue;
+                    };
+                    request.headers_mut().insert("Authorization", header_value);
                     log::info!("Using auth header for WebSocket connection");
                     connect_async(request).await
                 } else {
