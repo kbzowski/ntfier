@@ -1,5 +1,5 @@
 import { Bell } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useCallback, useState } from "react";
 import {
 	Sheet,
 	SheetContent,
@@ -34,10 +34,15 @@ export function AppLayout({
 }: AppLayoutProps) {
 	const [drawerOpen, setDrawerOpen] = useState(false);
 
-	const handleSelectTopic = (id: string) => {
-		onSelectTopic(id);
-		setDrawerOpen(false);
-	};
+	const handleSelectTopic = useCallback(
+		(id: string) => {
+			onSelectTopic(id);
+			setDrawerOpen(false);
+		},
+		[onSelectTopic],
+	);
+
+	const handleMenuClick = useCallback(() => setDrawerOpen(true), []);
 
 	const totalUnread = subscriptions
 		.filter((s) => !s.muted)
@@ -67,7 +72,7 @@ export function AppLayout({
 			<main className="flex-1 flex flex-col min-h-0">
 				<Header
 					totalUnread={totalUnread}
-					onMenuClick={() => setDrawerOpen(true)}
+					onMenuClick={handleMenuClick}
 					onSettingsClick={onOpenSettings}
 				/>
 
