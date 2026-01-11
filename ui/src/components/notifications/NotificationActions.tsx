@@ -1,5 +1,7 @@
+import { open } from "@tauri-apps/plugin-shell";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { isTauri } from "@/lib/tauri";
 import type { NotificationAction } from "@/types/ntfy";
 
 interface NotificationActionsProps {
@@ -9,9 +11,17 @@ interface NotificationActionsProps {
 export function NotificationActions({ actions }: NotificationActionsProps) {
 	if (actions.length === 0) return null;
 
-	const handleClick = (action: NotificationAction) => {
-		if (action.url) {
-			window.open(action.url, "_blank", "noopener,noreferrer");
+	const handleClick = async (action: NotificationAction) => {
+		if (!action.url) return;
+
+		try {
+			if (isTauri()) {
+				await open(action.url);
+			} else {
+				window.open(action.url, "_blank", "noopener,noreferrer");
+			}
+		} catch (err) {
+			console.error("Failed to open URL:", err);
 		}
 	};
 
