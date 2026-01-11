@@ -11,7 +11,11 @@ interface NotificationActionsProps {
 export function NotificationActions({ actions }: NotificationActionsProps) {
 	if (actions.length === 0) return null;
 
-	const handleClick = async (action: NotificationAction) => {
+	const handleClick = async (
+		e: React.MouseEvent,
+		action: NotificationAction,
+	) => {
+		e.stopPropagation();
 		if (!action.url) return;
 
 		try {
@@ -33,7 +37,7 @@ export function NotificationActions({ actions }: NotificationActionsProps) {
 					variant={action.clear ? "ghost" : "outline"}
 					size="sm"
 					className="h-8 text-xs gap-1.5 transition-all duration-150 hover:bg-accent hover:shadow-sm active:scale-95"
-					onClick={() => handleClick(action)}
+					onClick={(e) => handleClick(e, action)}
 				>
 					{action.url && <ExternalLink className="h-3 w-3" />}
 					{action.label}
