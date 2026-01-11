@@ -6,6 +6,7 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
 use futures_util::StreamExt;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, RwLock};
@@ -20,6 +21,13 @@ use crate::error::AppError;
 use crate::models::{normalize_url, Notification, NtfyMessage, Subscription};
 use crate::services::TrayManager;
 
+/// Connection entry storing both the shutdown sender and a unique connection ID.
+/// The ID is used to detect stale connections after a race condition.
+struct ConnectionEntry {
+    id: u64,
+    shutdown_tx: mpsc::Sender<()>,
+}
+
 /// Manages WebSocket connections to ntfy servers.
 ///
 /// Each subscription gets its own WebSocket connection that receives
@@ -27,7 +35,8 @@ use crate::services::TrayManager;
 /// using exponential backoff with jitter.
 pub struct ConnectionManager {
     app_handle: AppHandle,
-    connections: Arc<RwLock<HashMap<String, mpsc::Sender<()>>>>,
+    connections: Arc<RwLock<HashMap<String, ConnectionEntry>>>,
+    next_connection_id: AtomicU64,
 }
 
 impl ConnectionManager {
@@ -36,7 +45,13 @@ impl ConnectionManager {
         Self {
             app_handle,
             connections: Arc::new(RwLock::new(HashMap::new())),
+            next_connection_id: AtomicU64::new(1),
         }
+    }
+
+    /// Generates a unique connection ID.
+    fn generate_connection_id(&self) -> u64 {
+        self.next_connection_id.fetch_add(1, Ordering::Relaxed)
     }
 
     /// Builds HTTP Basic auth header for the given server URL if credentials exist.
@@ -86,21 +101,31 @@ impl ConnectionManager {
     ///
     /// If a connection already exists for this subscription, it will be closed first.
     /// The connection runs in a background task and automatically reconnects on failure.
+    /// Uses connection IDs to detect and handle race conditions where multiple
+    /// connect() calls happen in quick succession.
     pub async fn connect(&self, subscription: &Subscription) -> Result<(), AppError> {
         let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
+        let connection_id = self.generate_connection_id();
 
         {
             let mut conns = self.connections.write().await;
-            if let Some(old_tx) = conns.remove(&subscription.id) {
-                let _ = old_tx.send(()).await;
+            if let Some(old_entry) = conns.remove(&subscription.id) {
+                let _ = old_entry.shutdown_tx.send(()).await;
             }
-            conns.insert(subscription.id.clone(), shutdown_tx);
+            conns.insert(
+                subscription.id.clone(),
+                ConnectionEntry {
+                    id: connection_id,
+                    shutdown_tx,
+                },
+            );
         }
 
         let ws_url = Self::build_ws_url(subscription)?;
         let sub_id = subscription.id.clone();
         let is_muted = subscription.muted;
         let app_handle = self.app_handle.clone();
+        let connections = Arc::clone(&self.connections);
 
         let auth_header = self.get_auth_header(&subscription.server_url);
 
@@ -108,6 +133,22 @@ impl ConnectionManager {
             let mut reconnect_attempt: usize = 0;
 
             loop {
+                // Check if this connection is still the current one (race condition protection)
+                {
+                    let conns = connections.read().await;
+                    let is_current = conns
+                        .get(&sub_id)
+                        .map_or(false, |entry| entry.id == connection_id);
+                    if !is_current {
+                        log::info!(
+                            "Connection {} for {} is no longer current, stopping",
+                            connection_id,
+                            sub_id
+                        );
+                        return;
+                    }
+                }
+
                 log::info!("Connecting to WebSocket: {}", ws_url);
 
                 let connect_result = if let Some(ref auth) = auth_header {
@@ -194,8 +235,8 @@ impl ConnectionManager {
     /// Closes the WebSocket connection for a subscription.
     pub async fn disconnect(&self, subscription_id: &str) {
         let mut conns = self.connections.write().await;
-        if let Some(tx) = conns.remove(subscription_id) {
-            let _ = tx.send(()).await;
+        if let Some(entry) = conns.remove(subscription_id) {
+            let _ = entry.shutdown_tx.send(()).await;
         }
     }
 
