@@ -133,18 +133,29 @@ impl SyncService {
         };
 
         for sub in subscriptions {
-            Self::sync_subscription_notifications(&db, &client, &settings.servers, &sub).await;
+            // Find server credentials for this subscription
+            let server = settings.servers.iter().find(|s| s.url_matches(&sub.server_url));
+            let (username, password) = match server {
+                Some(s) => (s.username.as_deref(), s.password.as_deref()),
+                None => (None, None),
+            };
+
+            Self::sync_subscription_notifications(&db, &client, &sub, username, password).await;
         }
 
         log::info!("Notification sync completed");
     }
 
     /// Syncs notifications for a single subscription.
-    async fn sync_subscription_notifications(
+    ///
+    /// If `username` and `password` are provided, they are used for authentication.
+    /// Otherwise, credentials are looked up from the `servers` list.
+    pub async fn sync_subscription_notifications(
         db: &Database,
         client: &NtfyClient,
-        servers: &[crate::models::ServerConfig],
         sub: &crate::models::Subscription,
+        username: Option<&str>,
+        password: Option<&str>,
     ) {
         let last_sync = match db.get_subscription_with_last_sync(&sub.id) {
             Ok(Some((_, last_sync))) => last_sync,
@@ -156,13 +167,6 @@ impl SyncService {
                 log::error!("Failed to get last_sync for {}: {}", sub.id, e);
                 return;
             }
-        };
-
-        let server = servers.iter().find(|s| s.url_matches(&sub.server_url));
-
-        let (username, password) = match server {
-            Some(s) => (s.username.as_deref(), s.password.as_deref()),
-            None => (None, None),
         };
 
         log::info!(

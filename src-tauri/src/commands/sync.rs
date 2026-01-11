@@ -3,99 +3,7 @@ use tauri::State;
 use crate::db::Database;
 use crate::error::AppError;
 use crate::models::{normalize_url, Subscription};
-use crate::services::{ConnectionManager, NtfyClient};
-
-/// Sync notifications for a single subscription
-async fn sync_subscription_notifications(
-    db: &Database,
-    client: &NtfyClient,
-    sub: &Subscription,
-    username: Option<&str>,
-    password: Option<&str>,
-) {
-    // Get last_sync timestamp
-    let last_sync = match db.get_subscription_with_last_sync(&sub.id) {
-        Ok(Some((_, last_sync))) => last_sync,
-        Ok(None) => {
-            log::warn!("Subscription {} not found", sub.id);
-            return;
-        }
-        Err(e) => {
-            log::error!("Failed to get last_sync for {}: {}", sub.id, e);
-            return;
-        }
-    };
-
-    log::info!(
-        "Syncing notifications for {}/{} (since: {:?})",
-        sub.server_url,
-        sub.topic,
-        last_sync
-    );
-
-    // Fetch messages from server
-    let messages = match client
-        .get_messages(&sub.server_url, &sub.topic, last_sync, username, password)
-        .await
-    {
-        Ok(m) => m,
-        Err(e) => {
-            log::error!(
-                "Failed to fetch messages for {}/{}: {}",
-                sub.server_url,
-                sub.topic,
-                e
-            );
-            return;
-        }
-    };
-
-    if messages.is_empty() {
-        log::info!("No new messages for {}/{}", sub.server_url, sub.topic);
-    } else {
-        log::info!(
-            "Found {} new messages for {}/{}",
-            messages.len(),
-            sub.server_url,
-            sub.topic
-        );
-    }
-
-    let mut max_timestamp: i64 = last_sync.unwrap_or(0);
-
-    for msg in messages {
-        if db
-            .notification_exists_by_ntfy_id(msg.ntfy_id())
-            .unwrap_or(false)
-        {
-            continue;
-        }
-
-        let ntfy_id = msg.ntfy_id().to_string();
-        let msg_time = msg.time;
-        let notification = msg.into_notification(sub.id.clone());
-
-        if let Err(e) = db.insert_notification_with_ntfy_id(&notification, &ntfy_id) {
-            log::error!("Failed to insert notification: {}", e);
-        } else {
-            log::info!(
-                "Inserted notification: {} - {}",
-                notification.title,
-                notification.message
-            );
-        }
-
-        if msg_time > max_timestamp {
-            max_timestamp = msg_time;
-        }
-    }
-
-    // Update last_sync to current time (or max message time + 1 to avoid duplicates)
-    let new_sync_time = std::cmp::max(max_timestamp + 1, chrono::Utc::now().timestamp());
-    if let Err(e) = db.update_subscription_last_sync(&sub.id, new_sync_time) {
-        log::error!("Failed to update last_sync for {}: {}", sub.id, e);
-    }
-}
+use crate::services::{ConnectionManager, NtfyClient, SyncService};
 
 /// Sync subscriptions from a server that has user credentials
 #[tauri::command]
@@ -205,7 +113,7 @@ pub async fn sync_subscriptions(
         synced_subscriptions.len()
     );
     for sub in &synced_subscriptions {
-        sync_subscription_notifications(
+        SyncService::sync_subscription_notifications(
             &db,
             &client,
             sub,
