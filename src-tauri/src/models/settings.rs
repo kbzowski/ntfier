@@ -23,12 +23,14 @@ impl ServerConfig {
     pub fn validate(&self) -> Result<(), AppError> {
         // Check URL is not empty
         if self.url.trim().is_empty() {
-            return Err(AppError::InvalidUrl("Server URL cannot be empty".to_string()));
+            return Err(AppError::InvalidUrl(
+                "Server URL cannot be empty".to_string(),
+            ));
         }
 
         // Parse and validate URL
-        let parsed = Url::parse(&self.url)
-            .map_err(|e| AppError::InvalidUrl(format!("Invalid URL: {e}")))?;
+        let parsed =
+            Url::parse(&self.url).map_err(|e| AppError::InvalidUrl(format!("Invalid URL: {e}")))?;
 
         // Check scheme is http or https
         if !["http", "https"].contains(&parsed.scheme()) {

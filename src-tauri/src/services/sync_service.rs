@@ -134,7 +134,10 @@ impl SyncService {
 
         for sub in subscriptions {
             // Find server credentials for this subscription
-            let server = settings.servers.iter().find(|s| s.url_matches(&sub.server_url));
+            let server = settings
+                .servers
+                .iter()
+                .find(|s| s.url_matches(&sub.server_url));
             let (username, password) = match server {
                 Some(s) => (s.username.as_deref(), s.password.as_deref()),
                 None => (None, None),

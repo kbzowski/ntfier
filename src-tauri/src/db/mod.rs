@@ -42,11 +42,9 @@ impl Database {
     fn get_setting_string(&self, key: &str, default: &str) -> Result<String, AppError> {
         let conn = self.lock_conn()?;
         Ok(conn
-            .query_row(
-                "SELECT value FROM settings WHERE key = ?1",
-                [key],
-                |row| row.get(0),
-            )
+            .query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| {
+                row.get(0)
+            })
             .unwrap_or_else(|_| default.to_string()))
     }
 
@@ -480,8 +478,7 @@ impl Database {
     /// Gets all configured servers with credentials from keychain.
     fn get_servers_with_credentials(&self) -> Result<Vec<ServerConfig>, AppError> {
         let conn = self.lock_conn()?;
-        let mut stmt =
-            conn.prepare("SELECT url, username, password, is_default FROM servers")?;
+        let mut stmt = conn.prepare("SELECT url, username, password, is_default FROM servers")?;
         let servers_from_db: Vec<(String, Option<String>, Option<String>, bool)> = stmt
             .query_map([], |row| {
                 Ok((
