@@ -18,7 +18,6 @@ struct TrayState {
     has_unread: bool,
 }
 
-
 /// Manages system tray icon state and appearance.
 ///
 /// Supports two icon states: normal and unread (notification badge).

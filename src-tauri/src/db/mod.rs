@@ -239,7 +239,9 @@ impl Database {
             "SELECT id FROM servers WHERE url = ?1",
             [&sub.server_url],
             |row| row.get(0),
-        ) { id } else {
+        ) {
+            id
+        } else {
             let id = uuid::Uuid::new_v4().to_string();
             conn.execute(
                 "INSERT INTO servers (id, url, is_default) VALUES (?1, ?2, 0)",

@@ -71,9 +71,7 @@ pub async fn sync_subscriptions(
         let ntfy_base = normalize_url(&ntfy_sub.base_url);
 
         if ntfy_base != our_base {
-            log::info!(
-                "Skipping subscription - base_url mismatch: {ntfy_base} vs {our_base}"
-            );
+            log::info!("Skipping subscription - base_url mismatch: {ntfy_base} vs {our_base}");
             continue;
         }
 

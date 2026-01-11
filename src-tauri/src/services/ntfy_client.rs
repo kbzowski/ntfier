@@ -134,9 +134,7 @@ impl NtfyClient {
 
         let response = request.send().await.map_err(|e| {
             log::error!("Failed to fetch messages: {e}");
-            AppError::Connection(format!(
-                "Failed to fetch messages from {server_url}: {e}"
-            ))
+            AppError::Connection(format!("Failed to fetch messages from {server_url}: {e}"))
         })?;
 
         if !response.status().is_success() {

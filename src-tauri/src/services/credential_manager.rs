@@ -35,9 +35,7 @@ pub fn get_password(username: &str, server_url: &str) -> Result<Option<String>, 
             info!("No password found for {username}@{server_url}");
             Ok(None)
         }
-        Err(e) => Err(AppError::Credential(format!(
-            "Failed to get password: {e}"
-        ))),
+        Err(e) => Err(AppError::Credential(format!("Failed to get password: {e}"))),
     }
 }
 
