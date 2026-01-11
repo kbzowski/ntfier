@@ -38,6 +38,29 @@ impl Database {
         Ok(self.conn.lock()?)
     }
 
+    /// Gets a string setting from the database with a default fallback.
+    fn get_setting_string(&self, key: &str, default: &str) -> Result<String, AppError> {
+        let conn = self.lock_conn()?;
+        Ok(conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = ?1",
+                [key],
+                |row| row.get(0),
+            )
+            .unwrap_or_else(|_| default.to_string()))
+    }
+
+    /// Gets a boolean setting from the database with a default fallback.
+    fn get_setting_bool(&self, key: &str, default: bool) -> Result<bool, AppError> {
+        let conn = self.lock_conn()?;
+        Ok(conn
+            .query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| {
+                let val: String = row.get(0)?;
+                Ok(val == "true")
+            })
+            .unwrap_or(default))
+    }
+
     /// Creates a new database connection and initializes the schema.
     ///
     /// If the database file doesn't exist, it will be created.
@@ -438,38 +461,42 @@ impl Database {
     // ===== Settings =====
 
     pub fn get_settings(&self) -> Result<AppSettings, AppError> {
-        // First, get theme and servers data from DB
-        let (theme, servers_from_db) = {
-            let conn = self.lock_conn()?;
+        let theme = self.get_setting_string("theme", "system")?;
+        let minimize_to_tray = self.get_setting_bool("minimize_to_tray", true)?;
+        let start_minimized = self.get_setting_bool("start_minimized", false)?;
 
-            // Get theme
-            let theme: String = conn
-                .query_row(
-                    "SELECT value FROM settings WHERE key = 'theme'",
-                    [],
-                    |row| row.get(0),
-                )
-                .unwrap_or_else(|_| "system".to_string());
+        let servers = self.get_servers_with_credentials()?;
+        let default_server = self.get_default_server_url()?;
 
-            // Get servers (password may be in DB for legacy data, or in OS keychain for new data)
-            let mut stmt =
-                conn.prepare("SELECT url, username, password, is_default FROM servers")?;
-            let servers_from_db: Vec<(String, Option<String>, Option<String>, bool)> = stmt
-                .query_map([], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, Option<String>>(1)?,
-                        row.get::<_, Option<String>>(2)?,
-                        row.get::<_, i32>(3)? == 1,
-                    ))
-                })?
-                .collect::<Result<Vec<_>, _>>()?;
+        Ok(AppSettings {
+            theme,
+            servers,
+            default_server,
+            minimize_to_tray,
+            start_minimized,
+        })
+    }
 
-            (theme, servers_from_db)
-        };
+    /// Gets all configured servers with credentials from keychain.
+    fn get_servers_with_credentials(&self) -> Result<Vec<ServerConfig>, AppError> {
+        let conn = self.lock_conn()?;
+        let mut stmt =
+            conn.prepare("SELECT url, username, password, is_default FROM servers")?;
+        let servers_from_db: Vec<(String, Option<String>, Option<String>, bool)> = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, i32>(3)? == 1,
+                ))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(stmt);
+        drop(conn);
 
-        // Try to get passwords from OS keychain first
-        let servers: Vec<ServerConfig> = servers_from_db
+        // Try to get passwords from OS keychain first, fall back to DB
+        Ok(servers_from_db
             .into_iter()
             .map(|(url, username, db_password, is_default)| {
                 let password = username
@@ -483,49 +510,17 @@ impl Database {
                     is_default,
                 }
             })
-            .collect();
+            .collect())
+    }
 
-        // Re-acquire connection for remaining queries
+    /// Gets the URL of the default server.
+    fn get_default_server_url(&self) -> Result<String, AppError> {
         let conn = self.lock_conn()?;
-
-        // Get default server
-        let default_server: String = conn
+        Ok(conn
             .query_row("SELECT url FROM servers WHERE is_default = 1", [], |row| {
                 row.get(0)
             })
-            .unwrap_or_else(|_| "https://ntfy.sh".to_string());
-
-        // Get minimize_to_tray setting
-        let minimize_to_tray: bool = conn
-            .query_row(
-                "SELECT value FROM settings WHERE key = 'minimize_to_tray'",
-                [],
-                |row| {
-                    let val: String = row.get(0)?;
-                    Ok(val == "true")
-                },
-            )
-            .unwrap_or(true); // Default to true
-
-        // Get start_minimized setting
-        let start_minimized: bool = conn
-            .query_row(
-                "SELECT value FROM settings WHERE key = 'start_minimized'",
-                [],
-                |row| {
-                    let val: String = row.get(0)?;
-                    Ok(val == "true")
-                },
-            )
-            .unwrap_or(false); // Default to false
-
-        Ok(AppSettings {
-            theme,
-            servers,
-            default_server,
-            minimize_to_tray,
-            start_minimized,
-        })
+            .unwrap_or_else(|_| "https://ntfy.sh".to_string()))
     }
 
     pub fn set_setting(&self, key: &str, value: &str) -> Result<(), AppError> {
