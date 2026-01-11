@@ -8,20 +8,15 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use specta::Type;
 
 /// Notification priority levels matching ntfy's 1-5 scale.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr, Type)]
 #[repr(u8)]
 pub enum Priority {
     Min = 1,
     Low = 2,
+    #[default]
     Default = 3,
     High = 4,
     Max = 5,
-}
-
-impl Default for Priority {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 impl From<i8> for Priority {
