@@ -1,3 +1,4 @@
+import { Hash } from "lucide-react";
 import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PRIORITY_CONFIG } from "@/lib/constants";
@@ -11,11 +12,13 @@ import { NotificationTags } from "./NotificationTags";
 
 interface NotificationCardProps {
 	notification: NotificationType;
+	topicName?: string;
 	onClick?: () => void;
 }
 
 export const NotificationCard = memo(function NotificationCard({
 	notification,
+	topicName,
 	onClick,
 }: NotificationCardProps) {
 	const borderColor = PRIORITY_CONFIG[notification.priority].borderClass;
@@ -30,6 +33,12 @@ export const NotificationCard = memo(function NotificationCard({
 			onClick={onClick}
 		>
 			<CardContent className="p-4">
+				{topicName && (
+					<div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+						<Hash className="h-3 w-3" />
+						<span>{topicName}</span>
+					</div>
+				)}
 				<NotificationHeader
 					title={notification.title}
 					timestamp={notification.timestamp}

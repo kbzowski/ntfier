@@ -1,4 +1,5 @@
-import { CheckCheck, Hash } from "lucide-react";
+import { CheckCheck, Hash, Inbox } from "lucide-react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -16,6 +17,7 @@ import { NotificationCard } from "./NotificationCard";
 
 interface NotificationListProps {
 	subscription: Subscription | null;
+	subscriptions?: Subscription[];
 	notifications: NotificationType[];
 	onMarkAsRead: (id: string) => void;
 	onMarkAllAsRead: () => void;
@@ -23,11 +25,23 @@ interface NotificationListProps {
 
 export function NotificationList({
 	subscription,
+	subscriptions = [],
 	notifications,
 	onMarkAsRead,
 	onMarkAllAsRead,
 }: NotificationListProps) {
-	if (!subscription) {
+	const isAllView = !subscription;
+
+	// Create lookup map for topic names
+	const topicNames = useMemo(() => {
+		const map = new Map<string, string>();
+		for (const sub of subscriptions) {
+			map.set(sub.id, sub.displayName || sub.topic);
+		}
+		return map;
+	}, [subscriptions]);
+
+	if (isAllView && subscriptions.length === 0) {
 		return <EmptyState type="no-topic" />;
 	}
 
@@ -37,9 +51,15 @@ export function NotificationList({
 		<div className="flex-1 flex flex-col min-h-0 overflow-hidden">
 			<div className="flex items-center justify-between px-6 py-4 border-b border-border">
 				<div className="flex items-center gap-2">
-					<Hash className="h-5 w-5 text-muted-foreground" />
+					{isAllView ? (
+						<Inbox className="h-5 w-5 text-muted-foreground" />
+					) : (
+						<Hash className="h-5 w-5 text-muted-foreground" />
+					)}
 					<h1 className="text-lg font-semibold">
-						{subscription.displayName || subscription.topic}
+						{isAllView
+							? "All Notifications"
+							: subscription.displayName || subscription.topic}
 					</h1>
 					{unreadCount > 0 && (
 						<span className="text-sm text-muted-foreground">
@@ -47,7 +67,7 @@ export function NotificationList({
 						</span>
 					)}
 				</div>
-				{unreadCount > 0 && (
+				{unreadCount > 0 && !isAllView && (
 					<TooltipProvider>
 						<Tooltip>
 							<TooltipTrigger asChild>
@@ -78,6 +98,9 @@ export function NotificationList({
 							<div key={notification.id}>
 								<NotificationCard
 									notification={notification}
+									topicName={
+										isAllView ? topicNames.get(notification.topicId) : undefined
+									}
 									onClick={() => onMarkAsRead(notification.id)}
 								/>
 								{index < notifications.length - 1 && (

@@ -15,7 +15,7 @@ interface AppLayoutProps {
 	children: ReactNode;
 	subscriptions: Subscription[];
 	selectedTopicId: string | null;
-	onSelectTopic: (id: string) => void;
+	onSelectTopic: (id: string | null) => void;
 	onToggleMute: (id: string) => void;
 	onRemoveSubscription: (id: string) => void;
 	onOpenSettings: () => void;
@@ -35,7 +35,7 @@ export function AppLayout({
 	const [drawerOpen, setDrawerOpen] = useState(false);
 
 	const handleSelectTopic = useCallback(
-		(id: string) => {
+		(id: string | null) => {
 			onSelectTopic(id);
 			setDrawerOpen(false);
 		},

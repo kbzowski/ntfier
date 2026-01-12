@@ -176,9 +176,32 @@ export function useNotifications(subscriptions: Subscription[]) {
 		[byTopic],
 	);
 
+	/**
+	 * Loads notifications for all subscriptions.
+	 */
+	const loadAllTopics = useCallback(
+		async (subs: Subscription[]) => {
+			const promises = subs.map((sub) => loadForTopic(sub.id));
+			await Promise.all(promises);
+		},
+		[loadForTopic],
+	);
+
+	/**
+	 * Returns all notifications from all topics, sorted by timestamp.
+	 */
+	const getAllNotifications = useCallback(() => {
+		const all: Notification[] = [];
+		for (const notifs of byTopic.values()) {
+			all.push(...notifs);
+		}
+		return all.sort((a, b) => b.timestamp - a.timestamp);
+	}, [byTopic]);
+
 	return {
 		byTopic,
 		loadForTopic,
+		loadAllTopics,
 		addNotification,
 		markAsRead,
 		markAllAsRead,
@@ -187,5 +210,6 @@ export function useNotifications(subscriptions: Subscription[]) {
 		getUnreadCount,
 		getTotalUnread,
 		getForTopic,
+		getAllNotifications,
 	};
 }

@@ -101,6 +101,7 @@ function App() {
 			>
 				<NotificationList
 					subscription={selectedSubscription ?? null}
+					subscriptions={subscriptionsWithUnread}
 					notifications={currentNotifications}
 					onMarkAsRead={markAsRead}
 					onMarkAllAsRead={handleMarkAllAsRead}

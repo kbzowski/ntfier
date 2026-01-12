@@ -129,8 +129,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	useEffect(() => {
 		if (currentTopicId) {
 			notifications.loadForTopic(currentTopicId);
+		} else if (subscriptions.length > 0) {
+			// Load all notifications for the "All" view
+			notifications.loadAllTopics(subscriptions);
 		}
-	}, [currentTopicId, notifications.loadForTopic]);
+	}, [
+		currentTopicId,
+		subscriptions,
+		notifications.loadForTopic,
+		notifications.loadAllTopics,
+	]);
 
 	// Listen for new notifications from backend
 	useTauriEvent<Notification>(
@@ -307,9 +315,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 	// Derived data
 	const currentNotifications = useMemo(() => {
-		if (!currentTopicId) return [];
+		if (!currentTopicId) {
+			// Show all notifications when no topic selected
+			return notifications.getAllNotifications();
+		}
 		return notifications.getForTopic(currentTopicId);
-	}, [currentTopicId, notifications.getForTopic]);
+	}, [
+		currentTopicId,
+		notifications.getForTopic,
+		notifications.getAllNotifications,
+	]);
 
 	const subscriptionsWithUnread = useMemo(() => {
 		return subscriptions.map((sub) => ({
