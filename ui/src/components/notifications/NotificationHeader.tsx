@@ -1,3 +1,5 @@
+import { memo } from "react";
+import { cn } from "@/lib/utils";
 import type { NotificationPriority } from "@/types/ntfy";
 import { PriorityBadge } from "./PriorityBadge";
 
@@ -25,7 +27,7 @@ function formatTimestamp(timestamp: number): string {
 	return new Date(timestamp).toLocaleDateString();
 }
 
-export function NotificationHeader({
+export const NotificationHeader = memo(function NotificationHeader({
 	title,
 	timestamp,
 	priority,
@@ -34,7 +36,12 @@ export function NotificationHeader({
 	return (
 		<div className="flex items-start justify-between gap-3">
 			<div className="flex items-center gap-2 min-w-0">
-				{!read && <span className="h-2 w-2 rounded-full bg-primary shrink-0" />}
+				<span
+					className={cn(
+						"h-2 w-2 rounded-full bg-primary shrink-0 transition-opacity",
+						read && "opacity-0",
+					)}
+				/>
 				<h3 className="font-semibold text-sm truncate">{title}</h3>
 			</div>
 			<div className="flex items-center gap-2 shrink-0">
@@ -45,4 +52,4 @@ export function NotificationHeader({
 			</div>
 		</div>
 	);
-}
+});

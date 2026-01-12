@@ -1,10 +1,13 @@
+import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 
 interface NotificationTagsProps {
 	tags: string[];
 }
 
-export function NotificationTags({ tags }: NotificationTagsProps) {
+export const NotificationTags = memo(function NotificationTags({
+	tags,
+}: NotificationTagsProps) {
 	if (tags.length === 0) return null;
 
 	return (
@@ -20,4 +23,4 @@ export function NotificationTags({ tags }: NotificationTagsProps) {
 			))}
 		</div>
 	);
-}
+});

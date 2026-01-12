@@ -69,12 +69,10 @@ export function useNotifications(subscriptions: Subscription[]) {
 
 	/**
 	 * Marks a notification as read.
+	 * Uses optimistic UI update for instant feedback.
 	 */
-	const markAsRead = useCallback(async (id: string) => {
-		if (isTauri()) {
-			await notificationsApi.markAsRead(id);
-		}
-
+	const markAsRead = useCallback((id: string) => {
+		// Optimistic update - instant UI feedback
 		setByTopic((prev) => {
 			const topicId = findTopicForNotification(prev, id);
 			if (!topicId) return prev;
@@ -87,31 +85,42 @@ export function useNotifications(subscriptions: Subscription[]) {
 			);
 			return new Map(prev).set(topicId, updated);
 		});
+
+		// API call in background
+		if (isTauri()) {
+			notificationsApi.markAsRead(id).catch((err) => {
+				console.error("Failed to mark as read:", err);
+			});
+		}
 	}, []);
 
 	/**
 	 * Marks all notifications in a topic as read.
+	 * Uses optimistic UI update for instant feedback.
 	 */
-	const markAllAsRead = useCallback(async (subscriptionId: string) => {
-		if (isTauri()) {
-			await notificationsApi.markAllAsRead(subscriptionId);
-		}
+	const markAllAsRead = useCallback((subscriptionId: string) => {
+		// Optimistic update - instant UI feedback
 		setByTopic((prev) => {
 			const notifs = prev.get(subscriptionId);
 			if (!notifs) return prev;
 			const updated = notifs.map((n) => ({ ...n, read: true }));
 			return new Map(prev).set(subscriptionId, updated);
 		});
+
+		// API call in background
+		if (isTauri()) {
+			notificationsApi.markAllAsRead(subscriptionId).catch((err) => {
+				console.error("Failed to mark all as read:", err);
+			});
+		}
 	}, []);
 
 	/**
 	 * Deletes a notification.
+	 * Uses optimistic UI update for instant feedback.
 	 */
-	const deleteNotification = useCallback(async (id: string) => {
-		if (isTauri()) {
-			await notificationsApi.delete(id);
-		}
-
+	const deleteNotification = useCallback((id: string) => {
+		// Optimistic update - instant UI feedback
 		setByTopic((prev) => {
 			const topicId = findTopicForNotification(prev, id);
 			if (!topicId) return prev;
@@ -122,6 +131,13 @@ export function useNotifications(subscriptions: Subscription[]) {
 			const filtered = notifs.filter((n) => n.id !== id);
 			return new Map(prev).set(topicId, filtered);
 		});
+
+		// API call in background
+		if (isTauri()) {
+			notificationsApi.delete(id).catch((err) => {
+				console.error("Failed to delete notification:", err);
+			});
+		}
 	}, []);
 
 	/**

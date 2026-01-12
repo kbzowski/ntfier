@@ -1,5 +1,6 @@
 import { open } from "@tauri-apps/plugin-shell";
 import { ExternalLink } from "lucide-react";
+import { memo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { isTauri } from "@/lib/tauri";
 import type { NotificationAction } from "@/types/ntfy";
@@ -8,26 +9,28 @@ interface NotificationActionsProps {
 	actions: NotificationAction[];
 }
 
-export function NotificationActions({ actions }: NotificationActionsProps) {
-	if (actions.length === 0) return null;
+export const NotificationActions = memo(function NotificationActions({
+	actions,
+}: NotificationActionsProps) {
+	const handleClick = useCallback(
+		async (e: React.MouseEvent, action: NotificationAction) => {
+			e.stopPropagation();
+			if (!action.url) return;
 
-	const handleClick = async (
-		e: React.MouseEvent,
-		action: NotificationAction,
-	) => {
-		e.stopPropagation();
-		if (!action.url) return;
-
-		try {
-			if (isTauri()) {
-				await open(action.url);
-			} else {
-				window.open(action.url, "_blank", "noopener,noreferrer");
+			try {
+				if (isTauri()) {
+					await open(action.url);
+				} else {
+					window.open(action.url, "_blank", "noopener,noreferrer");
+				}
+			} catch (err) {
+				console.error("Failed to open URL:", err);
 			}
-		} catch (err) {
-			console.error("Failed to open URL:", err);
-		}
-	};
+		},
+		[],
+	);
+
+	if (actions.length === 0) return null;
 
 	return (
 		<div className="flex flex-wrap gap-2 mt-4">
@@ -45,4 +48,4 @@ export function NotificationActions({ actions }: NotificationActionsProps) {
 			))}
 		</div>
 	);
-}
+});

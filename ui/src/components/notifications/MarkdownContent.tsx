@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import remarkBreaks from "remark-breaks";
@@ -55,7 +55,10 @@ function ImageWithFallback({ src, alt }: { src: string; alt?: string }) {
 	);
 }
 
-export function MarkdownContent({ content, className }: MarkdownContentProps) {
+export const MarkdownContent = memo(function MarkdownContent({
+	content,
+	className,
+}: MarkdownContentProps) {
 	const processedContent = preprocessMarkdown(content);
 
 	return (
@@ -125,4 +128,4 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
 			</ReactMarkdown>
 		</div>
 	);
-}
+});

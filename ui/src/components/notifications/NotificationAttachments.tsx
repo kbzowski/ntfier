@@ -1,4 +1,5 @@
 import { Download, FileText, Image as ImageIcon } from "lucide-react";
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { useLazyImage } from "@/hooks";
 import type { Attachment } from "@/types/ntfy";
@@ -35,7 +36,7 @@ function formatFileSize(bytes: number): string {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function NotificationAttachments({
+export const NotificationAttachments = memo(function NotificationAttachments({
 	attachments,
 }: NotificationAttachmentsProps) {
 	if (attachments.length === 0) return null;
@@ -88,4 +89,4 @@ export function NotificationAttachments({
 			))}
 		</div>
 	);
-}
+});
