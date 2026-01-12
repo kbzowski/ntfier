@@ -1,7 +1,22 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { mockNotifications } from "@/data/mock-data";
 import { isTauri, notificationsApi } from "@/lib/tauri";
 import type { Notification, Subscription } from "@/types/ntfy";
+
+/**
+ * Finds the topic ID for a notification by searching through all topics.
+ */
+function findTopicForNotification(
+	byTopic: Map<string, Notification[]>,
+	notificationId: string,
+): string | undefined {
+	for (const [topicId, notifs] of byTopic) {
+		if (notifs.some((n) => n.id === notificationId)) {
+			return topicId;
+		}
+	}
+	return undefined;
+}
 
 /**
  * Manages notification state and operations.
@@ -14,17 +29,6 @@ export function useNotifications(subscriptions: Subscription[]) {
 		new Map(),
 	);
 	const loadedTopicsRef = useRef<Set<string>>(new Set());
-
-	// Reverse lookup: notificationId -> topicId for O(1) access
-	const notificationToTopic = useMemo(() => {
-		const map = new Map<string, string>();
-		for (const [topicId, notifs] of byTopic) {
-			for (const n of notifs) {
-				map.set(n.id, topicId);
-			}
-		}
-		return map;
-	}, [byTopic]);
 
 	/**
 	 * Loads notifications for a topic if not already loaded.
@@ -65,29 +69,25 @@ export function useNotifications(subscriptions: Subscription[]) {
 
 	/**
 	 * Marks a notification as read.
-	 * Uses reverse lookup for O(1) topic identification.
 	 */
-	const markAsRead = useCallback(
-		async (id: string) => {
-			if (isTauri()) {
-				await notificationsApi.markAsRead(id);
-			}
+	const markAsRead = useCallback(async (id: string) => {
+		if (isTauri()) {
+			await notificationsApi.markAsRead(id);
+		}
 
-			const topicId = notificationToTopic.get(id);
-			if (!topicId) return;
+		setByTopic((prev) => {
+			const topicId = findTopicForNotification(prev, id);
+			if (!topicId) return prev;
 
-			setByTopic((prev) => {
-				const notifs = prev.get(topicId);
-				if (!notifs) return prev;
+			const notifs = prev.get(topicId);
+			if (!notifs) return prev;
 
-				const updated = notifs.map((n) =>
-					n.id === id ? { ...n, read: true } : n,
-				);
-				return new Map(prev).set(topicId, updated);
-			});
-		},
-		[notificationToTopic],
-	);
+			const updated = notifs.map((n) =>
+				n.id === id ? { ...n, read: true } : n,
+			);
+			return new Map(prev).set(topicId, updated);
+		});
+	}, []);
 
 	/**
 	 * Marks all notifications in a topic as read.
@@ -106,27 +106,23 @@ export function useNotifications(subscriptions: Subscription[]) {
 
 	/**
 	 * Deletes a notification.
-	 * Uses reverse lookup for O(1) topic identification.
 	 */
-	const deleteNotification = useCallback(
-		async (id: string) => {
-			if (isTauri()) {
-				await notificationsApi.delete(id);
-			}
+	const deleteNotification = useCallback(async (id: string) => {
+		if (isTauri()) {
+			await notificationsApi.delete(id);
+		}
 
-			const topicId = notificationToTopic.get(id);
-			if (!topicId) return;
+		setByTopic((prev) => {
+			const topicId = findTopicForNotification(prev, id);
+			if (!topicId) return prev;
 
-			setByTopic((prev) => {
-				const notifs = prev.get(topicId);
-				if (!notifs) return prev;
+			const notifs = prev.get(topicId);
+			if (!notifs) return prev;
 
-				const filtered = notifs.filter((n) => n.id !== id);
-				return new Map(prev).set(topicId, filtered);
-			});
-		},
-		[notificationToTopic],
-	);
+			const filtered = notifs.filter((n) => n.id !== id);
+			return new Map(prev).set(topicId, filtered);
+		});
+	}, []);
 
 	/**
 	 * Clears cached notifications for a topic (used when unsubscribing).

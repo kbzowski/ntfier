@@ -1,5 +1,5 @@
 import { Hash } from "lucide-react";
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PRIORITY_CONFIG } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -13,15 +13,19 @@ import { NotificationTags } from "./NotificationTags";
 interface NotificationCardProps {
 	notification: NotificationType;
 	topicName?: string;
-	onClick?: () => void;
+	onMarkAsRead?: (id: string) => void;
 }
 
 export const NotificationCard = memo(function NotificationCard({
 	notification,
 	topicName,
-	onClick,
+	onMarkAsRead,
 }: NotificationCardProps) {
 	const borderColor = PRIORITY_CONFIG[notification.priority].borderClass;
+
+	const handleClick = useCallback(() => {
+		onMarkAsRead?.(notification.id);
+	}, [onMarkAsRead, notification.id]);
 
 	return (
 		<Card
@@ -30,7 +34,7 @@ export const NotificationCard = memo(function NotificationCard({
 				borderColor,
 				!notification.read && "bg-accent/20",
 			)}
-			onClick={onClick}
+			onClick={handleClick}
 		>
 			<CardContent className="p-4">
 				{topicName && (

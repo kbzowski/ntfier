@@ -101,7 +101,7 @@ export function NotificationList({
 									topicName={
 										isAllView ? topicNames.get(notification.topicId) : undefined
 									}
-									onClick={() => onMarkAsRead(notification.id)}
+									onMarkAsRead={onMarkAsRead}
 								/>
 								{index < notifications.length - 1 && (
 									<Separator className="my-3 opacity-0" />
