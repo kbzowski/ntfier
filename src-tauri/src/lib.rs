@@ -59,6 +59,10 @@ pub fn export_bindings() {
             commands::set_minimize_to_tray,
             commands::set_start_minimized,
             commands::sync_subscriptions,
+            // Update
+            commands::check_for_update,
+            commands::install_update,
+            commands::get_app_version,
         ]);
 
     // Configure TypeScript export to handle i64 as number (safe for timestamps up to year 285,616)
@@ -99,6 +103,7 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--minimized"]),
         ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Initialize database
             let app_data_dir = app.path().app_data_dir()?;
@@ -262,6 +267,10 @@ pub fn run() {
             commands::set_start_minimized,
             // Sync
             commands::sync_subscriptions,
+            // Update
+            commands::check_for_update,
+            commands::install_update,
+            commands::get_app_version,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Ntfier");

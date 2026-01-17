@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build",
+    "build": "pnpm dotenv -e .env -- pnpm tauri build",
     "build:debug": "tauri build --debug",
     "build:msi": "tauri build --bundles msi",
     "build:nsis": "tauri build --bundles nsis",
@@ -18,6 +18,7 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "dotenv-cli": "^11.0.0",
     "husky": "^9.1.7",
     "rimraf": "^6"
   }

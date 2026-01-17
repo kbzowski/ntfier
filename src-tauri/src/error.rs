@@ -32,6 +32,9 @@ pub enum AppError {
 
     #[error("Credential error: {0}")]
     Credential(String),
+
+    #[error("Updater error: {0}")]
+    Updater(String),
 }
 
 // Conversion from rusqlite::Error
