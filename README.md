@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Ntfier Logo" width="128" height="128">
+  <img src="assets/logo.png" alt="Ntfier Logo" width="200">
 </p>
 
 <h1 align="center">Ntfier</h1>
