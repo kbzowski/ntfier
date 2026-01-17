@@ -184,8 +184,10 @@ pub fn run() {
                 let args: Vec<String> = std::env::args().collect();
                 let has_minimized_arg = args.iter().any(|arg| arg == "--minimized");
 
-                if start_minimized || has_minimized_arg {
-                    let _ = window.hide();
+                // Window starts hidden (visible: false in tauri.conf.json)
+                // Only show it if not starting minimized
+                if !start_minimized && !has_minimized_arg {
+                    let _ = window.show();
                 }
 
                 let win = window.clone();
