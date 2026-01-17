@@ -327,11 +327,17 @@ impl ConnectionManager {
             &notification.title
         };
 
-        let _ = app_handle
+        let mut builder = app_handle
             .notification()
             .builder()
             .title(title)
-            .body(&notification.message)
-            .show();
+            .body(&notification.message);
+
+        // Add sound for notifications with priority >= Default (3) to ensure Windows shows them as toast popups
+        if notification.priority as i32 >= 3 {
+            builder = builder.sound("Default");
+        }
+
+        let _ = builder.show();
     }
 }

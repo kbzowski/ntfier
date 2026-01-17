@@ -40,25 +40,22 @@ impl UpdateService {
             .await
             .map_err(|e| AppError::Updater(e.to_string()))?;
 
-        match update {
-            Some(update) => {
-                log::info!(
-                    "Update available: {} -> {}",
-                    update.current_version,
-                    update.version
-                );
+        if let Some(update) = update {
+            log::info!(
+                "Update available: {} -> {}",
+                update.current_version,
+                update.version
+            );
 
-                Ok(Some(UpdateInfo {
-                    version: update.version.clone(),
-                    current_version: update.current_version.clone(),
-                    body: update.body.clone(),
-                    date: update.date.map(|d| d.to_string()),
-                }))
-            }
-            None => {
-                log::info!("No update available");
-                Ok(None)
-            }
+            Ok(Some(UpdateInfo {
+                version: update.version.clone(),
+                current_version: update.current_version.clone(),
+                body: update.body.clone(),
+                date: update.date.map(|d| d.to_string()),
+            }))
+        } else {
+            log::info!("No update available");
+            Ok(None)
         }
     }
 
@@ -75,33 +72,32 @@ impl UpdateService {
             .await
             .map_err(|e| AppError::Updater(e.to_string()))?;
 
-        match update {
-            Some(update) => {
-                log::info!("Downloading update {}...", update.version);
+        if let Some(update) = update {
+            log::info!("Downloading update {}...", update.version);
 
-                // Download and install the update
-                let mut downloaded = 0;
-                update
-                    .download_and_install(
-                        |chunk_length, content_length| {
-                            downloaded += chunk_length;
-                            log::info!(
-                                "Downloaded {} / {}",
-                                downloaded,
-                                content_length.unwrap_or(0)
-                            );
-                        },
-                        || {
-                            log::info!("Download complete, installing...");
-                        },
-                    )
-                    .await
-                    .map_err(|e| AppError::Updater(e.to_string()))?;
+            // Download and install the update
+            let mut downloaded = 0;
+            update
+                .download_and_install(
+                    |chunk_length, content_length| {
+                        downloaded += chunk_length;
+                        log::info!(
+                            "Downloaded {} / {}",
+                            downloaded,
+                            content_length.unwrap_or(0)
+                        );
+                    },
+                    || {
+                        log::info!("Download complete, installing...");
+                    },
+                )
+                .await
+                .map_err(|e| AppError::Updater(e.to_string()))?;
 
-                log::info!("Update installed successfully, restart required");
-                Ok(())
-            }
-            None => Err(AppError::Updater("No update available".to_string())),
+            log::info!("Update installed successfully, restart required");
+            Ok(())
+        } else {
+            Err(AppError::Updater("No update available".to_string()))
         }
     }
 
