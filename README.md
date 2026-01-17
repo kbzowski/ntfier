@@ -1,6 +1,35 @@
-# Ntfier
+<p align="center">
+  <img src="assets/logo.png" alt="Ntfier Logo" width="128" height="128">
+</p>
 
-Desktop notification client for [ntfy](https://ntfy.sh).
+<h1 align="center">Ntfier</h1>
+
+<p align="center">
+  A modern desktop notification client for <a href="https://ntfy.sh">ntfy</a>
+</p>
+
+## Features
+
+- **Real-time notifications** — Receive push notifications instantly via WebSocket
+- **Multiple servers** — Connect to multiple ntfy servers simultaneously
+- **Topic subscriptions** — Subscribe to multiple topics and manage them easily
+- **System tray** — Minimize to tray and receive notifications in the background
+- **Auto-start** — Launch automatically on system startup
+- **Notification history** — Browse and search past notifications
+- **Markdown support** — Rich text rendering for notification content
+- **Attachments** — View images and download attachments
+- **Priority levels** — Visual indicators for notification priority
+- **Dark/Light themes** — Multiple theme presets with system preference support
+- **Auto-updates** — Automatic update checking and installation
+- **Cross-platform** — Built with Tauri for Windows (macOS and Linux planned)
+
+## Screenshots
+
+*Coming soon*
+
+## Installation
+
+Download the latest release from the [Releases](https://github.com/kbzowski/ntfier/releases) page.
 
 ## Requirements
 
@@ -43,7 +72,7 @@ pnpm --filter ui check
 ```bash
 cd src-tauri
 cargo fmt
-cargo lint
+cargo clippy
 ```
 
 ## License
