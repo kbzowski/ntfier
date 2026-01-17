@@ -1,5 +1,5 @@
 import { CheckCheck, Hash, Inbox } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -8,6 +8,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useTauriEvent } from "@/hooks/useTauriEvent";
 import type {
 	Notification as NotificationType,
 	Subscription,
@@ -31,6 +32,12 @@ export function NotificationList({
 	onMarkAllAsRead,
 }: NotificationListProps) {
 	const isAllView = !subscription;
+	const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+	// Scroll to top when window is shown (tray icon click)
+	useTauriEvent("window:shown", () => {
+		scrollContainerRef.current?.scrollTo({ top: 0 });
+	});
 
 	// Create lookup map for topic names
 	const topicNames = useMemo(() => {
@@ -92,7 +99,7 @@ export function NotificationList({
 			{notifications.length === 0 ? (
 				<EmptyState type="no-notifications" />
 			) : (
-				<div className="flex-1 overflow-y-auto min-h-0">
+				<div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0">
 					<div className="p-4 space-y-3">
 						{notifications.map((notification, index) => (
 							<div key={notification.id}>

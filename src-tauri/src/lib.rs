@@ -155,21 +155,12 @@ pub fn run() {
                     {
                         let app_handle = tray.app_handle();
 
-                        // Find first subscription with unread notifications
-                        let db = app_handle.state::<Database>();
-                        if let Ok(subscriptions) = db.get_all_subscriptions() {
-                            if let Some(sub) = subscriptions
-                                .iter()
-                                .find(|s| !s.muted && s.unread_count > 0)
-                            {
-                                let _ = app_handle.emit("navigate:subscription", &sub.id);
-                            }
-                        }
-
                         // Show and focus window
                         if let Some(window) = app_handle.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
+                            // Notify frontend to scroll to top
+                            let _ = app_handle.emit("window:shown", ());
                         }
                     }
                 })
