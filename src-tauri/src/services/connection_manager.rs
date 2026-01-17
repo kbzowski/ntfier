@@ -5,6 +5,7 @@
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use futures_util::StreamExt;
+use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -318,19 +319,74 @@ impl ConnectionManager {
         }
     }
 
+    /// Sanitizes text for Windows notification display by extracting plain text from markdown.
+    ///
+    /// Uses pulldown-cmark to parse markdown and extract only the text content,
+    /// ignoring images and autolinks (URLs).
+    fn sanitize_for_notification(text: &str) -> String {
+        let parser = Parser::new(text);
+        let mut result = String::new();
+        let mut skip_until_end: Option<TagEnd> = None;
+
+        for event in parser {
+            // Skip content inside images (alt text)
+            if let Some(ref end_tag) = skip_until_end {
+                if let Event::End(tag) = &event {
+                    if tag == end_tag {
+                        skip_until_end = None;
+                    }
+                }
+                continue;
+            }
+
+            match event {
+                // Skip images entirely (including alt text)
+                Event::Start(Tag::Image { .. }) => {
+                    skip_until_end = Some(TagEnd::Image);
+                }
+                // Extract text content
+                Event::Text(text) => {
+                    if !result.is_empty() && !result.ends_with(' ') {
+                        result.push(' ');
+                    }
+                    result.push_str(&text);
+                }
+                // Include inline code content
+                Event::Code(code) => {
+                    if !result.is_empty() && !result.ends_with(' ') {
+                        result.push(' ');
+                    }
+                    result.push_str(&code);
+                }
+                // Add space after blocks
+                Event::End(
+                    TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::Item | TagEnd::BlockQuote(_),
+                ) => {
+                    if !result.is_empty() && !result.ends_with(' ') {
+                        result.push(' ');
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Normalize whitespace and trim
+        result.split_whitespace().collect::<Vec<_>>().join(" ")
+    }
+
     fn show_native_notification(app_handle: &AppHandle, notification: &Notification) {
         use tauri_plugin_notification::NotificationExt;
 
         let title = if notification.title.is_empty() {
-            "New notification"
+            "New notification".to_string()
         } else {
-            &notification.title
+            Self::sanitize_for_notification(&notification.title)
         };
 
         let mut builder = app_handle
             .notification()
             .builder()
-            .title(title)
+            .title(&title)
             .body(&notification.message);
 
         // Add sound for notifications with priority >= Default (3) to ensure Windows shows them as toast popups

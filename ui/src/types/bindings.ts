@@ -151,6 +151,38 @@ async syncSubscriptions(serverUrl: string) : Promise<Result<Subscription[], AppE
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Check for available updates.
+ * 
+ * Returns update information if an update is available, null otherwise.
+ */
+async checkForUpdate() : Promise<Result<UpdateInfo | null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("check_for_update") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Download and install an available update.
+ * 
+ * This will download the update and may restart the application.
+ */
+async installUpdate() : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("install_update") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Get the current application version.
+ */
+async getAppVersion() : Promise<string> {
+    return await TAURI_INVOKE("get_app_version");
 }
 }
 
@@ -173,7 +205,7 @@ async syncSubscriptions(serverUrl: string) : Promise<Result<Subscription[], AppE
  * type AppError = { Database: string } | { WebSocket: string } | ...
  * ```
  */
-export type AppError = { Database: string } | { WebSocket: string } | { Serialization: string } | { NotFound: string } | { InvalidUrl: string } | { Connection: string } | { Credential: string }
+export type AppError = { Database: string } | { WebSocket: string } | { Serialization: string } | { NotFound: string } | { InvalidUrl: string } | { Connection: string } | { Credential: string } | { Updater: string }
 /**
  * Application-wide settings.
  */
@@ -238,6 +270,26 @@ lastNotification: number | null;
  * Whether notifications from this subscription are muted.
  */
 muted: boolean }
+/**
+ * Information about an available update.
+ */
+export type UpdateInfo = { 
+/**
+ * The new version available.
+ */
+version: string; 
+/**
+ * The current installed version.
+ */
+current_version: string; 
+/**
+ * Release notes for the update.
+ */
+body: string | null; 
+/**
+ * Release date.
+ */
+date: string | null }
 
 /** tauri-specta globals **/
 

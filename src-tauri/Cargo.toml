@@ -49,6 +49,7 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 thiserror = "2"
 url = "2"
+pulldown-cmark = { version = "0.12", default-features = false }
 base64 = "0.22"
 image = { version = "0.25", default-features = false, features = ["png"] }
 rand = "0.8"
