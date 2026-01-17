@@ -82,10 +82,16 @@ jobs:
         with:
           tagName: v${{ inputs.version }}
           releaseName: 'Ntfier v${{ inputs.version }}'
-          releaseBody: |
-            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
           releaseDraft: true
           prerelease: ${{ inputs.prerelease }}
+
+      - name: Update release notes from commits
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          draft: true
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
 
       - name: Generate update.json
         run: node scripts/generate-update-json.js
