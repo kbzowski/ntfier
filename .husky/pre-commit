@@ -1,5 +1,6 @@
-# Format Rust code
+# Format and lint Rust code
 cargo fmt --manifest-path src-tauri/Cargo.toml
+cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
-# Lint UI code
-pnpm --filter ui lint
+# Format and lint UI code (auto-fix)
+pnpm --filter ui biome check --write
