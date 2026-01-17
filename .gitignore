@@ -157,3 +157,4 @@ vite.config.ts.timestamp-*
 .vite/
 .claude
 /ui/CLAUDE.md
+update.json
