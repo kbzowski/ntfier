@@ -3,4 +3,4 @@ cargo fmt --manifest-path src-tauri/Cargo.toml
 cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
 # Format and lint UI code (auto-fix)
-pnpm --filter ui biome check --write
+cd ui && pnpm biome check --write && cd ..
