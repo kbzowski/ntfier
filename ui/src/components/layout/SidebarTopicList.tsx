@@ -1,4 +1,5 @@
 import { Inbox } from "lucide-react";
+import { useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { Subscription } from "@/types/ntfy";
@@ -19,9 +20,13 @@ export function SidebarTopicList({
 	onToggleMute,
 	onRemove,
 }: SidebarTopicListProps) {
-	const totalUnread = subscriptions
-		.filter((s) => !s.muted)
-		.reduce((sum, s) => sum + s.unreadCount, 0);
+	const totalUnread = useMemo(
+		() =>
+			subscriptions
+				.filter((s) => !s.muted)
+				.reduce((sum, s) => sum + s.unreadCount, 0),
+		[subscriptions],
+	);
 
 	return (
 		<ScrollArea className="flex-1">

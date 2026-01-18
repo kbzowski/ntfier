@@ -25,6 +25,7 @@ import {
 	type Result,
 	type ServerConfig,
 	type Subscription,
+	type ThemeMode,
 } from "@/types/bindings";
 
 // Re-export types for consumers
@@ -136,7 +137,7 @@ export const notificationsApi = {
 export const settingsApi = {
 	get: async () => unwrap(await commands.getSettings()),
 
-	setTheme: async (theme: string) => {
+	setTheme: async (theme: ThemeMode) => {
 		unwrap(await commands.setTheme(theme));
 	},
 

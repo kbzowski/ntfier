@@ -93,7 +93,7 @@ async getSettings() : Promise<Result<AppSettings, AppError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async setTheme(theme: string) : Promise<Result<null, AppError>> {
+async setTheme(theme: ThemeMode) : Promise<Result<null, AppError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_theme", { theme }) };
 } catch (e) {
@@ -219,9 +219,9 @@ export type AppError = { Database: string } | { WebSocket: string } | { Serializ
  */
 export type AppSettings = { 
 /**
- * Theme ID or "system" for automatic.
+ * Theme mode for the application.
  */
-theme: string; 
+theme: ThemeMode; 
 /**
  * Configured ntfy servers.
  */
@@ -249,7 +249,11 @@ export type CreateSubscription = { topic: string; serverUrl: string; displayName
 /**
  * A notification stored in the local database.
  */
-export type Notification = { id: string; topicId: string; title: string; message: string; priority: Priority; tags: string[]; 
+export type Notification = { id: string; topicId: string; title: string; message: string; 
+/**
+ * Priority level (1-5): 1=min, 2=low, 3=default, 4=high, 5=max.
+ */
+priority: number; tags: string[]; 
 /**
  * Unix timestamp in milliseconds.
  */
@@ -258,10 +262,6 @@ timestamp: number; actions: NotificationAction[]; attachments: Attachment[]; rea
  * An action button attached to a notification.
  */
 export type NotificationAction = { id: string; label: string; url: string | null; method: string | null; clear: boolean }
-/**
- * Notification priority levels matching ntfy's 1-5 scale.
- */
-export type Priority = "Min" | "Low" | "Default" | "High" | "Max"
 /**
  * Configuration for a single ntfy server.
  */
@@ -278,6 +278,10 @@ lastNotification: number | null;
  * Whether notifications from this subscription are muted.
  */
 muted: boolean }
+/**
+ * Theme mode for the application.
+ */
+export type ThemeMode = "light" | "dark" | "system"
 /**
  * Information about an available update.
  */

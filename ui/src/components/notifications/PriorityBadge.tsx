@@ -9,14 +9,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { PRIORITY_CONFIG } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import type { NotificationPriority } from "@/types/ntfy";
 
 interface PriorityBadgeProps {
-	priority: NotificationPriority;
+	priority: number;
 	className?: string;
 }
 
-const PRIORITY_ICONS: Record<NotificationPriority, LucideIcon> = {
+const PRIORITY_ICONS: Record<number, LucideIcon> = {
 	1: ArrowDown,
 	2: ArrowDownRight,
 	3: Minus,

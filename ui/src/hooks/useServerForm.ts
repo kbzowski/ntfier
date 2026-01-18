@@ -87,8 +87,8 @@ export function useServerForm({
 		try {
 			await onSubmit({
 				url: url.trim(),
-				username: username.trim() || undefined,
-				password: password || undefined,
+				username: username.trim() || null,
+				password: password || null,
 			});
 
 			reset();

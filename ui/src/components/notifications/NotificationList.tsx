@@ -1,5 +1,5 @@
 import { CheckCheck, Hash, Inbox } from "lucide-react";
-import { useMemo, useRef } from "react";
+import { memo, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -24,7 +24,7 @@ interface NotificationListProps {
 	onMarkAllAsRead: () => void;
 }
 
-export function NotificationList({
+export const NotificationList = memo(function NotificationList({
 	subscription,
 	subscriptions = [],
 	notifications,
@@ -123,4 +123,4 @@ export function NotificationList({
 			)}
 		</div>
 	);
-}
+});

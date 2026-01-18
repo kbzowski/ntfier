@@ -6,6 +6,16 @@ use url::Url;
 
 use crate::error::AppError;
 
+/// Theme mode for the application.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum ThemeMode {
+    Light,
+    Dark,
+    #[default]
+    System,
+}
+
 /// Configuration for a single ntfy server.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -71,8 +81,8 @@ impl ServerConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
-    /// Theme ID or "system" for automatic.
-    pub theme: String,
+    /// Theme mode for the application.
+    pub theme: ThemeMode,
     /// Configured ntfy servers.
     pub servers: Vec<ServerConfig>,
     /// URL of the default server for new subscriptions.
@@ -92,7 +102,7 @@ const fn default_true() -> bool {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            theme: "system".to_string(),
+            theme: ThemeMode::System,
             servers: vec![ServerConfig {
                 url: "https://ntfy.sh".to_string(),
                 username: None,

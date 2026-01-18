@@ -1,12 +1,11 @@
 import { memo } from "react";
 import { cn } from "@/lib/utils";
-import type { NotificationPriority } from "@/types/ntfy";
 import { PriorityBadge } from "./PriorityBadge";
 
 interface NotificationHeaderProps {
 	title: string;
 	timestamp: number;
-	priority: NotificationPriority;
+	priority: number;
 	read: boolean;
 }
 

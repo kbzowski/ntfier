@@ -18,7 +18,7 @@ impl<T> From<PoisonError<T>> for AppError {
 }
 use crate::models::{
     AppSettings, Attachment, CreateSubscription, Notification, NotificationAction, Priority,
-    ServerConfig, Subscription,
+    ServerConfig, Subscription, ThemeMode,
 };
 use crate::services::credential_manager;
 
@@ -458,7 +458,12 @@ impl Database {
     // ===== Settings =====
 
     pub fn get_settings(&self) -> Result<AppSettings, AppError> {
-        let theme = self.get_setting_string("theme", "system")?;
+        let theme_str = self.get_setting_string("theme", "system")?;
+        let theme = match theme_str.as_str() {
+            "light" => ThemeMode::Light,
+            "dark" => ThemeMode::Dark,
+            _ => ThemeMode::System,
+        };
         let minimize_to_tray = self.get_setting_bool("minimize_to_tray", true)?;
         let start_minimized = self.get_setting_bool("start_minimized", false)?;
 

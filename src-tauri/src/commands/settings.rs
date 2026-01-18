@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::db::Database;
 use crate::error::AppError;
-use crate::models::{AppSettings, ServerConfig};
+use crate::models::{AppSettings, ServerConfig, ThemeMode};
 use crate::services::ConnectionManager;
 
 #[tauri::command]
@@ -13,8 +13,13 @@ pub fn get_settings(db: State<'_, Database>) -> Result<AppSettings, AppError> {
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_theme(db: State<'_, Database>, theme: String) -> Result<(), AppError> {
-    db.set_setting("theme", &theme)
+pub fn set_theme(db: State<'_, Database>, theme: ThemeMode) -> Result<(), AppError> {
+    let theme_str = match theme {
+        ThemeMode::Light => "light",
+        ThemeMode::Dark => "dark",
+        ThemeMode::System => "system",
+    };
+    db.set_setting("theme", theme_str)
 }
 
 #[tauri::command]

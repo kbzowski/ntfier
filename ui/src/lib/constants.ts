@@ -1,7 +1,5 @@
-import type { NotificationPriority } from "@/types/ntfy";
-
 export const PRIORITY_CONFIG: Record<
-	NotificationPriority,
+	number,
 	{
 		label: string;
 		borderClass: string;

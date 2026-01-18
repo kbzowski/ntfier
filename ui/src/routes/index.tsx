@@ -122,9 +122,9 @@ function App() {
 				onSetDefaultServer={setDefaultServer}
 				autostart={autostart}
 				onAutostartChange={setAutostart}
-				minimizeToTray={settings.minimizeToTray}
+				minimizeToTray={settings.minimizeToTray ?? true}
 				onMinimizeToTrayChange={setMinimizeToTray}
-				startMinimized={settings.startMinimized}
+				startMinimized={settings.startMinimized ?? false}
 				onStartMinimizedChange={setStartMinimized}
 			/>
 

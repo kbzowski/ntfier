@@ -53,10 +53,10 @@ interface AppActions {
 	// Topic selection
 	setCurrentTopicId: (id: string | null) => void;
 
-	// Notifications
-	markAsRead: (id: string) => Promise<void>;
-	markAllAsRead: (subscriptionId: string) => Promise<void>;
-	deleteNotification: (id: string) => Promise<void>;
+	// Notifications (optimistic updates - fire and forget)
+	markAsRead: (id: string) => void;
+	markAllAsRead: (subscriptionId: string) => void;
+	deleteNotification: (id: string) => void;
 	getUnreadCount: (subscriptionId: string) => number;
 	getTotalUnread: () => number;
 
@@ -97,16 +97,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		const loadData = async () => {
 			try {
 				if (isTauri()) {
-					// Load subscriptions
-					const subs = await subscriptionsApi.getAll();
+					// Load all data in parallel to avoid waterfall
+					const [subs, loadedSettings, autostartEnabled] = await Promise.all([
+						subscriptionsApi.getAll(),
+						settingsApi.get(),
+						autostartApi.isEnabled(),
+					]);
+
 					setSubscriptions(subs);
-
-					// Load settings
-					const loadedSettings = await settingsApi.get();
 					setSettings(loadedSettings);
-
-					// Load autostart state
-					const autostartEnabled = await autostartApi.isEnabled();
 					setAutostartState(autostartEnabled);
 				} else {
 					// Fallback to mock data
@@ -180,7 +179,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			const newSub: Subscription = {
 				...subscription,
 				id: `sub-${Date.now()}`,
+				displayName: subscription.displayName ?? null,
 				unreadCount: 0,
+				lastNotification: null,
 				muted: false,
 			};
 			setSubscriptions((prev) => [...prev, newSub]);

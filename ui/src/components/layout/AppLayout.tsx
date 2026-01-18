@@ -1,5 +1,5 @@
 import { Bell } from "lucide-react";
-import { type ReactNode, useCallback, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import {
 	Sheet,
 	SheetContent,
@@ -44,9 +44,13 @@ export function AppLayout({
 
 	const handleMenuClick = useCallback(() => setDrawerOpen(true), []);
 
-	const totalUnread = subscriptions
-		.filter((s) => !s.muted)
-		.reduce((sum, s) => sum + s.unreadCount, 0);
+	const totalUnread = useMemo(
+		() =>
+			subscriptions
+				.filter((s) => !s.muted)
+				.reduce((sum, s) => sum + s.unreadCount, 0),
+		[subscriptions],
+	);
 
 	return (
 		<div className="flex h-screen bg-background">

@@ -8,6 +8,8 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use specta::Type;
 
 /// Notification priority levels matching ntfy's 1-5 scale.
+///
+/// Serialized as numbers 1-5 via `serde_repr`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize_repr, Deserialize_repr, Type)]
 #[repr(u8)]
 pub enum Priority {
@@ -39,6 +41,8 @@ pub struct Notification {
     pub topic_id: String,
     pub title: String,
     pub message: String,
+    /// Priority level (1-5): 1=min, 2=low, 3=default, 4=high, 5=max.
+    #[specta(type = u8)]
     pub priority: Priority,
     pub tags: Vec<String>,
     /// Unix timestamp in milliseconds.
