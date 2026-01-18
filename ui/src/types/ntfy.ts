@@ -7,6 +7,7 @@ export type {
 	ServerConfig,
 	Subscription,
 	ThemeMode,
+	UpdateInfo,
 } from "./bindings";
 
 // Type alias for notification priority (1-5 scale)

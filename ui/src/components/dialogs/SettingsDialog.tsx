@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ThemeDefinition } from "@/themes";
-import { commands } from "@/types/bindings";
+import { commands, type UpdateInfo } from "@/types/bindings";
 import type { ServerConfig } from "@/types/ntfy";
 import { ServerConfigForm } from "./ServerConfigForm";
 import { AppearanceTab, BehaviorTab } from "./settings";
@@ -33,6 +33,8 @@ interface SettingsDialogProps {
 	onMinimizeToTrayChange: (enabled: boolean) => void;
 	startMinimized: boolean;
 	onStartMinimizedChange: (enabled: boolean) => void;
+	updateInfo: UpdateInfo | null;
+	onUpdateInfoChange: (info: UpdateInfo | null) => void;
 }
 
 export function SettingsDialog({
@@ -53,6 +55,8 @@ export function SettingsDialog({
 	onMinimizeToTrayChange,
 	startMinimized,
 	onStartMinimizedChange,
+	updateInfo,
+	onUpdateInfoChange,
 }: SettingsDialogProps) {
 	const [version, setVersion] = useState<string>("");
 
@@ -103,6 +107,8 @@ export function SettingsDialog({
 							onMinimizeToTrayChange={onMinimizeToTrayChange}
 							startMinimized={startMinimized}
 							onStartMinimizedChange={onStartMinimizedChange}
+							updateInfo={updateInfo}
+							onUpdateInfoChange={onUpdateInfoChange}
 						/>
 					</TabsContent>
 

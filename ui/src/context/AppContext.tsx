@@ -22,6 +22,7 @@ import type {
 	ServerConfig,
 	Subscription,
 	ThemeMode,
+	UpdateInfo,
 } from "@/types/ntfy";
 
 interface AppState {
@@ -37,6 +38,9 @@ interface AppState {
 	settings: AppSettings;
 	settingsLoading: boolean;
 	autostart: boolean;
+
+	// Updates
+	updateInfo: UpdateInfo | null;
 }
 
 interface AppActions {
@@ -70,6 +74,9 @@ interface AppActions {
 	setAutostart: (enabled: boolean) => Promise<void>;
 	setMinimizeToTray: (enabled: boolean) => Promise<void>;
 	setStartMinimized: (enabled: boolean) => Promise<void>;
+
+	// Updates
+	setUpdateInfo: (info: UpdateInfo | null) => void;
 }
 
 interface AppContextValue extends AppState, AppActions {
@@ -88,6 +95,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [settings, setSettings] = useState<AppSettings>(mockSettings);
 	const [settingsLoading, setSettingsLoading] = useState(true);
 	const [autostart, setAutostartState] = useState(false);
+	const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
 
 	// Notification management via custom hook
 	const notifications = useNotifications(subscriptions);
@@ -161,6 +169,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		useCallback((subscriptionId: string) => {
 			console.log("Navigating to subscription:", subscriptionId);
 			setCurrentTopicId(subscriptionId);
+		}, []),
+	);
+
+	// Listen for update:available event (from startup update check)
+	useTauriEvent<UpdateInfo>(
+		"update:available",
+		useCallback((info: UpdateInfo) => {
+			console.log("Update available:", info.version);
+			setUpdateInfo(info);
 		}, []),
 	);
 
@@ -345,6 +362,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		settings,
 		settingsLoading,
 		autostart,
+		updateInfo,
 
 		// Actions
 		addSubscription,
@@ -364,6 +382,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setAutostart,
 		setMinimizeToTray,
 		setStartMinimized,
+		setUpdateInfo,
 
 		// Derived
 		currentNotifications,

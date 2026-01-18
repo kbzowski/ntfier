@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 import { useTheme } from "@/components/common/ThemeProvider";
+import { UpdateToast } from "@/components/common/UpdateToast";
 import { AddSubscriptionDialog } from "@/components/dialogs/AddSubscriptionDialog";
 import { ConfirmDialog } from "@/components/dialogs/ConfirmDialog";
 import { SettingsDialog } from "@/components/dialogs/SettingsDialog";
@@ -39,6 +40,8 @@ function App() {
 		setAutostart,
 		setMinimizeToTray,
 		setStartMinimized,
+		updateInfo,
+		setUpdateInfo,
 	} = useApp();
 
 	const selectedSubscription = subscriptionsWithUnread.find(
@@ -126,6 +129,8 @@ function App() {
 				onMinimizeToTrayChange={setMinimizeToTray}
 				startMinimized={settings.startMinimized ?? false}
 				onStartMinimizedChange={setStartMinimized}
+				updateInfo={updateInfo}
+				onUpdateInfoChange={setUpdateInfo}
 			/>
 
 			<AddSubscriptionDialog
@@ -149,6 +154,12 @@ function App() {
 				confirmLabel="Unsubscribe"
 				variant="destructive"
 				onConfirm={handleConfirmRemove}
+			/>
+
+			<UpdateToast
+				updateInfo={updateInfo}
+				onOpenSettings={() => setSettingsOpen(true)}
+				onDismiss={() => {}}
 			/>
 		</>
 	);

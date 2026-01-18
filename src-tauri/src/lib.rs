@@ -243,6 +243,11 @@ pub fn run() {
 
                 // 4. Update tray icon based on unread count (force initial update)
                 tray_manager.initial_refresh(&handle).await;
+
+                // 5. Check for updates (non-blocking)
+                if let Ok(Some(update_info)) = services::UpdateService::check_for_update(&handle).await {
+                    let _ = handle.emit("update:available", update_info);
+                }
             });
 
             Ok(())

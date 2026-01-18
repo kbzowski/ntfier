@@ -26,6 +26,7 @@ import {
 	type ServerConfig,
 	type Subscription,
 	type ThemeMode,
+	type UpdateInfo,
 } from "@/types/bindings";
 
 // Re-export types for consumers
@@ -36,6 +37,7 @@ export type {
 	Subscription,
 	Notification,
 	AppSettings,
+	UpdateInfo,
 };
 
 // ===== Error Handling =====
@@ -200,6 +202,21 @@ export const autostartApi = {
 	enable: () => autostartEnable(),
 	disable: () => autostartDisable(),
 	isEnabled: () => autostartIsEnabled(),
+};
+
+// ===== Update API =====
+
+export const updateApi = {
+	/** Check for available updates */
+	checkForUpdate: async (): Promise<UpdateInfo | null> => {
+		const result = await commands.checkForUpdate();
+		return unwrap(result);
+	},
+
+	/** Install the available update */
+	installUpdate: async (): Promise<void> => {
+		unwrap(await commands.installUpdate());
+	},
 };
 
 // ===== Utility to check if running in Tauri =====
