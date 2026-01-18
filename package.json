@@ -1,6 +1,6 @@
 {
-  "name": "ntfy-desktop",
-  "version": "0.1.0",
+  "name": "ntfier",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "dev": "tauri dev",
