@@ -29,3 +29,16 @@ pub async fn install_update(handle: AppHandle) -> Result<(), AppError> {
 pub fn get_app_version(handle: AppHandle) -> String {
     UpdateService::get_app_version(&handle)
 }
+
+/// Get the application version for display purposes.
+///
+/// Returns "dev" in debug builds, "vX.Y.Z" in release builds.
+#[tauri::command]
+#[specta::specta]
+pub fn get_app_version_display(handle: AppHandle) -> String {
+    if cfg!(debug_assertions) {
+        "dev".to_string()
+    } else {
+        format!("v{}", UpdateService::get_app_version(&handle))
+    }
+}

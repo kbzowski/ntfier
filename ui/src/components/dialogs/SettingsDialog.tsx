@@ -1,4 +1,5 @@
 import { Palette, Server, Settings2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
 	Dialog,
 	DialogContent,
@@ -7,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ThemeDefinition } from "@/themes";
+import { commands } from "@/types/bindings";
 import type { ServerConfig } from "@/types/ntfy";
 import { ServerConfigForm } from "./ServerConfigForm";
 import { AppearanceTab, BehaviorTab } from "./settings";
@@ -52,6 +54,14 @@ export function SettingsDialog({
 	startMinimized,
 	onStartMinimizedChange,
 }: SettingsDialogProps) {
+	const [version, setVersion] = useState<string>("");
+
+	useEffect(() => {
+		if (open) {
+			commands.getAppVersionDisplay().then(setVersion);
+		}
+	}, [open]);
+
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-lg">
@@ -105,6 +115,10 @@ export function SettingsDialog({
 						/>
 					</TabsContent>
 				</Tabs>
+
+				<div className="mt-4 pt-3 border-t text-center text-xs text-muted-foreground">
+					Ntfier {version}
+				</div>
 			</DialogContent>
 		</Dialog>
 	);

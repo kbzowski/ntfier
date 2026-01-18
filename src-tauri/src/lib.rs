@@ -63,6 +63,7 @@ pub fn export_bindings() {
             commands::check_for_update,
             commands::install_update,
             commands::get_app_version,
+            commands::get_app_version_display,
         ]);
 
     // Configure TypeScript export to handle i64 as number (safe for timestamps up to year 285,616)
@@ -273,6 +274,7 @@ pub fn run() {
             commands::check_for_update,
             commands::install_update,
             commands::get_app_version,
+            commands::get_app_version_display,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Ntfier");

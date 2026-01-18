@@ -183,6 +183,14 @@ async installUpdate() : Promise<Result<null, AppError>> {
  */
 async getAppVersion() : Promise<string> {
     return await TAURI_INVOKE("get_app_version");
+},
+/**
+ * Get the application version for display purposes.
+ * 
+ * Returns "dev" in debug builds, "vX.Y.Z" in release builds.
+ */
+async getAppVersionDisplay() : Promise<string> {
+    return await TAURI_INVOKE("get_app_version_display");
 }
 }
 
