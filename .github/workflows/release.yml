@@ -85,13 +85,22 @@ jobs:
           releaseDraft: true
           prerelease: ${{ inputs.prerelease }}
 
-      - name: Update release notes from commits
+      - name: Generate changelog from commits
+        id: changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: .github/cliff.toml
+          args: --latest --strip header
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update release notes
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ inputs.version }}
           draft: true
           prerelease: ${{ inputs.prerelease }}
-          generate_release_notes: true
+          body: ${{ steps.changelog.outputs.content }}
 
       - name: Generate update.json
         run: node scripts/generate-update-json.js
