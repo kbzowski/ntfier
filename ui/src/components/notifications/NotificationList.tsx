@@ -74,7 +74,7 @@ export const NotificationList = memo(function NotificationList({
 						</span>
 					)}
 				</div>
-				{unreadCount > 0 && !isAllView && (
+				{unreadCount > 0 && (
 					<TooltipProvider>
 						<Tooltip>
 							<TooltipTrigger asChild>

@@ -372,6 +372,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setCurrentTopicId,
 		markAsRead: notifications.markAsRead,
 		markAllAsRead: notifications.markAllAsRead,
+		markAllAsReadGlobally: notifications.markAllAsReadGlobally,
 		deleteNotification: notifications.deleteNotification,
 		getUnreadCount: notifications.getUnreadCount,
 		getTotalUnread: notifications.getTotalUnread,

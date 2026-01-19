@@ -32,6 +32,7 @@ function App() {
 		toggleMute,
 		markAsRead,
 		markAllAsRead,
+		markAllAsReadGlobally,
 		settings,
 		addServer,
 		removeServer,
@@ -88,8 +89,11 @@ function App() {
 	const handleMarkAllAsRead = useCallback(() => {
 		if (currentTopicId) {
 			markAllAsRead(currentTopicId);
+		} else {
+			// In "All notifications" view - mark all across all topics
+			markAllAsReadGlobally();
 		}
-	}, [markAllAsRead, currentTopicId]);
+	}, [markAllAsRead, markAllAsReadGlobally, currentTopicId]);
 
 	return (
 		<>

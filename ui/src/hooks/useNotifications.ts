@@ -116,6 +116,34 @@ export function useNotifications(subscriptions: Subscription[]) {
 	}, []);
 
 	/**
+	 * Marks all notifications across all topics as read.
+	 * Uses optimistic UI update for instant feedback.
+	 */
+	const markAllAsReadGlobally = useCallback(() => {
+		// Optimistic update - mark all as read in UI
+		setByTopic((prev) => {
+			const updated = new Map<string, Notification[]>();
+			for (const [topicId, notifs] of prev) {
+				updated.set(
+					topicId,
+					notifs.map((n) => ({ ...n, read: true })),
+				);
+			}
+			return updated;
+		});
+
+		// API calls in background for each subscription
+		if (isTauri()) {
+			const topicIds = Array.from(byTopic.keys());
+			for (const topicId of topicIds) {
+				notificationsApi.markAllAsRead(topicId).catch((err) => {
+					console.error(`Failed to mark all as read for ${topicId}:`, err);
+				});
+			}
+		}
+	}, [byTopic]);
+
+	/**
 	 * Deletes a notification.
 	 * Uses optimistic UI update for instant feedback.
 	 */
@@ -217,6 +245,7 @@ export function useNotifications(subscriptions: Subscription[]) {
 		addNotification,
 		markAsRead,
 		markAllAsRead,
+		markAllAsReadGlobally,
 		deleteNotification,
 		clearTopic,
 		getUnreadCount,
