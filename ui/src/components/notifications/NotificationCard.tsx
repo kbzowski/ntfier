@@ -30,9 +30,9 @@ export const NotificationCard = memo(function NotificationCard({
 	return (
 		<Card
 			className={cn(
-				"cursor-pointer transition-all hover:bg-accent/50",
-				!notification.read ? "border-l-8 bg-accent/30" : "border-l-4",
+				"cursor-pointer transition-colors hover:bg-accent/50 border-l-4",
 				borderColor,
+				!notification.read && "bg-accent/20",
 			)}
 			onClick={handleClick}
 		>

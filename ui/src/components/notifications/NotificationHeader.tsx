@@ -35,10 +35,12 @@ export const NotificationHeader = memo(function NotificationHeader({
 	return (
 		<div className="flex items-start justify-between gap-3">
 			<div className="flex items-center gap-2 min-w-0">
-				<h3 className={cn(
-					"text-lg truncate transition-all",
-					!read ? "font-bold" : "font-semibold"
-				)}>
+				<h3
+					className={cn(
+						"text-lg truncate transition-all",
+						!read ? "font-bold" : "font-semibold",
+					)}
+				>
 					{title}
 				</h3>
 			</div>
