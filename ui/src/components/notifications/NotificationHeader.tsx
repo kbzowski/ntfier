@@ -41,7 +41,7 @@ export const NotificationHeader = memo(function NotificationHeader({
 						read && "opacity-0",
 					)}
 				/>
-				<h3 className="font-semibold text-sm truncate">{title}</h3>
+				<h3 className="font-semibold text-lg truncate">{title}</h3>
 			</div>
 			<div className="flex items-center gap-2 shrink-0">
 				<PriorityBadge priority={priority} />

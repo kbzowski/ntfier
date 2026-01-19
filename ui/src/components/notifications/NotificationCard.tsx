@@ -36,7 +36,7 @@ export const NotificationCard = memo(function NotificationCard({
 			)}
 			onClick={handleClick}
 		>
-			<CardContent className="p-4">
+			<CardContent>
 				{topicName && (
 					<div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
 						<Hash className="h-3 w-3" />
