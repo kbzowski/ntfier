@@ -3,11 +3,11 @@
 //! Handles syncing subscriptions from ntfy servers and fetching
 //! historical notifications for each subscription.
 
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::db::Database;
 use crate::models::{normalize_url, CreateSubscription};
-use crate::services::{ConnectionManager, NtfyClient};
+use crate::services::{ConnectionManager, NtfyClient, TrayManager};
 
 /// Synchronization service for subscriptions and notifications.
 pub struct SyncService;
@@ -143,7 +143,8 @@ impl SyncService {
                 None => (None, None),
             };
 
-            Self::sync_subscription_notifications(&db, &client, &sub, username, password).await;
+            Self::sync_subscription_notifications(handle, &db, &client, &sub, username, password)
+                .await;
         }
 
         log::info!("Notification sync completed");
@@ -153,7 +154,10 @@ impl SyncService {
     ///
     /// If `username` and `password` are provided, they are used for authentication.
     /// Otherwise, credentials are looked up from the `servers` list.
+    ///
+    /// Shows system notifications for each new message unless the subscription is muted.
     pub async fn sync_subscription_notifications(
+        handle: &AppHandle,
         db: &Database,
         client: &NtfyClient,
         sub: &crate::models::Subscription,
@@ -208,6 +212,8 @@ impl SyncService {
 
         let mut max_timestamp: i64 = last_sync.unwrap_or(0);
 
+        let mut new_notifications = Vec::new();
+
         for msg in messages {
             if db
                 .notification_exists_by_ntfy_id(msg.ntfy_id())
@@ -228,11 +234,29 @@ impl SyncService {
                     notification.title,
                     notification.message
                 );
+                new_notifications.push(notification);
             }
 
             if msg_time > max_timestamp {
                 max_timestamp = msg_time;
             }
+        }
+
+        // Emit events and show system notifications for new messages
+        for notification in &new_notifications {
+            if let Err(e) = handle.emit("notification:new", notification) {
+                log::error!("Failed to emit notification event: {e}");
+            }
+
+            if !sub.muted {
+                ConnectionManager::show_notification(handle, notification).await;
+            }
+        }
+
+        // Update tray icon if there were new notifications
+        if !new_notifications.is_empty() {
+            let tray_manager: tauri::State<TrayManager> = handle.state();
+            tray_manager.refresh_from_db(handle).await;
         }
 
         let new_sync_time = std::cmp::max(max_timestamp + 1, chrono::Utc::now().timestamp());

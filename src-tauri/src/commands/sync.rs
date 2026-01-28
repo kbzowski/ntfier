@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::db::Database;
 use crate::error::AppError;
@@ -9,6 +9,7 @@ use crate::services::{ConnectionManager, NtfyClient, SyncService};
 #[tauri::command]
 #[specta::specta]
 pub async fn sync_subscriptions(
+    app_handle: AppHandle,
     db: State<'_, Database>,
     conn_manager: State<'_, ConnectionManager>,
     server_url: String,
@@ -110,6 +111,7 @@ pub async fn sync_subscriptions(
     );
     for sub in &synced_subscriptions {
         SyncService::sync_subscription_notifications(
+            &app_handle,
             &db,
             &client,
             sub,
