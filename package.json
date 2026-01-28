@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tauri dev",
-	"types:create": "cd src-tauri && cargo run --bin ntfier -- --export-bindings",
+    "types:create": "cd src-tauri && cargo run --bin ntfier -- --export-bindings",
     "build": "pnpm tauri build --no-sign",
     "build:debug": "tauri build --debug --no-sign",
     "release": "pnpm dotenv -e .env -- tauri build --bundles msi,nsis",
@@ -13,12 +13,12 @@
     "ui:build": "pnpm --filter ui build",
     "ui:test": "pnpm --filter ui test",
     "ui:lint": "pnpm --filter ui lint",
-    "prepare": "husky"
+    "prepare": "lefthook install"
   },
   "devDependencies": {
+    "@evilmartians/lefthook": "^2.0.16",
     "@tauri-apps/cli": "^2",
     "dotenv-cli": "^11.0.0",
-    "husky": "^9.1.7",
     "rimraf": "^6"
   }
 }
