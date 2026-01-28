@@ -19,6 +19,7 @@ import {
 import type {
 	AppSettings,
 	Notification,
+	NotificationDisplayMethod,
 	ServerConfig,
 	Subscription,
 	ThemeMode,
@@ -60,6 +61,7 @@ interface AppActions {
 	// Notifications (optimistic updates - fire and forget)
 	markAsRead: (id: string) => void;
 	markAllAsRead: (subscriptionId: string) => void;
+	markAllAsReadGlobally: () => void;
 	deleteNotification: (id: string) => void;
 	getUnreadCount: (subscriptionId: string) => number;
 	getTotalUnread: () => number;
@@ -74,6 +76,12 @@ interface AppActions {
 	setAutostart: (enabled: boolean) => Promise<void>;
 	setMinimizeToTray: (enabled: boolean) => Promise<void>;
 	setStartMinimized: (enabled: boolean) => Promise<void>;
+
+	// Notification settings
+	setNotificationMethod: (method: NotificationDisplayMethod) => Promise<void>;
+	setNotificationForceDisplay: (enabled: boolean) => Promise<void>;
+	setNotificationShowActions: (enabled: boolean) => Promise<void>;
+	setNotificationShowImages: (enabled: boolean) => Promise<void>;
 
 	// Updates
 	setUpdateInfo: (info: UpdateInfo | null) => void;
@@ -331,6 +339,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		}
 	}, []);
 
+	// Notification settings actions
+	const setNotificationMethod = useCallback(
+		async (method: NotificationDisplayMethod) => {
+			if (isTauri()) {
+				await settingsApi.setNotificationMethod(method);
+				setSettings((prev) => ({ ...prev, notificationMethod: method }));
+			}
+		},
+		[],
+	);
+
+	const setNotificationForceDisplay = useCallback(async (enabled: boolean) => {
+		if (isTauri()) {
+			await settingsApi.setNotificationForceDisplay(enabled);
+			setSettings((prev) => ({ ...prev, notificationForceDisplay: enabled }));
+		}
+	}, []);
+
+	const setNotificationShowActions = useCallback(async (enabled: boolean) => {
+		if (isTauri()) {
+			await settingsApi.setNotificationShowActions(enabled);
+			setSettings((prev) => ({ ...prev, notificationShowActions: enabled }));
+		}
+	}, []);
+
+	const setNotificationShowImages = useCallback(async (enabled: boolean) => {
+		if (isTauri()) {
+			await settingsApi.setNotificationShowImages(enabled);
+			setSettings((prev) => ({ ...prev, notificationShowImages: enabled }));
+		}
+	}, []);
+
 	// Derived data
 	const currentNotifications = useMemo(() => {
 		if (!currentTopicId) {
@@ -383,6 +423,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setAutostart,
 		setMinimizeToTray,
 		setStartMinimized,
+		setNotificationMethod,
+		setNotificationForceDisplay,
+		setNotificationShowActions,
+		setNotificationShowImages,
 		setUpdateInfo,
 
 		// Derived

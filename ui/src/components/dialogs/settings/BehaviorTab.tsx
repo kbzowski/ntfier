@@ -151,7 +151,8 @@ export function BehaviorTab({
 			<div className="space-y-3">
 				<h4 className="text-sm font-medium">Updates</h4>
 
-				{updateStatus === "available" && updateInfo && (
+				{(updateStatus === "available" || updateStatus === "installing") &&
+				updateInfo && (
 					<div className="rounded-md border p-3 space-y-2">
 						<div className="flex items-center justify-between">
 							<span className="text-sm font-medium">
@@ -193,6 +194,7 @@ export function BehaviorTab({
 				{error && <p className="text-sm text-destructive">{error}</p>}
 
 				{(updateStatus === "idle" ||
+					updateStatus === "checking" ||
 					updateStatus === "up-to-date" ||
 					updateStatus === "error") && (
 					<Button
