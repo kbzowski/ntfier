@@ -280,9 +280,13 @@ mod tests {
 
     #[test]
     fn test_cache_filename() {
+        use std::path::Path;
+
         let url = "https://example.com/path/to/image.jpg";
         let filename = get_cache_filename(url);
-        assert!(filename.ends_with(".jpg"));
+        assert!(Path::new(&filename)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("jpg")));
 
         let url2 = "https://example.com/image.png?query=1";
         let filename2 = get_cache_filename(url2);
