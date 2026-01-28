@@ -58,6 +58,10 @@ pub fn export_bindings() {
             commands::set_default_server,
             commands::set_minimize_to_tray,
             commands::set_start_minimized,
+            commands::set_notification_method,
+            commands::set_notification_force_display,
+            commands::set_notification_show_actions,
+            commands::set_notification_show_images,
             commands::sync_subscriptions,
             // Update
             commands::check_for_update,
@@ -218,6 +222,9 @@ pub fn run() {
                 // Small delay to ensure state is ready
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
+                // Clean up old cached images (older than 24 hours)
+                services::image_cache::cleanup_old_images(24 * 60 * 60).await;
+
                 // Set up tray icon with custom icons
                 let tray_manager: tauri::State<TrayManager> = handle.state();
                 tray_manager.set_tray_icon(tray).await;
@@ -275,6 +282,10 @@ pub fn run() {
             commands::set_default_server,
             commands::set_minimize_to_tray,
             commands::set_start_minimized,
+            commands::set_notification_method,
+            commands::set_notification_force_display,
+            commands::set_notification_show_actions,
+            commands::set_notification_show_images,
             // Sync
             commands::sync_subscriptions,
             // Update

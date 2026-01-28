@@ -1,5 +1,6 @@
 mod connection_manager;
 pub mod credential_manager;
+pub mod image_cache;
 mod ntfy_client;
 mod sync_service;
 mod tray_manager;

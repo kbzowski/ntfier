@@ -19,7 +19,9 @@ use tokio_tungstenite::{
 use crate::config::connection::{JITTER_MAX_SECS, RETRY_BACKOFF_SECS};
 use crate::db::Database;
 use crate::error::AppError;
-use crate::models::{normalize_url, Notification, NtfyMessage, Subscription};
+use crate::models::{
+    normalize_url, AppSettings, Notification, NotificationDisplayMethod, NtfyMessage, Subscription,
+};
 use crate::services::TrayManager;
 
 /// Connection entry storing both the shutdown sender and a unique connection ID.
@@ -315,7 +317,32 @@ impl ConnectionManager {
         tray_manager.refresh_from_db(app_handle).await;
 
         if !is_muted {
-            Self::show_native_notification(app_handle, &notification);
+            Self::show_notification(app_handle, &notification).await;
+        }
+    }
+
+    /// Shows a notification using the configured display method.
+    pub async fn show_notification(app_handle: &AppHandle, notification: &Notification) {
+        let db: tauri::State<'_, Database> = app_handle.state();
+        let Ok(settings) = db.get_settings() else {
+            // Fallback to native if settings can't be read
+            Self::show_native_notification(app_handle, notification);
+            return;
+        };
+
+        match settings.notification_method {
+            NotificationDisplayMethod::Native => {
+                Self::show_native_notification(app_handle, notification);
+            }
+            #[cfg(windows)]
+            NotificationDisplayMethod::WindowsEnhanced => {
+                Self::show_winrt_notification(app_handle, notification, &settings).await;
+            }
+            #[cfg(not(windows))]
+            NotificationDisplayMethod::WindowsEnhanced => {
+                // Fallback to native on non-Windows platforms
+                Self::show_native_notification(app_handle, notification);
+            }
         }
     }
 
@@ -395,5 +422,115 @@ impl ConnectionManager {
         }
 
         let _ = builder.show();
+    }
+
+    /// Shows a Windows enhanced notification using `WinRT` APIs.
+    ///
+    /// Features:
+    /// - Force display option (ignores Focus Assist)
+    /// - Action buttons from ntfy
+    /// - Priority-based duration and sound
+    /// - Hero images from attachments or markdown (landscape images above text)
+    /// - Inline images for portrait orientation (below text, properly centered)
+    #[cfg(windows)]
+    async fn show_winrt_notification(
+        app_handle: &AppHandle,
+        notification: &Notification,
+        settings: &AppSettings,
+    ) {
+        use crate::services::image_cache::{self, CachedImage};
+
+        // Download image first (async), before creating Toast (which is not Send)
+        let cached_image: Option<CachedImage> = if settings.notification_show_images {
+            image_cache::get_notification_image(&notification.attachments, &notification.message)
+                .await
+        } else {
+            None
+        };
+
+        // Now create and show the toast (sync part)
+        Self::show_winrt_notification_sync(app_handle, notification, settings, cached_image);
+    }
+
+    /// Synchronous part of `WinRT` notification display.
+    ///
+    /// Separated from async to avoid Send issues with Toast type.
+    #[cfg(windows)]
+    fn show_winrt_notification_sync(
+        app_handle: &AppHandle,
+        notification: &Notification,
+        settings: &AppSettings,
+        cached_image: Option<crate::services::image_cache::CachedImage>,
+    ) {
+        use crate::services::image_cache::ImageOrientation;
+        use tauri_winrt_notification::{Duration, Scenario, Sound, Toast};
+
+        let title = if notification.title.is_empty() {
+            "New notification"
+        } else {
+            &notification.title
+        };
+
+        // Get the app's AUMID (Application User Model ID)
+        // Tauri apps use the bundle identifier from tauri.conf.json
+        let aumid = app_handle.config().identifier.as_str();
+
+        let mut toast = Toast::new(aumid)
+            .title(&Self::sanitize_for_notification(title))
+            .text1(&Self::sanitize_for_notification(&notification.message));
+
+        // Force display - ignores Focus Assist using Scenario::Alarm
+        if settings.notification_force_display {
+            toast = toast.scenario(Scenario::Alarm);
+        }
+
+        // Duration based on priority
+        if notification.priority as i32 >= 4 {
+            toast = toast.duration(Duration::Long);
+        }
+
+        // Sound based on priority
+        let sound = if notification.priority as i32 >= 4 {
+            Some(Sound::SMS) // Louder sound for high priority
+        } else if notification.priority as i32 >= 3 {
+            Some(Sound::Default)
+        } else {
+            None
+        };
+        if let Some(s) = sound {
+            toast = toast.sound(Some(s));
+        }
+
+        // Action buttons from ntfy (max 3 buttons supported by Windows)
+        if settings.notification_show_actions && !notification.actions.is_empty() {
+            for action in notification.actions.iter().take(3) {
+                if let Some(ref url) = action.url {
+                    toast = toast.add_button(&action.label, url);
+                }
+            }
+        }
+
+        // Image display based on orientation:
+        // - Landscape/square images: use hero() for prominent display above text
+        // - Portrait images: use image() for inline display below text (avoids cropping)
+        if let Some(ref cached) = cached_image {
+            match cached.orientation {
+                ImageOrientation::Landscape => {
+                    // Hero image above text - ideal for landscape images
+                    toast = toast.hero(&cached.path, "");
+                }
+                ImageOrientation::Portrait => {
+                    // Inline image below text - better for portrait images
+                    // Windows will display it centered and properly scaled
+                    toast = toast.image(&cached.path, "");
+                }
+            }
+        }
+
+        if let Err(e) = toast.show() {
+            log::error!("Failed to show WinRT notification: {e}");
+            // Fallback to native notification on error
+            Self::show_native_notification(app_handle, notification);
+        }
     }
 }

@@ -51,11 +51,15 @@ thiserror = "2"
 url = "2"
 pulldown-cmark = { version = "0.12", default-features = false }
 base64 = "0.22"
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 rand = "0.8"
 
 # Secure credential storage
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+
+# Windows-specific enhanced notifications
+[target.'cfg(windows)'.dependencies]
+tauri-winrt-notification = "0.5"
 
 # Type-safe bindings between Rust and TypeScript
 specta = "=2.0.0-rc.22"
