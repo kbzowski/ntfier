@@ -152,37 +152,37 @@ export function BehaviorTab({
 				<h4 className="text-sm font-medium">Updates</h4>
 
 				{(updateStatus === "available" || updateStatus === "installing") &&
-				updateInfo && (
-					<div className="rounded-md border p-3 space-y-2">
-						<div className="flex items-center justify-between">
-							<span className="text-sm font-medium">
-								Version {updateInfo.version} available
-							</span>
-							<Button
-								size="sm"
-								onClick={handleInstallUpdate}
-								disabled={updateStatus === "installing"}
-							>
-								{updateStatus === "installing" ? (
-									<>
-										<Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-										Installing...
-									</>
-								) : (
-									<>
-										<Download className="h-4 w-4 mr-1.5" />
-										Install & Restart
-									</>
-								)}
-							</Button>
+					updateInfo && (
+						<div className="rounded-md border p-3 space-y-2">
+							<div className="flex items-center justify-between">
+								<span className="text-sm font-medium">
+									Version {updateInfo.version} available
+								</span>
+								<Button
+									size="sm"
+									onClick={handleInstallUpdate}
+									disabled={updateStatus === "installing"}
+								>
+									{updateStatus === "installing" ? (
+										<>
+											<Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+											Installing...
+										</>
+									) : (
+										<>
+											<Download className="h-4 w-4 mr-1.5" />
+											Install & Restart
+										</>
+									)}
+								</Button>
+							</div>
+							{updateInfo.body && (
+								<p className="text-xs text-muted-foreground whitespace-pre-wrap">
+									{updateInfo.body}
+								</p>
+							)}
 						</div>
-						{updateInfo.body && (
-							<p className="text-xs text-muted-foreground whitespace-pre-wrap">
-								{updateInfo.body}
-							</p>
-						)}
-					</div>
-				)}
+					)}
 
 				{updateStatus === "up-to-date" && (
 					<div className="flex items-center gap-2 text-sm text-muted-foreground">
