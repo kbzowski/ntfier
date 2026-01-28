@@ -19,11 +19,11 @@ use tokio_tungstenite::{
 use crate::config::connection::{JITTER_MAX_SECS, RETRY_BACKOFF_SECS};
 use crate::db::Database;
 use crate::error::AppError;
+#[cfg(windows)]
+use crate::models::AppSettings;
 use crate::models::{
     normalize_url, Notification, NotificationDisplayMethod, NtfyMessage, Subscription,
 };
-#[cfg(windows)]
-use crate::models::AppSettings;
 use crate::services::TrayManager;
 
 /// Connection entry storing both the shutdown sender and a unique connection ID.
