@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::db::Database;
 use crate::error::AppError;
-use crate::models::{AppSettings, ServerConfig, ThemeMode};
+use crate::models::{AppSettings, NotificationDisplayMethod, ServerConfig, ThemeMode};
 use crate::services::ConnectionManager;
 
 #[tauri::command]
@@ -55,4 +55,53 @@ pub fn set_minimize_to_tray(db: State<'_, Database>, enabled: bool) -> Result<()
 #[specta::specta]
 pub fn set_start_minimized(db: State<'_, Database>, enabled: bool) -> Result<(), AppError> {
     db.set_setting("start_minimized", if enabled { "true" } else { "false" })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_notification_method(
+    db: State<'_, Database>,
+    method: NotificationDisplayMethod,
+) -> Result<(), AppError> {
+    let method_str = match method {
+        NotificationDisplayMethod::Native => "native",
+        NotificationDisplayMethod::WindowsEnhanced => "windows_enhanced",
+    };
+    db.set_setting("notification_method", method_str)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_notification_force_display(
+    db: State<'_, Database>,
+    enabled: bool,
+) -> Result<(), AppError> {
+    db.set_setting(
+        "notification_force_display",
+        if enabled { "true" } else { "false" },
+    )
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_notification_show_actions(
+    db: State<'_, Database>,
+    enabled: bool,
+) -> Result<(), AppError> {
+    db.set_setting(
+        "notification_show_actions",
+        if enabled { "true" } else { "false" },
+    )
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_notification_show_images(
+    db: State<'_, Database>,
+    enabled: bool,
+) -> Result<(), AppError> {
+    db.set_setting(
+        "notification_show_images",
+        if enabled { "true" } else { "false" },
+    )
 }

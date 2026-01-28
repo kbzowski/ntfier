@@ -349,4 +349,8 @@ export const mockSettings: AppSettings = {
 	defaultServer: "https://ntfy.sh",
 	minimizeToTray: true,
 	startMinimized: false,
+	notificationMethod: "native",
+	notificationForceDisplay: false,
+	notificationShowActions: true,
+	notificationShowImages: true,
 };

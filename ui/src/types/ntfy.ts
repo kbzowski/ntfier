@@ -4,6 +4,7 @@ export type {
 	Attachment,
 	Notification,
 	NotificationAction,
+	NotificationDisplayMethod,
 	ServerConfig,
 	Subscription,
 	ThemeMode,

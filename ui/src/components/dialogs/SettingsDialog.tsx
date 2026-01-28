@@ -1,4 +1,4 @@
-import { Palette, Server, Settings2 } from "lucide-react";
+import { Bell, Palette, Server, Settings2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
 	Dialog,
@@ -8,10 +8,14 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ThemeDefinition } from "@/themes";
-import { commands, type UpdateInfo } from "@/types/bindings";
+import {
+	commands,
+	type NotificationDisplayMethod,
+	type UpdateInfo,
+} from "@/types/bindings";
 import type { ServerConfig } from "@/types/ntfy";
 import { ServerConfigForm } from "./ServerConfigForm";
-import { AppearanceTab, BehaviorTab } from "./settings";
+import { AppearanceTab, BehaviorTab, NotificationsTab } from "./settings";
 
 interface SettingsDialogProps {
 	open: boolean;
@@ -35,6 +39,14 @@ interface SettingsDialogProps {
 	onStartMinimizedChange: (enabled: boolean) => void;
 	updateInfo: UpdateInfo | null;
 	onUpdateInfoChange: (info: UpdateInfo | null) => void;
+	notificationMethod: NotificationDisplayMethod;
+	onNotificationMethodChange: (method: NotificationDisplayMethod) => void;
+	notificationForceDisplay: boolean;
+	onNotificationForceDisplayChange: (enabled: boolean) => void;
+	notificationShowActions: boolean;
+	onNotificationShowActionsChange: (enabled: boolean) => void;
+	notificationShowImages: boolean;
+	onNotificationShowImagesChange: (enabled: boolean) => void;
 }
 
 export function SettingsDialog({
@@ -57,6 +69,14 @@ export function SettingsDialog({
 	onStartMinimizedChange,
 	updateInfo,
 	onUpdateInfoChange,
+	notificationMethod,
+	onNotificationMethodChange,
+	notificationForceDisplay,
+	onNotificationForceDisplayChange,
+	notificationShowActions,
+	onNotificationShowActionsChange,
+	notificationShowImages,
+	onNotificationShowImagesChange,
 }: SettingsDialogProps) {
 	const [version, setVersion] = useState<string>("");
 
@@ -74,7 +94,7 @@ export function SettingsDialog({
 				</DialogHeader>
 
 				<Tabs defaultValue="appearance">
-					<TabsList className="grid w-full grid-cols-3">
+					<TabsList className="grid w-full grid-cols-4">
 						<TabsTrigger value="appearance">
 							<Palette className="h-4 w-4 mr-1.5" />
 							Appearance
@@ -82,6 +102,10 @@ export function SettingsDialog({
 						<TabsTrigger value="behavior">
 							<Settings2 className="h-4 w-4 mr-1.5" />
 							Behavior
+						</TabsTrigger>
+						<TabsTrigger value="notifications">
+							<Bell className="h-4 w-4 mr-1.5" />
+							Notifications
 						</TabsTrigger>
 						<TabsTrigger value="servers">
 							<Server className="h-4 w-4 mr-1.5" />
@@ -109,6 +133,21 @@ export function SettingsDialog({
 							onStartMinimizedChange={onStartMinimizedChange}
 							updateInfo={updateInfo}
 							onUpdateInfoChange={onUpdateInfoChange}
+						/>
+					</TabsContent>
+
+					<TabsContent value="notifications" className="mt-4">
+						<NotificationsTab
+							notificationMethod={notificationMethod}
+							onNotificationMethodChange={onNotificationMethodChange}
+							notificationForceDisplay={notificationForceDisplay}
+							onNotificationForceDisplayChange={
+								onNotificationForceDisplayChange
+							}
+							notificationShowActions={notificationShowActions}
+							onNotificationShowActionsChange={onNotificationShowActionsChange}
+							notificationShowImages={notificationShowImages}
+							onNotificationShowImagesChange={onNotificationShowImagesChange}
 						/>
 					</TabsContent>
 

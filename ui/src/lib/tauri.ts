@@ -22,6 +22,7 @@ import {
 	type CreateSubscription,
 	commands,
 	type Notification,
+	type NotificationDisplayMethod,
 	type Result,
 	type ServerConfig,
 	type Subscription,
@@ -36,6 +37,7 @@ export type {
 	ServerConfig,
 	Subscription,
 	Notification,
+	NotificationDisplayMethod,
 	AppSettings,
 	UpdateInfo,
 };
@@ -166,6 +168,22 @@ export const settingsApi = {
 
 	setStartMinimized: async (enabled: boolean) => {
 		unwrap(await commands.setStartMinimized(enabled));
+	},
+
+	setNotificationMethod: async (method: NotificationDisplayMethod) => {
+		unwrap(await commands.setNotificationMethod(method));
+	},
+
+	setNotificationForceDisplay: async (enabled: boolean) => {
+		unwrap(await commands.setNotificationForceDisplay(enabled));
+	},
+
+	setNotificationShowActions: async (enabled: boolean) => {
+		unwrap(await commands.setNotificationShowActions(enabled));
+	},
+
+	setNotificationShowImages: async (enabled: boolean) => {
+		unwrap(await commands.setNotificationShowImages(enabled));
 	},
 };
 

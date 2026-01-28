@@ -41,6 +41,10 @@ function App() {
 		setAutostart,
 		setMinimizeToTray,
 		setStartMinimized,
+		setNotificationMethod,
+		setNotificationForceDisplay,
+		setNotificationShowActions,
+		setNotificationShowImages,
 		updateInfo,
 		setUpdateInfo,
 	} = useApp();
@@ -135,6 +139,14 @@ function App() {
 				onStartMinimizedChange={setStartMinimized}
 				updateInfo={updateInfo}
 				onUpdateInfoChange={setUpdateInfo}
+				notificationMethod={settings.notificationMethod ?? "native"}
+				onNotificationMethodChange={setNotificationMethod}
+				notificationForceDisplay={settings.notificationForceDisplay ?? false}
+				onNotificationForceDisplayChange={setNotificationForceDisplay}
+				notificationShowActions={settings.notificationShowActions ?? true}
+				onNotificationShowActionsChange={setNotificationShowActions}
+				notificationShowImages={settings.notificationShowImages ?? true}
+				onNotificationShowImagesChange={setNotificationShowImages}
 			/>
 
 			<AddSubscriptionDialog

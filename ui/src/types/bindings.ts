@@ -141,6 +141,38 @@ async setStartMinimized(enabled: boolean) : Promise<Result<null, AppError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async setNotificationMethod(method: NotificationDisplayMethod) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_notification_method", { method }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setNotificationForceDisplay(enabled: boolean) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_notification_force_display", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setNotificationShowActions(enabled: boolean) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_notification_show_actions", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setNotificationShowImages(enabled: boolean) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_notification_show_images", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * Sync subscriptions from a server that has user credentials
  */
@@ -237,7 +269,23 @@ minimizeToTray?: boolean;
 /**
  * Start application minimized to tray.
  */
-startMinimized?: boolean }
+startMinimized?: boolean; 
+/**
+ * Notification display method.
+ */
+notificationMethod?: NotificationDisplayMethod; 
+/**
+ * Force display even when Focus Assist is on (Windows Enhanced only).
+ */
+notificationForceDisplay?: boolean; 
+/**
+ * Show action buttons in notification (Windows Enhanced only).
+ */
+notificationShowActions?: boolean; 
+/**
+ * Show images in notification (Windows Enhanced only).
+ */
+notificationShowImages?: boolean }
 /**
  * A file attachment on a notification.
  */
@@ -262,6 +310,18 @@ timestamp: number; actions: NotificationAction[]; attachments: Attachment[]; rea
  * An action button attached to a notification.
  */
 export type NotificationAction = { id: string; label: string; url: string | null; method: string | null; clear: boolean }
+/**
+ * Notification display method.
+ */
+export type NotificationDisplayMethod = 
+/**
+ * Standard cross-platform notifications (may be suppressed by Focus Assist).
+ */
+"native" | 
+/**
+ * Windows-specific enhanced notifications with action buttons and force display.
+ */
+"windows_enhanced"
 /**
  * Configuration for a single ntfy server.
  */

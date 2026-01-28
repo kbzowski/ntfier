@@ -17,8 +17,8 @@ impl<T> From<PoisonError<T>> for AppError {
     }
 }
 use crate::models::{
-    AppSettings, Attachment, CreateSubscription, Notification, NotificationAction, Priority,
-    ServerConfig, Subscription, ThemeMode,
+    AppSettings, Attachment, CreateSubscription, Notification, NotificationAction,
+    NotificationDisplayMethod, Priority, ServerConfig, Subscription, ThemeMode,
 };
 use crate::services::credential_manager;
 
@@ -467,6 +467,17 @@ impl Database {
         let minimize_to_tray = self.get_setting_bool("minimize_to_tray", true)?;
         let start_minimized = self.get_setting_bool("start_minimized", false)?;
 
+        // Notification settings
+        let notification_method_str = self.get_setting_string("notification_method", "native")?;
+        let notification_method = match notification_method_str.as_str() {
+            "windows_enhanced" => NotificationDisplayMethod::WindowsEnhanced,
+            _ => NotificationDisplayMethod::Native,
+        };
+        let notification_force_display =
+            self.get_setting_bool("notification_force_display", false)?;
+        let notification_show_actions = self.get_setting_bool("notification_show_actions", true)?;
+        let notification_show_images = self.get_setting_bool("notification_show_images", true)?;
+
         let servers = self.get_servers_with_credentials()?;
         let default_server = self.get_default_server_url()?;
 
@@ -476,6 +487,10 @@ impl Database {
             default_server,
             minimize_to_tray,
             start_minimized,
+            notification_method,
+            notification_force_display,
+            notification_show_actions,
+            notification_show_images,
         })
     }
 

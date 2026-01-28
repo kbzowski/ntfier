@@ -16,6 +16,17 @@ pub enum ThemeMode {
     System,
 }
 
+/// Notification display method.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum NotificationDisplayMethod {
+    /// Standard cross-platform notifications (may be suppressed by Focus Assist).
+    #[default]
+    Native,
+    /// Windows-specific enhanced notifications with action buttons and force display.
+    WindowsEnhanced,
+}
+
 /// Configuration for a single ntfy server.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -93,6 +104,18 @@ pub struct AppSettings {
     /// Start application minimized to tray.
     #[serde(default)]
     pub start_minimized: bool,
+    /// Notification display method.
+    #[serde(default)]
+    pub notification_method: NotificationDisplayMethod,
+    /// Force display even when Focus Assist is on (Windows Enhanced only).
+    #[serde(default)]
+    pub notification_force_display: bool,
+    /// Show action buttons in notification (Windows Enhanced only).
+    #[serde(default = "default_true")]
+    pub notification_show_actions: bool,
+    /// Show images in notification (Windows Enhanced only).
+    #[serde(default = "default_true")]
+    pub notification_show_images: bool,
 }
 
 const fn default_true() -> bool {
@@ -112,6 +135,10 @@ impl Default for AppSettings {
             default_server: "https://ntfy.sh".to_string(),
             minimize_to_tray: true,
             start_minimized: false,
+            notification_method: NotificationDisplayMethod::Native,
+            notification_force_display: false,
+            notification_show_actions: true,
+            notification_show_images: true,
         }
     }
 }
