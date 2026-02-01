@@ -1,5 +1,6 @@
-import { Check, Monitor } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Check, LayoutList, Monitor } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { SettingCheckbox } from "@/components/ui/setting-checkbox";
 import { cn } from "@/lib/utils";
 import type { ThemeDefinition } from "@/themes";
 
@@ -9,6 +10,10 @@ interface AppearanceTabProps {
 	isSystemMode: boolean;
 	onSystemModeChange: (enabled: boolean) => void;
 	availableThemes: ThemeDefinition[];
+	compactView: boolean;
+	onCompactViewChange: (enabled: boolean) => void;
+	expandNewMessages: boolean;
+	onExpandNewMessagesChange: (enabled: boolean) => void;
 }
 
 function ThemePreview({
@@ -65,60 +70,106 @@ function ThemePreview({
 	);
 }
 
+function ThemeSelector({
+	themes,
+	selectedId,
+	onSelect,
+	disabled,
+}: {
+	themes: ThemeDefinition[];
+	selectedId: string;
+	onSelect: (id: string) => void;
+	disabled?: boolean;
+}) {
+	return (
+		<div className="grid grid-cols-3 gap-3">
+			{themes.map((theme) => (
+				<button
+					key={theme.id}
+					type="button"
+					className={cn(
+						"text-left transition-all rounded-lg select-none",
+						"hover:ring-2 hover:ring-ring hover:ring-offset-2",
+						"focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+						disabled && "opacity-50 pointer-events-none",
+					)}
+					onClick={() => onSelect(theme.id)}
+					disabled={disabled}
+				>
+					<ThemePreview
+						theme={theme}
+						isSelected={!disabled && selectedId === theme.id}
+					/>
+					<p className="mt-1.5 text-xs font-medium text-center truncate">
+						{theme.name}
+					</p>
+				</button>
+			))}
+		</div>
+	);
+}
+
 export function AppearanceTab({
 	themeId,
 	onThemeChange,
 	isSystemMode,
 	onSystemModeChange,
 	availableThemes,
+	compactView,
+	onCompactViewChange,
+	expandNewMessages,
+	onExpandNewMessagesChange,
 }: AppearanceTabProps) {
 	return (
 		<div className="space-y-4">
-			<div className="grid grid-cols-3 gap-3">
-				{availableThemes.map((theme) => (
-					<button
-						key={theme.id}
-						type="button"
-						className={cn(
-							"text-left transition-all rounded-lg select-none",
-							"hover:ring-2 hover:ring-ring hover:ring-offset-2",
-							"focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-							isSystemMode && "opacity-50 pointer-events-none",
-						)}
-						onClick={() => onThemeChange(theme.id)}
-						disabled={isSystemMode}
-					>
-						<ThemePreview
-							theme={theme}
-							isSelected={!isSystemMode && themeId === theme.id}
-						/>
-						<p className="mt-1.5 text-xs font-medium text-center truncate">
-							{theme.name}
-						</p>
-					</button>
-				))}
-			</div>
+			<ThemeSelector
+				themes={availableThemes}
+				selectedId={themeId}
+				onSelect={onThemeChange}
+				disabled={isSystemMode}
+			/>
 
-			<div className="flex items-center gap-2 pt-2">
-				<Checkbox
-					id="system-mode"
-					checked={isSystemMode}
-					onCheckedChange={(checked) => onSystemModeChange(checked === true)}
+			<SettingCheckbox
+				id="system-mode"
+				checked={isSystemMode}
+				onCheckedChange={onSystemModeChange}
+				label="Use system preference"
+				icon={<Monitor className="h-4 w-4 text-muted-foreground" />}
+				description={
+					isSystemMode
+						? "Automatically switches between Light and Dark based on your system settings"
+						: undefined
+				}
+				className="pt-2"
+			/>
+
+			<Separator />
+
+			<div className="space-y-3">
+				<h4 className="text-sm font-medium flex items-center gap-2">
+					<LayoutList className="h-4 w-4 text-muted-foreground" />
+					Message Display
+				</h4>
+
+				<SettingCheckbox
+					id="compact-view"
+					checked={compactView}
+					onCheckedChange={onCompactViewChange}
+					label="Compact view"
+					description="Show messages in collapsed accordion style. Click to expand."
 				/>
-				<label
-					htmlFor="system-mode"
-					className="flex items-center gap-2 text-sm font-medium cursor-pointer"
-				>
-					<Monitor className="h-4 w-4 text-muted-foreground" />
-					Use system preference
-				</label>
+
+				{compactView && (
+					<SettingCheckbox
+						id="expand-new-messages"
+						checked={expandNewMessages}
+						onCheckedChange={onExpandNewMessagesChange}
+						label="Expand new messages"
+						description="Automatically expand newly received messages"
+						className="pt-2"
+					/>
+				)}
 			</div>
-			{isSystemMode && (
-				<p className="text-xs text-muted-foreground pl-6">
-					Automatically switches between Light and Dark based on your system
-					settings
-				</p>
-			)}
 		</div>
 	);
 }

@@ -49,6 +49,7 @@ pub fn export_bindings() {
             commands::mark_as_read,
             commands::mark_all_as_read,
             commands::delete_notification,
+            commands::set_notification_expanded,
             commands::get_unread_count,
             commands::get_total_unread_count,
             commands::get_settings,
@@ -62,6 +63,9 @@ pub fn export_bindings() {
             commands::set_notification_force_display,
             commands::set_notification_show_actions,
             commands::set_notification_show_images,
+            commands::set_notification_sound,
+            commands::set_compact_view,
+            commands::set_expand_new_messages,
             commands::sync_subscriptions,
             // Update
             commands::check_for_update,
@@ -272,6 +276,7 @@ pub fn run() {
             commands::mark_as_read,
             commands::mark_all_as_read,
             commands::delete_notification,
+            commands::set_notification_expanded,
             commands::get_unread_count,
             commands::get_total_unread_count,
             // Settings
@@ -286,6 +291,9 @@ pub fn run() {
             commands::set_notification_force_display,
             commands::set_notification_show_actions,
             commands::set_notification_show_images,
+            commands::set_notification_sound,
+            commands::set_compact_view,
+            commands::set_expand_new_messages,
             // Sync
             commands::sync_subscriptions,
             // Update

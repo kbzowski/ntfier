@@ -169,6 +169,26 @@ export function useNotifications(subscriptions: Subscription[]) {
 	}, []);
 
 	/**
+	 * Sets the expanded state for a notification.
+	 * Uses optimistic UI update for instant feedback.
+	 */
+	const setExpanded = useCallback((id: string, expanded: boolean) => {
+		// Optimistic update - instant UI feedback
+		setByTopic((prev) => {
+			const topicId = findTopicForNotification(prev, id);
+			if (!topicId) return prev;
+
+			const notifs = prev.get(topicId);
+			if (!notifs) return prev;
+
+			const updated = notifs.map((n) =>
+				n.id === id ? { ...n, isExpanded: expanded } : n,
+			);
+			return new Map(prev).set(topicId, updated);
+		});
+	}, []);
+
+	/**
 	 * Clears cached notifications for a topic (used when unsubscribing).
 	 */
 	const clearTopic = useCallback((topicId: string) => {
@@ -247,6 +267,7 @@ export function useNotifications(subscriptions: Subscription[]) {
 		markAllAsRead,
 		markAllAsReadGlobally,
 		deleteNotification,
+		setExpanded,
 		clearTopic,
 		getUnreadCount,
 		getTotalUnread,

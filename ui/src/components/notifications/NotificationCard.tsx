@@ -1,6 +1,11 @@
 import { Hash } from "lucide-react";
-import { memo, useCallback } from "react";
+import { memo, useCallback, type ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { PRIORITY_CONFIG } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Notification as NotificationType } from "@/types/ntfy";
@@ -14,12 +19,46 @@ interface NotificationCardProps {
 	notification: NotificationType;
 	topicName?: string;
 	onMarkAsRead?: (id: string) => void;
+	isCollapsible?: boolean;
+	isExpanded?: boolean;
+	onExpandedChange?: (expanded: boolean) => void;
+}
+
+interface CardFrameProps {
+	children: ReactNode;
+	borderColor: string;
+	isUnread: boolean;
+	onClick?: () => void;
+}
+
+function CardFrame({
+	children,
+	borderColor,
+	isUnread,
+	onClick,
+}: CardFrameProps) {
+	return (
+		<Card
+			className={cn(
+				"transition-colors hover:bg-accent/50 border-l-4",
+				borderColor,
+				isUnread && "bg-accent/20",
+				onClick && "cursor-pointer",
+			)}
+			onClick={onClick}
+		>
+			<CardContent>{children}</CardContent>
+		</Card>
+	);
 }
 
 export const NotificationCard = memo(function NotificationCard({
 	notification,
 	topicName,
 	onMarkAsRead,
+	isCollapsible = false,
+	isExpanded = true,
+	onExpandedChange,
 }: NotificationCardProps) {
 	const borderColor = PRIORITY_CONFIG[notification.priority].borderClass;
 
@@ -27,37 +66,75 @@ export const NotificationCard = memo(function NotificationCard({
 		onMarkAsRead?.(notification.id);
 	}, [onMarkAsRead, notification.id]);
 
-	return (
-		<Card
-			className={cn(
-				"cursor-pointer transition-colors hover:bg-accent/50 border-l-4",
-				borderColor,
-				!notification.read && "bg-accent/20",
+	const handleExpandedChange = useCallback(
+		(expanded: boolean) => {
+			onExpandedChange?.(expanded);
+			if (expanded) {
+				onMarkAsRead?.(notification.id);
+			}
+		},
+		[onExpandedChange, onMarkAsRead, notification.id],
+	);
+
+	const topicBadge = topicName && (
+		<div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+			<Hash className="h-3 w-3" />
+			<span>{topicName}</span>
+		</div>
+	);
+
+	const header = (
+		<NotificationHeader
+			title={notification.title}
+			timestamp={notification.timestamp}
+			priority={notification.priority}
+			read={notification.read}
+			showChevron={isCollapsible}
+			isExpanded={isExpanded}
+		/>
+	);
+
+	const details = (
+		<>
+			{notification.message && (
+				<div className="mt-2 text-sm text-muted-foreground selectable">
+					<MarkdownContent content={notification.message} />
+				</div>
 			)}
+			<NotificationTags tags={notification.tags} />
+			<NotificationAttachments attachments={notification.attachments} />
+			<NotificationActions actions={notification.actions} />
+		</>
+	);
+
+	if (isCollapsible) {
+		return (
+			<Collapsible open={isExpanded} onOpenChange={handleExpandedChange}>
+				<CardFrame
+					borderColor={borderColor}
+					isUnread={!notification.read}
+				>
+					<CollapsibleTrigger className="w-full text-left cursor-pointer">
+						{topicBadge}
+						{header}
+					</CollapsibleTrigger>
+					<CollapsibleContent className="collapsible-content overflow-hidden">
+						{details}
+					</CollapsibleContent>
+				</CardFrame>
+			</Collapsible>
+		);
+	}
+
+	return (
+		<CardFrame
+			borderColor={borderColor}
+			isUnread={!notification.read}
 			onClick={handleClick}
 		>
-			<CardContent>
-				{topicName && (
-					<div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
-						<Hash className="h-3 w-3" />
-						<span>{topicName}</span>
-					</div>
-				)}
-				<NotificationHeader
-					title={notification.title}
-					timestamp={notification.timestamp}
-					priority={notification.priority}
-					read={notification.read}
-				/>
-				{notification.message && (
-					<div className="mt-2 text-sm text-muted-foreground selectable">
-						<MarkdownContent content={notification.message} />
-					</div>
-				)}
-				<NotificationTags tags={notification.tags} />
-				<NotificationAttachments attachments={notification.attachments} />
-				<NotificationActions actions={notification.actions} />
-			</CardContent>
-		</Card>
+			{topicBadge}
+			{header}
+			{details}
+		</CardFrame>
 	);
 });

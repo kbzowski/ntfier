@@ -304,7 +304,7 @@ impl Database {
     ) -> Result<Vec<Notification>, AppError> {
         let conn = self.lock_conn()?;
         let mut stmt = conn.prepare(
-            "SELECT id, subscription_id, title, message, priority, tags, timestamp, read, actions, attachments
+            "SELECT id, subscription_id, title, message, priority, tags, timestamp, read, actions, attachments, is_expanded
              FROM notifications
              WHERE subscription_id = ?1
              ORDER BY timestamp DESC"
@@ -336,6 +336,7 @@ impl Database {
                     actions,
                     attachments,
                     read: row.get::<_, i32>(7)? == 1,
+                    is_expanded: row.get::<_, i32>(10).unwrap_or(0) == 1,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -361,8 +362,8 @@ impl Database {
         let attachments_json = serde_json::to_string(&notification.attachments)?;
 
         conn.execute(
-            "INSERT OR REPLACE INTO notifications (id, subscription_id, title, message, priority, tags, timestamp, read, actions, attachments)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT OR REPLACE INTO notifications (id, subscription_id, title, message, priority, tags, timestamp, read, actions, attachments, is_expanded)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             rusqlite::params![
                 notification.id,
                 notification.topic_id,
@@ -374,6 +375,7 @@ impl Database {
                 if notification.read { 1 } else { 0 },
                 actions_json,
                 attachments_json,
+                if notification.is_expanded { 1 } else { 0 },
             ],
         )?;
 
@@ -391,8 +393,8 @@ impl Database {
         let attachments_json = serde_json::to_string(&notification.attachments)?;
 
         conn.execute(
-            "INSERT OR IGNORE INTO notifications (id, subscription_id, ntfy_id, title, message, priority, tags, timestamp, read, actions, attachments)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            "INSERT OR IGNORE INTO notifications (id, subscription_id, ntfy_id, title, message, priority, tags, timestamp, read, actions, attachments, is_expanded)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             rusqlite::params![
                 notification.id,
                 notification.topic_id,
@@ -405,6 +407,7 @@ impl Database {
                 if notification.read { 1 } else { 0 },
                 actions_json,
                 attachments_json,
+                if notification.is_expanded { 1 } else { 0 },
             ],
         )?;
 
@@ -422,6 +425,15 @@ impl Database {
         conn.execute(
             "UPDATE notifications SET read = 1 WHERE subscription_id = ?1",
             [subscription_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_notification_expanded(&self, id: &str, expanded: bool) -> Result<(), AppError> {
+        let conn = self.lock_conn()?;
+        conn.execute(
+            "UPDATE notifications SET is_expanded = ?1 WHERE id = ?2",
+            rusqlite::params![if expanded { 1 } else { 0 }, id],
         )?;
         Ok(())
     }
@@ -477,6 +489,11 @@ impl Database {
             self.get_setting_bool("notification_force_display", false)?;
         let notification_show_actions = self.get_setting_bool("notification_show_actions", true)?;
         let notification_show_images = self.get_setting_bool("notification_show_images", true)?;
+        let notification_sound = self.get_setting_bool("notification_sound", true)?;
+
+        // Message display settings
+        let compact_view = self.get_setting_bool("compact_view", false)?;
+        let expand_new_messages = self.get_setting_bool("expand_new_messages", true)?;
 
         let servers = self.get_servers_with_credentials()?;
         let default_server = self.get_default_server_url()?;
@@ -491,6 +508,9 @@ impl Database {
             notification_force_display,
             notification_show_actions,
             notification_show_images,
+            notification_sound,
+            compact_view,
+            expand_new_messages,
         })
     }
 
