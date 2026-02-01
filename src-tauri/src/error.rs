@@ -37,10 +37,22 @@ pub enum AppError {
     Updater(String),
 }
 
-// Conversion from rusqlite::Error
-impl From<rusqlite::Error> for AppError {
-    fn from(err: rusqlite::Error) -> Self {
+// Conversion from Diesel errors
+impl From<diesel::result::Error> for AppError {
+    fn from(err: diesel::result::Error) -> Self {
         Self::Database(err.to_string())
+    }
+}
+
+impl From<diesel::ConnectionError> for AppError {
+    fn from(err: diesel::ConnectionError) -> Self {
+        Self::Database(err.to_string())
+    }
+}
+
+impl<T> From<std::sync::PoisonError<T>> for AppError {
+    fn from(err: std::sync::PoisonError<T>) -> Self {
+        Self::Database(format!("Mutex poisoned: {err}"))
     }
 }
 

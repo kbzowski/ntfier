@@ -31,6 +31,20 @@
 
 Download the latest release from the [Releases](https://github.com/kbzowski/ntfier/releases) page.
 
+## Upgrading
+
+### v1.0.0 Breaking Changes
+
+**Database migration required:** Version 1.0.0 switches from rusqlite to Diesel ORM with a new database schema. The old database is **not compatible** with this version.
+
+**Before upgrading, you must delete the old database file:**
+
+```
+%APPDATA%\com.ntfier.app\ntfier.db
+```
+
+> **Note:** This will delete all your subscriptions and notification history. You will need to re-add your subscriptions after upgrading.
+
 ## Requirements
 
 This project uses [proto](https://moonrepo.dev/proto) for toolchain management:
