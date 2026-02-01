@@ -50,6 +50,8 @@ pub struct Notification {
     pub actions: Vec<NotificationAction>,
     pub attachments: Vec<Attachment>,
     pub read: bool,
+    /// Whether the notification is expanded in compact view mode.
+    pub is_expanded: bool,
 }
 
 /// An action button attached to a notification.
@@ -173,6 +175,7 @@ impl NtfyMessage {
             actions,
             attachments,
             read: false,
+            is_expanded: false,
         }
     }
 

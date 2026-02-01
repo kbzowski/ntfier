@@ -67,4 +67,7 @@ CREATE INDEX IF NOT EXISTS idx_servers_default ON servers(is_default);
 /// Database migrations.
 /// Each migration is applied once and tracked in the migrations table.
 /// Migrations should be additive - never modify existing migrations.
-pub const MIGRATIONS: &[&str] = &[];
+pub const MIGRATIONS: &[&str] = &[
+    // Migration 1: Add is_expanded column to notifications for persisting collapsed/expanded state
+    "ALTER TABLE notifications ADD COLUMN is_expanded INTEGER NOT NULL DEFAULT 0",
+];

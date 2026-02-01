@@ -60,6 +60,16 @@ pub fn delete_notification(
 
 #[tauri::command]
 #[specta::specta]
+pub fn set_notification_expanded(
+    db: State<'_, Database>,
+    id: String,
+    expanded: bool,
+) -> Result<(), AppError> {
+    db.set_notification_expanded(&id, expanded)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn get_unread_count(db: State<'_, Database>, subscription_id: String) -> Result<i32, AppError> {
     db.get_unread_count(&subscription_id)
 }
