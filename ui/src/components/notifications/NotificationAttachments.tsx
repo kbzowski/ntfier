@@ -1,39 +1,12 @@
 import { Download, FileText, Image as ImageIcon } from "lucide-react";
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
-import { useLazyImage } from "@/hooks";
+import { LazyImage } from "@/components/ui/lazy-image";
+import { formatFileSize } from "@/lib/utils";
 import type { Attachment } from "@/types/ntfy";
-
-function LazyImage({
-	src,
-	alt,
-	className,
-}: {
-	src: string;
-	alt: string;
-	className?: string;
-}) {
-	const { ref, isInView } = useLazyImage();
-
-	return (
-		<div ref={ref as React.RefObject<HTMLDivElement>}>
-			{isInView ? (
-				<img src={src} alt={alt} className={className} />
-			) : (
-				<div className="h-32 bg-muted animate-pulse" />
-			)}
-		</div>
-	);
-}
 
 interface NotificationAttachmentsProps {
 	attachments: Attachment[];
-}
-
-function formatFileSize(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export const NotificationAttachments = memo(function NotificationAttachments({

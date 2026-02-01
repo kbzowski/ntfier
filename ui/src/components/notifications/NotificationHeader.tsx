@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { PriorityBadge } from "./PriorityBadge";
@@ -7,6 +8,8 @@ interface NotificationHeaderProps {
 	timestamp: number;
 	priority: number;
 	read: boolean;
+	showChevron?: boolean;
+	isExpanded?: boolean;
 }
 
 function formatTimestamp(timestamp: number): string {
@@ -31,10 +34,20 @@ export const NotificationHeader = memo(function NotificationHeader({
 	timestamp,
 	priority,
 	read,
+	showChevron,
+	isExpanded,
 }: NotificationHeaderProps) {
 	return (
 		<div className="flex items-start justify-between gap-3">
 			<div className="flex items-center gap-2 min-w-0">
+				{showChevron && (
+					<ChevronRight
+						className={cn(
+							"h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+							isExpanded && "rotate-90",
+						)}
+					/>
+				)}
 				<h3
 					className={cn(
 						"text-lg truncate transition-all",
