@@ -63,6 +63,7 @@ interface AppActions {
 	markAllAsRead: (subscriptionId: string) => void;
 	markAllAsReadGlobally: () => void;
 	deleteNotification: (id: string) => void;
+	setNotificationExpanded: (id: string, expanded: boolean) => void;
 	getUnreadCount: (subscriptionId: string) => number;
 	getTotalUnread: () => number;
 
@@ -82,6 +83,11 @@ interface AppActions {
 	setNotificationForceDisplay: (enabled: boolean) => Promise<void>;
 	setNotificationShowActions: (enabled: boolean) => Promise<void>;
 	setNotificationShowImages: (enabled: boolean) => Promise<void>;
+	setNotificationSound: (enabled: boolean) => Promise<void>;
+
+	// Message display settings
+	setCompactView: (enabled: boolean) => Promise<void>;
+	setExpandNewMessages: (enabled: boolean) => Promise<void>;
 
 	// Updates
 	setUpdateInfo: (info: UpdateInfo | null) => void;
@@ -371,6 +377,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		}
 	}, []);
 
+	const setNotificationSound = useCallback(async (enabled: boolean) => {
+		if (isTauri()) {
+			await settingsApi.setNotificationSound(enabled);
+			setSettings((prev) => ({ ...prev, notificationSound: enabled }));
+		}
+	}, []);
+
+	// Message display settings actions
+	const setCompactView = useCallback(async (enabled: boolean) => {
+		if (isTauri()) {
+			await settingsApi.setCompactView(enabled);
+			setSettings((prev) => ({ ...prev, compactView: enabled }));
+		}
+	}, []);
+
+	const setExpandNewMessages = useCallback(async (enabled: boolean) => {
+		if (isTauri()) {
+			await settingsApi.setExpandNewMessages(enabled);
+			setSettings((prev) => ({ ...prev, expandNewMessages: enabled }));
+		}
+	}, []);
+
 	// Derived data
 	const currentNotifications = useMemo(() => {
 		if (!currentTopicId) {
@@ -414,6 +442,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		markAllAsRead: notifications.markAllAsRead,
 		markAllAsReadGlobally: notifications.markAllAsReadGlobally,
 		deleteNotification: notifications.deleteNotification,
+		setNotificationExpanded: notifications.setExpanded,
 		getUnreadCount: notifications.getUnreadCount,
 		getTotalUnread: notifications.getTotalUnread,
 		setTheme,
@@ -427,6 +456,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setNotificationForceDisplay,
 		setNotificationShowActions,
 		setNotificationShowImages,
+		setNotificationSound,
+		setCompactView,
+		setExpandNewMessages,
 		setUpdateInfo,
 
 		// Derived

@@ -328,13 +328,13 @@ impl ConnectionManager {
         let db: tauri::State<'_, Database> = app_handle.state();
         let Ok(settings) = db.get_settings() else {
             // Fallback to native if settings can't be read
-            Self::show_native_notification(app_handle, notification);
+            Self::show_native_notification(app_handle, notification, None);
             return;
         };
 
         match settings.notification_method {
             NotificationDisplayMethod::Native => {
-                Self::show_native_notification(app_handle, notification);
+                Self::show_native_notification(app_handle, notification, Some(&settings));
             }
             #[cfg(windows)]
             NotificationDisplayMethod::WindowsEnhanced => {
@@ -343,7 +343,7 @@ impl ConnectionManager {
             #[cfg(not(windows))]
             NotificationDisplayMethod::WindowsEnhanced => {
                 // Fallback to native on non-Windows platforms
-                Self::show_native_notification(app_handle, notification);
+                Self::show_native_notification(app_handle, notification, Some(&settings));
             }
         }
     }
@@ -403,7 +403,11 @@ impl ConnectionManager {
         result.split_whitespace().collect::<Vec<_>>().join(" ")
     }
 
-    fn show_native_notification(app_handle: &AppHandle, notification: &Notification) {
+    fn show_native_notification(
+        app_handle: &AppHandle,
+        notification: &Notification,
+        settings: Option<&AppSettings>,
+    ) {
         use tauri_plugin_notification::NotificationExt;
 
         let title = if notification.title.is_empty() {
@@ -419,7 +423,9 @@ impl ConnectionManager {
             .body(&notification.message);
 
         // Add sound for notifications with priority >= Default (3) to ensure Windows shows them as toast popups
-        if notification.priority as i32 >= 3 {
+        // Respect notification_sound setting (defaults to true if settings unavailable)
+        let sound_enabled = settings.map_or(true, |s| s.notification_sound);
+        if sound_enabled && notification.priority as i32 >= 3 {
             builder = builder.sound("Default");
         }
 
@@ -491,16 +497,18 @@ impl ConnectionManager {
             toast = toast.duration(Duration::Long);
         }
 
-        // Sound based on priority
-        let sound = if notification.priority as i32 >= 4 {
-            Some(Sound::SMS) // Louder sound for high priority
-        } else if notification.priority as i32 >= 3 {
-            Some(Sound::Default)
-        } else {
-            None
-        };
-        if let Some(s) = sound {
-            toast = toast.sound(Some(s));
+        // Sound based on priority (only if notification_sound is enabled)
+        if settings.notification_sound {
+            let sound = if notification.priority as i32 >= 4 {
+                Some(Sound::SMS) // Louder sound for high priority
+            } else if notification.priority as i32 >= 3 {
+                Some(Sound::Default)
+            } else {
+                None
+            };
+            if let Some(s) = sound {
+                toast = toast.sound(Some(s));
+            }
         }
 
         // Action buttons from ntfy (max 3 buttons supported by Windows)
@@ -532,7 +540,7 @@ impl ConnectionManager {
         if let Err(e) = toast.show() {
             log::error!("Failed to show WinRT notification: {e}");
             // Fallback to native notification on error
-            Self::show_native_notification(app_handle, notification);
+            Self::show_native_notification(app_handle, notification, Some(settings));
         }
     }
 }

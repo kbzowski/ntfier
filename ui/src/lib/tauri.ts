@@ -132,6 +132,10 @@ export const notificationsApi = {
 		unwrap(await commands.deleteNotification(id));
 	},
 
+	setExpanded: async (id: string, expanded: boolean) => {
+		unwrap(await commands.setNotificationExpanded(id, expanded));
+	},
+
 	getUnreadCount: async (subscriptionId: string) =>
 		unwrap(await commands.getUnreadCount(subscriptionId)),
 };
@@ -184,6 +188,18 @@ export const settingsApi = {
 
 	setNotificationShowImages: async (enabled: boolean) => {
 		unwrap(await commands.setNotificationShowImages(enabled));
+	},
+
+	setNotificationSound: async (enabled: boolean) => {
+		unwrap(await commands.setNotificationSound(enabled));
+	},
+
+	setCompactView: async (enabled: boolean) => {
+		unwrap(await commands.setCompactView(enabled));
+	},
+
+	setExpandNewMessages: async (enabled: boolean) => {
+		unwrap(await commands.setExpandNewMessages(enabled));
 	},
 };
 

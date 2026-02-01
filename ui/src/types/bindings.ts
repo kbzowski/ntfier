@@ -69,6 +69,14 @@ async deleteNotification(id: string) : Promise<Result<null, AppError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async setNotificationExpanded(id: string, expanded: boolean) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_notification_expanded", { id, expanded }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async getUnreadCount(subscriptionId: string) : Promise<Result<number, AppError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_unread_count", { subscriptionId }) };
@@ -168,6 +176,30 @@ async setNotificationShowActions(enabled: boolean) : Promise<Result<null, AppErr
 async setNotificationShowImages(enabled: boolean) : Promise<Result<null, AppError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_notification_show_images", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setNotificationSound(enabled: boolean) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_notification_sound", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setCompactView(enabled: boolean) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_compact_view", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setExpandNewMessages(enabled: boolean) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_expand_new_messages", { enabled }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -285,7 +317,19 @@ notificationShowActions?: boolean;
 /**
  * Show images in notification (Windows Enhanced only).
  */
-notificationShowImages?: boolean }
+notificationShowImages?: boolean;
+/**
+ * Play notification sound.
+ */
+notificationSound?: boolean;
+/**
+ * Show messages in collapsed accordion style.
+ */
+compactView?: boolean; 
+/**
+ * Automatically expand newly received messages (when compact view is enabled).
+ */
+expandNewMessages?: boolean }
 /**
  * A file attachment on a notification.
  */
@@ -305,7 +349,11 @@ priority: number; tags: string[];
 /**
  * Unix timestamp in milliseconds.
  */
-timestamp: number; actions: NotificationAction[]; attachments: Attachment[]; read: boolean }
+timestamp: number; actions: NotificationAction[]; attachments: Attachment[]; read: boolean; 
+/**
+ * Whether the notification is expanded in compact view mode.
+ */
+isExpanded: boolean }
 /**
  * An action button attached to a notification.
  */

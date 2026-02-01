@@ -1,8 +1,8 @@
-import { Bell, Monitor, Zap } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Bell, Monitor, Volume2, Zap } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
+import { SettingCheckbox } from "@/components/ui/setting-checkbox";
 import type { NotificationDisplayMethod } from "@/types/bindings";
 
 const NOTIFICATION_METHODS: {
@@ -38,6 +38,8 @@ interface NotificationsTabProps {
 	onNotificationShowActionsChange: (enabled: boolean) => void;
 	notificationShowImages: boolean;
 	onNotificationShowImagesChange: (enabled: boolean) => void;
+	notificationSound: boolean;
+	onNotificationSoundChange: (enabled: boolean) => void;
 }
 
 export function NotificationsTab({
@@ -49,6 +51,8 @@ export function NotificationsTab({
 	onNotificationShowActionsChange,
 	notificationShowImages,
 	onNotificationShowImagesChange,
+	notificationSound,
+	onNotificationSoundChange,
 }: NotificationsTabProps) {
 	const isWindowsEnhanced = notificationMethod === "windows_enhanced";
 
@@ -95,6 +99,23 @@ export function NotificationsTab({
 				</RadioGroup>
 			</div>
 
+			<Separator />
+
+			<div className="space-y-3">
+				<h4 className="text-sm font-medium flex items-center gap-2">
+					<Volume2 className="h-4 w-4 text-muted-foreground" />
+					Sound
+				</h4>
+
+				<SettingCheckbox
+					id="notification-sound"
+					checked={notificationSound}
+					onCheckedChange={onNotificationSoundChange}
+					label="Play notification sound"
+					description="Play a sound when new notifications arrive (respects system volume settings)"
+				/>
+			</div>
+
 			{isWindowsEnhanced && (
 				<>
 					<Separator />
@@ -102,63 +123,31 @@ export function NotificationsTab({
 					<div className="space-y-3">
 						<h4 className="text-sm font-medium">Windows Enhanced Options</h4>
 
-						<div className="flex items-center gap-2">
-							<Checkbox
-								id="force-display"
-								checked={notificationForceDisplay}
-								onCheckedChange={(checked) =>
-									onNotificationForceDisplayChange(checked === true)
-								}
-							/>
-							<label
-								htmlFor="force-display"
-								className="text-sm font-medium cursor-pointer"
-							>
-								Force display
-							</label>
-						</div>
-						<p className="text-xs text-muted-foreground pl-6">
-							Show notifications even when Focus Assist or Do Not Disturb is
-							active. Uses alarm-priority notifications.
-						</p>
+						<SettingCheckbox
+							id="force-display"
+							checked={notificationForceDisplay}
+							onCheckedChange={onNotificationForceDisplayChange}
+							label="Force display"
+							description="Show notifications even when Focus Assist or Do Not Disturb is active. Uses alarm-priority notifications."
+						/>
 
-						<div className="flex items-center gap-2 pt-2">
-							<Checkbox
-								id="show-actions"
-								checked={notificationShowActions}
-								onCheckedChange={(checked) =>
-									onNotificationShowActionsChange(checked === true)
-								}
-							/>
-							<label
-								htmlFor="show-actions"
-								className="text-sm font-medium cursor-pointer"
-							>
-								Show action buttons
-							</label>
-						</div>
-						<p className="text-xs text-muted-foreground pl-6">
-							Display action buttons from ntfy notifications (up to 3 buttons)
-						</p>
+						<SettingCheckbox
+							id="show-actions"
+							checked={notificationShowActions}
+							onCheckedChange={onNotificationShowActionsChange}
+							label="Show action buttons"
+							description="Display action buttons from ntfy notifications (up to 3 buttons)"
+							className="pt-2"
+						/>
 
-						<div className="flex items-center gap-2 pt-2">
-							<Checkbox
-								id="show-images"
-								checked={notificationShowImages}
-								onCheckedChange={(checked) =>
-									onNotificationShowImagesChange(checked === true)
-								}
-							/>
-							<label
-								htmlFor="show-images"
-								className="text-sm font-medium cursor-pointer"
-							>
-								Show images
-							</label>
-						</div>
-						<p className="text-xs text-muted-foreground pl-6">
-							Display images from attachments or message content
-						</p>
+						<SettingCheckbox
+							id="show-images"
+							checked={notificationShowImages}
+							onCheckedChange={onNotificationShowImagesChange}
+							label="Show images"
+							description="Display images from attachments or message content"
+							className="pt-2"
+						/>
 					</div>
 				</>
 			)}

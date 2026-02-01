@@ -116,6 +116,15 @@ pub struct AppSettings {
     /// Show images in notification (Windows Enhanced only).
     #[serde(default = "default_true")]
     pub notification_show_images: bool,
+    /// Play notification sound.
+    #[serde(default = "default_true")]
+    pub notification_sound: bool,
+    /// Show messages in collapsed accordion style.
+    #[serde(default)]
+    pub compact_view: bool,
+    /// Automatically expand newly received messages (when compact view is enabled).
+    #[serde(default = "default_true")]
+    pub expand_new_messages: bool,
 }
 
 const fn default_true() -> bool {
@@ -139,6 +148,9 @@ impl Default for AppSettings {
             notification_force_display: false,
             notification_show_actions: true,
             notification_show_images: true,
+            notification_sound: true,
+            compact_view: false,
+            expand_new_messages: true,
         }
     }
 }

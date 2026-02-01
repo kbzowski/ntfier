@@ -33,6 +33,7 @@ function App() {
 		markAsRead,
 		markAllAsRead,
 		markAllAsReadGlobally,
+		setNotificationExpanded,
 		settings,
 		addServer,
 		removeServer,
@@ -45,6 +46,9 @@ function App() {
 		setNotificationForceDisplay,
 		setNotificationShowActions,
 		setNotificationShowImages,
+		setNotificationSound,
+		setCompactView,
+		setExpandNewMessages,
 		updateInfo,
 		setUpdateInfo,
 	} = useApp();
@@ -116,6 +120,9 @@ function App() {
 					notifications={currentNotifications}
 					onMarkAsRead={markAsRead}
 					onMarkAllAsRead={handleMarkAllAsRead}
+					onExpandedChange={setNotificationExpanded}
+					compactView={settings.compactView ?? false}
+					expandNewMessages={settings.expandNewMessages ?? true}
 				/>
 			</AppLayout>
 
@@ -147,6 +154,12 @@ function App() {
 				onNotificationShowActionsChange={setNotificationShowActions}
 				notificationShowImages={settings.notificationShowImages ?? true}
 				onNotificationShowImagesChange={setNotificationShowImages}
+				notificationSound={settings.notificationSound ?? true}
+				onNotificationSoundChange={setNotificationSound}
+				compactView={settings.compactView ?? false}
+				onCompactViewChange={setCompactView}
+				expandNewMessages={settings.expandNewMessages ?? true}
+				onExpandNewMessagesChange={setExpandNewMessages}
 			/>
 
 			<AddSubscriptionDialog

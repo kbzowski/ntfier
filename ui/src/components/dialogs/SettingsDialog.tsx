@@ -47,6 +47,12 @@ interface SettingsDialogProps {
 	onNotificationShowActionsChange: (enabled: boolean) => void;
 	notificationShowImages: boolean;
 	onNotificationShowImagesChange: (enabled: boolean) => void;
+	notificationSound: boolean;
+	onNotificationSoundChange: (enabled: boolean) => void;
+	compactView: boolean;
+	onCompactViewChange: (enabled: boolean) => void;
+	expandNewMessages: boolean;
+	onExpandNewMessagesChange: (enabled: boolean) => void;
 }
 
 export function SettingsDialog({
@@ -77,6 +83,12 @@ export function SettingsDialog({
 	onNotificationShowActionsChange,
 	notificationShowImages,
 	onNotificationShowImagesChange,
+	notificationSound,
+	onNotificationSoundChange,
+	compactView,
+	onCompactViewChange,
+	expandNewMessages,
+	onExpandNewMessagesChange,
 }: SettingsDialogProps) {
 	const [version, setVersion] = useState<string>("");
 
@@ -120,6 +132,10 @@ export function SettingsDialog({
 							isSystemMode={isSystemMode}
 							onSystemModeChange={onSystemModeChange}
 							availableThemes={availableThemes}
+							compactView={compactView}
+							onCompactViewChange={onCompactViewChange}
+							expandNewMessages={expandNewMessages}
+							onExpandNewMessagesChange={onExpandNewMessagesChange}
 						/>
 					</TabsContent>
 
@@ -148,6 +164,8 @@ export function SettingsDialog({
 							onNotificationShowActionsChange={onNotificationShowActionsChange}
 							notificationShowImages={notificationShowImages}
 							onNotificationShowImagesChange={onNotificationShowImagesChange}
+							notificationSound={notificationSound}
+							onNotificationSoundChange={onNotificationSoundChange}
 						/>
 					</TabsContent>
 
