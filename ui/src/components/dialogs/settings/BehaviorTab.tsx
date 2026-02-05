@@ -182,7 +182,7 @@ export function BehaviorTab({
 				onCheckedChange={onMinimizeToTrayChange}
 				label="Minimize to system tray"
 				icon={<PanelBottomClose className="h-4 w-4 text-muted-foreground" />}
-				description="When closing the window, minimize to system tray instead of quitting"
+				description="When closing or minimizing the window, hide to system tray instead of quitting"
 				className="pt-2"
 			/>
 

@@ -202,20 +202,29 @@ pub fn run() {
                 let win = window.clone();
                 let app_handle = app.handle().clone();
                 window.on_window_event(move |event| {
-                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                        // Check minimize_to_tray setting
-                        let db: tauri::State<Database> = app_handle.state();
-                        let minimize_to_tray = db
-                            .get_settings()
-                            .map(|s| s.minimize_to_tray)
-                            .unwrap_or(true);
+                    let db: tauri::State<Database> = app_handle.state();
+                    let minimize_to_tray = db
+                        .get_settings()
+                        .map(|s| s.minimize_to_tray)
+                        .unwrap_or(true);
 
-                        if minimize_to_tray {
-                            // Prevent close and hide to tray
-                            api.prevent_close();
-                            let _ = win.hide();
+                    match event {
+                        tauri::WindowEvent::CloseRequested { api, .. } => {
+                            if minimize_to_tray {
+                                // Prevent close and hide to tray
+                                api.prevent_close();
+                                let _ = win.hide();
+                            }
+                            // If minimize_to_tray is false, allow normal close
                         }
-                        // If minimize_to_tray is false, allow normal close
+                        tauri::WindowEvent::Resized(_) => {
+                            if minimize_to_tray && win.is_minimized().unwrap_or(false) {
+                                // Unminimize and hide to tray instead
+                                let _ = win.unminimize();
+                                let _ = win.hide();
+                            }
+                        }
+                        _ => {}
                     }
                 });
             }
