@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from "react";
+import { toast } from "sonner";
 import { mockNotifications } from "@/data/mock-data";
+import { classifyError } from "@/lib/error-classification";
 import { isTauri, notificationsApi } from "@/lib/tauri";
 import type { Notification, Subscription } from "@/types/ntfy";
 
@@ -69,12 +71,17 @@ export function useNotifications(subscriptions: Subscription[]) {
 
 	/**
 	 * Marks a notification as read.
-	 * Uses optimistic UI update for instant feedback.
+	 * Uses optimistic UI update for instant feedback with rollback on error.
 	 */
 	const markAsRead = useCallback((id: string) => {
+		// Store previous state for rollback
+		let previousState: Map<string, Notification[]> | null = null;
+		let topicId: string | undefined;
+
 		// Optimistic update - instant UI feedback
 		setByTopic((prev) => {
-			const topicId = findTopicForNotification(prev, id);
+			previousState = new Map(prev);
+			topicId = findTopicForNotification(prev, id);
 			if (!topicId) return prev;
 
 			const notifs = prev.get(topicId);
@@ -89,18 +96,30 @@ export function useNotifications(subscriptions: Subscription[]) {
 		// API call in background
 		if (isTauri()) {
 			notificationsApi.markAsRead(id).catch((err) => {
-				console.error("Failed to mark as read:", err);
+				// Rollback on error
+				if (previousState) {
+					setByTopic(previousState);
+				}
+				const classified = classifyError(err);
+				toast.error(classified.userMessage, {
+					description: "Failed to mark notification as read",
+				});
+				console.error("[Mark as read error]", err);
 			});
 		}
 	}, []);
 
 	/**
 	 * Marks all notifications in a topic as read.
-	 * Uses optimistic UI update for instant feedback.
+	 * Uses optimistic UI update for instant feedback with rollback on error.
 	 */
 	const markAllAsRead = useCallback((subscriptionId: string) => {
+		// Store previous state for rollback
+		let previousState: Map<string, Notification[]> | null = null;
+
 		// Optimistic update - instant UI feedback
 		setByTopic((prev) => {
+			previousState = new Map(prev);
 			const notifs = prev.get(subscriptionId);
 			if (!notifs) return prev;
 			const updated = notifs.map((n) => ({ ...n, read: true }));
@@ -110,18 +129,30 @@ export function useNotifications(subscriptions: Subscription[]) {
 		// API call in background
 		if (isTauri()) {
 			notificationsApi.markAllAsRead(subscriptionId).catch((err) => {
-				console.error("Failed to mark all as read:", err);
+				// Rollback on error
+				if (previousState) {
+					setByTopic(previousState);
+				}
+				const classified = classifyError(err);
+				toast.error(classified.userMessage, {
+					description: "Failed to mark all notifications as read",
+				});
+				console.error("[Mark all as read error]", err);
 			});
 		}
 	}, []);
 
 	/**
 	 * Marks all notifications across all topics as read.
-	 * Uses optimistic UI update for instant feedback.
+	 * Uses optimistic UI update for instant feedback with rollback on error.
 	 */
 	const markAllAsReadGlobally = useCallback(() => {
+		// Store previous state for rollback
+		let previousState: Map<string, Notification[]> | null = null;
+
 		// Optimistic update - mark all as read in UI
 		setByTopic((prev) => {
+			previousState = new Map(prev);
 			const updated = new Map<string, Notification[]>();
 			for (const [topicId, notifs] of prev) {
 				updated.set(
@@ -135,22 +166,41 @@ export function useNotifications(subscriptions: Subscription[]) {
 		// API calls in background for each subscription
 		if (isTauri()) {
 			const topicIds = Array.from(byTopic.keys());
-			for (const topicId of topicIds) {
-				notificationsApi.markAllAsRead(topicId).catch((err) => {
-					console.error(`Failed to mark all as read for ${topicId}:`, err);
-				});
-			}
+			let hasError = false;
+
+			Promise.all(
+				topicIds.map((topicId) =>
+					notificationsApi.markAllAsRead(topicId).catch((err) => {
+						hasError = true;
+						console.error(`Failed to mark all as read for ${topicId}:`, err);
+						return err;
+					}),
+				),
+			).then(() => {
+				if (hasError && previousState) {
+					// Rollback on error
+					setByTopic(previousState);
+					toast.error("Failed to mark all notifications as read", {
+						description: "Please try again",
+					});
+				}
+			});
 		}
 	}, [byTopic]);
 
 	/**
 	 * Deletes a notification.
-	 * Uses optimistic UI update for instant feedback.
+	 * Uses optimistic UI update for instant feedback with rollback on error.
 	 */
 	const deleteNotification = useCallback((id: string) => {
+		// Store previous state for rollback
+		let previousState: Map<string, Notification[]> | null = null;
+		let topicId: string | undefined;
+
 		// Optimistic update - instant UI feedback
 		setByTopic((prev) => {
-			const topicId = findTopicForNotification(prev, id);
+			previousState = new Map(prev);
+			topicId = findTopicForNotification(prev, id);
 			if (!topicId) return prev;
 
 			const notifs = prev.get(topicId);
@@ -163,7 +213,15 @@ export function useNotifications(subscriptions: Subscription[]) {
 		// API call in background
 		if (isTauri()) {
 			notificationsApi.delete(id).catch((err) => {
-				console.error("Failed to delete notification:", err);
+				// Rollback on error
+				if (previousState) {
+					setByTopic(previousState);
+				}
+				const classified = classifyError(err);
+				toast.error(classified.userMessage, {
+					description: "Failed to delete notification",
+				});
+				console.error("[Delete notification error]", err);
 			});
 		}
 	}, []);

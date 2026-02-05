@@ -1,5 +1,5 @@
 import { Hash } from "lucide-react";
-import { memo, useCallback, type ReactNode } from "react";
+import { memo, type ReactNode, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
 	Collapsible,
@@ -110,18 +110,21 @@ export const NotificationCard = memo(function NotificationCard({
 	if (isCollapsible) {
 		return (
 			<Collapsible open={isExpanded} onOpenChange={handleExpandedChange}>
-				<CardFrame
-					borderColor={borderColor}
-					isUnread={!notification.read}
+				<Card
+					className={cn(
+						"transition-colors hover:bg-accent/50 border-l-4 py-0",
+						borderColor,
+						!notification.read && "bg-accent/20",
+					)}
 				>
-					<CollapsibleTrigger className="w-full text-left cursor-pointer">
+					<CollapsibleTrigger className="w-full text-left cursor-pointer block px-6 py-4">
 						{topicBadge}
 						{header}
 					</CollapsibleTrigger>
 					<CollapsibleContent className="collapsible-content overflow-hidden">
-						{details}
+						<div className="px-6 pb-4">{details}</div>
 					</CollapsibleContent>
-				</CardFrame>
+				</Card>
 			</Collapsible>
 		);
 	}

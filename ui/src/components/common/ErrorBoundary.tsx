@@ -1,7 +1,6 @@
-import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Component, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { toast } from "sonner";
+import { ErrorCard } from "@/components/ui/error-card";
 
 interface ErrorBoundaryProps {
 	children: ReactNode;
@@ -36,6 +35,14 @@ export class ErrorBoundary extends Component<
 		this.props.onReset?.();
 	};
 
+	handleCopyError = (): void => {
+		if (this.state.error) {
+			const errorText = `Error: ${this.state.error.message}\n\nStack: ${this.state.error.stack || "No stack trace available"}`;
+			navigator.clipboard.writeText(errorText);
+			toast.success("Error details copied to clipboard");
+		}
+	};
+
 	render(): ReactNode {
 		if (this.state.hasError) {
 			if (this.props.fallback) {
@@ -43,25 +50,23 @@ export class ErrorBoundary extends Component<
 			}
 
 			return (
-				<Card className="m-4 border-destructive">
-					<CardContent className="flex flex-col items-center justify-center gap-4 p-8 text-center">
-						<AlertTriangle className="h-12 w-12 text-destructive" />
-						<div>
-							<h2 className="text-lg font-semibold">Something went wrong</h2>
-							<p className="mt-1 text-sm text-muted-foreground">
-								{this.state.error?.message || "An unexpected error occurred"}
-							</p>
-						</div>
-						<Button
-							onClick={this.handleReset}
-							variant="outline"
-							className="gap-2"
-						>
-							<RefreshCw className="h-4 w-4" />
-							Try again
-						</Button>
-					</CardContent>
-				</Card>
+				<div className="m-4">
+					<ErrorCard
+						message="Something went wrong"
+						details={
+							this.state.error?.message || "An unexpected error occurred"
+						}
+						onRetry={this.handleReset}
+						actions={[
+							{
+								label: "Copy Error",
+								onClick: this.handleCopyError,
+								variant: "ghost",
+							},
+						]}
+						size="md"
+					/>
+				</div>
 			);
 		}
 
@@ -74,29 +79,31 @@ interface AppErrorBoundaryProps {
 }
 
 export function AppErrorBoundary({ children }: AppErrorBoundaryProps) {
+	const handleCopyError = () => {
+		const errorText =
+			"Application crashed. Please check the console for details.";
+		navigator.clipboard.writeText(errorText);
+		toast.success("Error details copied to clipboard");
+	};
+
 	return (
 		<ErrorBoundary
 			fallback={
-				<div className="flex h-screen w-full items-center justify-center bg-background">
-					<Card className="max-w-md border-destructive">
-						<CardContent className="flex flex-col items-center justify-center gap-4 p-8 text-center">
-							<AlertTriangle className="h-16 w-16 text-destructive" />
-							<div>
-								<h1 className="text-xl font-semibold">Application Error</h1>
-								<p className="mt-2 text-sm text-muted-foreground">
-									The application encountered an unexpected error. Please
-									refresh the page to try again.
-								</p>
-							</div>
-							<Button
-								onClick={() => window.location.reload()}
-								className="gap-2"
-							>
-								<RefreshCw className="h-4 w-4" />
-								Refresh Page
-							</Button>
-						</CardContent>
-					</Card>
+				<div className="flex h-screen w-full items-center justify-center bg-background p-4">
+					<ErrorCard
+						message="Application Error"
+						details="The application encountered an unexpected error. Please refresh the page to try again."
+						onRetry={() => window.location.reload()}
+						actions={[
+							{
+								label: "Copy Error",
+								onClick: handleCopyError,
+								variant: "ghost",
+							},
+						]}
+						size="lg"
+						className="max-w-lg"
+					/>
 				</div>
 			}
 		>

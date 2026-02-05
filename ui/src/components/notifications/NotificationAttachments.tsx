@@ -10,7 +10,9 @@ import {
 	RefreshCw,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { classifyError } from "@/lib/error-classification";
 import { isTauri } from "@/lib/tauri";
 import { formatFileSize } from "@/lib/utils";
 import type { Attachment } from "@/types/ntfy";
@@ -229,7 +231,18 @@ export const NotificationAttachments = memo(function NotificationAttachments({
 				window.open(url, "_blank", "noopener,noreferrer");
 			}
 		} catch (err) {
-			console.error("Failed to open attachment URL:", err);
+			const classified = classifyError(err);
+			toast.error(classified.userMessage, {
+				description: "Failed to open attachment",
+				action: {
+					label: "Copy URL",
+					onClick: () => {
+						navigator.clipboard.writeText(url);
+						toast.success("URL copied to clipboard");
+					},
+				},
+			});
+			console.error("[Download attachment error]", err);
 		}
 	}, []);
 
@@ -242,9 +255,18 @@ export const NotificationAttachments = memo(function NotificationAttachments({
 				window.open(url, "_blank", "noopener,noreferrer");
 			}
 		} catch (fallbackErr) {
-			console.error("[ImagePreview] Browser fallback failed:", fallbackErr);
-			// Ultimate fallback
-			window.open(url, "_blank", "noopener,noreferrer");
+			const classified = classifyError(fallbackErr);
+			toast.error(classified.userMessage, {
+				description: "Failed to open in browser",
+				action: {
+					label: "Copy URL",
+					onClick: () => {
+						navigator.clipboard.writeText(url);
+						toast.success("URL copied to clipboard");
+					},
+				},
+			});
+			console.error("[Browser fallback error]", fallbackErr);
 		}
 	}, []);
 

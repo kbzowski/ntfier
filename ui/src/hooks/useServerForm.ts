@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useState } from "react";
-import { getErrorMessage } from "@/lib/tauri";
+import { getErrorMessage } from "@/lib/error-classification";
 import type { ServerConfig } from "@/types/ntfy";
 
 interface ServerFormData {

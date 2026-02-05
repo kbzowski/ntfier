@@ -1,5 +1,6 @@
 import { ChevronDown, Server } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { classifyError } from "@/lib/error-classification";
 import type { ServerConfig } from "@/types/ntfy";
 
 interface AddSubscriptionDialogProps {
@@ -23,7 +25,11 @@ interface AddSubscriptionDialogProps {
 	onOpenChange: (open: boolean) => void;
 	servers: ServerConfig[];
 	defaultServer: string;
-	onAdd: (topic: string, serverUrl: string, displayName?: string) => void;
+	onAdd: (
+		topic: string,
+		serverUrl: string,
+		displayName?: string,
+	) => Promise<void>;
 }
 
 export function AddSubscriptionDialog({
@@ -36,17 +42,37 @@ export function AddSubscriptionDialog({
 	const [topic, setTopic] = useState("");
 	const [displayName, setDisplayName] = useState("");
 	const [selectedServer, setSelectedServer] = useState(defaultServer);
+	const [error, setError] = useState<string | null>(null);
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	const handleSubmit = (e: React.FormEvent) => {
+	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!topic.trim()) return;
+		if (!topic.trim() || isSubmitting) return;
 
-		onAdd(topic.trim(), selectedServer, displayName.trim() || undefined);
+		setError(null);
+		setIsSubmitting(true);
 
-		setTopic("");
-		setDisplayName("");
-		setSelectedServer(defaultServer);
-		onOpenChange(false);
+		try {
+			await onAdd(
+				topic.trim(),
+				selectedServer,
+				displayName.trim() || undefined,
+			);
+
+			// Reset form on success
+			setTopic("");
+			setDisplayName("");
+			setSelectedServer(defaultServer);
+			toast.success("Subscribed to topic");
+			onOpenChange(false);
+		} catch (err) {
+			const classified = classifyError(err);
+			setError(classified.userMessage);
+			toast.error(classified.userMessage);
+			console.error("[Subscription Error]", err);
+		} finally {
+			setIsSubmitting(false);
+		}
 	};
 
 	const handleOpenChange = (newOpen: boolean) => {
@@ -54,6 +80,7 @@ export function AddSubscriptionDialog({
 			setTopic("");
 			setDisplayName("");
 			setSelectedServer(defaultServer);
+			setError(null);
 		}
 		onOpenChange(newOpen);
 	};
@@ -127,16 +154,23 @@ export function AddSubscriptionDialog({
 						</p>
 					</div>
 
+					{error && (
+						<div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+							{error}
+						</div>
+					)}
+
 					<DialogFooter>
 						<Button
 							type="button"
 							variant="ghost"
 							onClick={() => handleOpenChange(false)}
+							disabled={isSubmitting}
 						>
 							Cancel
 						</Button>
-						<Button type="submit" disabled={!topic.trim()}>
-							Subscribe
+						<Button type="submit" disabled={!topic.trim() || isSubmitting}>
+							{isSubmitting ? "Subscribing..." : "Subscribe"}
 						</Button>
 					</DialogFooter>
 				</form>

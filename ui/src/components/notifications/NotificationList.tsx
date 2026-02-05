@@ -47,9 +47,9 @@ export const NotificationList = memo(function NotificationList({
 	const handleExpandedChange = useCallback(
 		(notificationId: string, expanded: boolean) => {
 			// Persist expanded state to database
-			notificationsApi
-				.setExpanded(notificationId, expanded)
-				.catch(console.error);
+			notificationsApi.setExpanded(notificationId, expanded).catch((err) => {
+				console.error("[Background] Failed to persist expand state:", err);
+			});
 			// Notify parent to update local state
 			if (onExpandedChange) {
 				onExpandedChange(notificationId, expanded);

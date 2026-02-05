@@ -1,7 +1,9 @@
 import { open } from "@tauri-apps/plugin-shell";
 import { ExternalLink } from "lucide-react";
 import { memo, useCallback } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { classifyError } from "@/lib/error-classification";
 import { isTauri } from "@/lib/tauri";
 import type { NotificationAction } from "@/types/ntfy";
 
@@ -24,7 +26,18 @@ export const NotificationActions = memo(function NotificationActions({
 					window.open(action.url, "_blank", "noopener,noreferrer");
 				}
 			} catch (err) {
-				console.error("Failed to open URL:", err);
+				const classified = classifyError(err);
+				toast.error(classified.userMessage, {
+					description: "Failed to open URL",
+					action: {
+						label: "Copy URL",
+						onClick: () => {
+							navigator.clipboard.writeText(action.url);
+							toast.success("URL copied to clipboard");
+						},
+					},
+				});
+				console.error("[Open URL error]", err);
 			}
 		},
 		[],

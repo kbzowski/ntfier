@@ -7,8 +7,10 @@ import {
 	useMemo,
 	useState,
 } from "react";
+import { toast } from "sonner";
 import { mockSettings, mockSubscriptions } from "@/data/mock-data";
 import { useNotifications, useTauriEvent } from "@/hooks";
+import { classifyError } from "@/lib/error-classification";
 import {
 	autostartApi,
 	isTauri,
@@ -170,9 +172,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 				// Auto-expand new notifications in compact view if enabled
 				if (settings.compactView && settings.expandNewMessages) {
 					notification.isExpanded = true;
-					notificationsApi
-						.setExpanded(notification.id, true)
-						.catch(console.error);
+					notificationsApi.setExpanded(notification.id, true).catch((err) => {
+						console.error("[Background] Failed to persist expand state:", err);
+					});
 				}
 				notifications.addNotification(notification);
 			},
@@ -241,20 +243,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const removeSubscription = useCallback(
 		async (id: string) => {
 			if (isTauri()) {
-				await subscriptionsApi.remove(id);
+				try {
+					await subscriptionsApi.remove(id);
+					setSubscriptions((prev) => prev.filter((sub) => sub.id !== id));
+					notifications.clearTopic(id);
+					toast.success("Subscription removed");
+				} catch (err) {
+					const classified = classifyError(err);
+					toast.error(classified.userMessage, {
+						description: "Failed to remove subscription",
+					});
+					console.error("[Remove subscription error]", err);
+				}
+			} else {
+				setSubscriptions((prev) => prev.filter((sub) => sub.id !== id));
+				notifications.clearTopic(id);
 			}
-			setSubscriptions((prev) => prev.filter((sub) => sub.id !== id));
-			notifications.clearTopic(id);
 		},
 		[notifications.clearTopic],
 	);
 
 	const toggleMute = useCallback(async (id: string) => {
 		if (isTauri()) {
-			const updated = await subscriptionsApi.toggleMute(id);
-			setSubscriptions((prev) =>
-				prev.map((sub) => (sub.id === id ? updated : sub)),
-			);
+			// Store previous state for rollback
+			let previousSubscriptions: Subscription[] = [];
+			setSubscriptions((prev) => {
+				previousSubscriptions = [...prev];
+				// Optimistic update
+				return prev.map((sub) =>
+					sub.id === id ? { ...sub, muted: !sub.muted } : sub,
+				);
+			});
+
+			try {
+				const updated = await subscriptionsApi.toggleMute(id);
+				setSubscriptions((prev) =>
+					prev.map((sub) => (sub.id === id ? updated : sub)),
+				);
+				toast.success(updated.muted ? "Topic muted" : "Topic unmuted");
+			} catch (err) {
+				// Rollback on error
+				setSubscriptions(previousSubscriptions);
+				const classified = classifyError(err);
+				toast.error(classified.userMessage, {
+					description: "Failed to toggle mute",
+				});
+				console.error("[Toggle mute error]", err);
+			}
 		} else {
 			setSubscriptions((prev) =>
 				prev.map((sub) =>
@@ -278,9 +313,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	// Settings actions
 	const setTheme = useCallback(async (theme: ThemeMode) => {
 		if (isTauri()) {
-			await settingsApi.setTheme(theme);
+			try {
+				await settingsApi.setTheme(theme);
+				setSettings((prev) => ({ ...prev, theme }));
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage, {
+					description: "Failed to save theme preference",
+				});
+				console.error("[Settings Error]", err);
+			}
+		} else {
+			setSettings((prev) => ({ ...prev, theme }));
 		}
-		setSettings((prev) => ({ ...prev, theme }));
 	}, []);
 
 	const addServer = useCallback(
@@ -318,47 +363,98 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 	const removeServer = useCallback(async (url: string) => {
 		if (isTauri()) {
-			await settingsApi.removeServer(url);
+			try {
+				await settingsApi.removeServer(url);
+				setSettings((prev) => ({
+					...prev,
+					servers: prev.servers.filter((s) => s.url !== url),
+				}));
+				toast.success("Server removed");
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage);
+				console.error("[Settings Error]", err);
+			}
+		} else {
+			setSettings((prev) => ({
+				...prev,
+				servers: prev.servers.filter((s) => s.url !== url),
+			}));
 		}
-		setSettings((prev) => ({
-			...prev,
-			servers: prev.servers.filter((s) => s.url !== url),
-		}));
 	}, []);
 
 	const setDefaultServer = useCallback(async (url: string) => {
 		if (isTauri()) {
-			await settingsApi.setDefaultServer(url);
+			try {
+				await settingsApi.setDefaultServer(url);
+				setSettings((prev) => ({
+					...prev,
+					defaultServer: url,
+					servers: prev.servers.map((s) => ({
+						...s,
+						isDefault: s.url === url,
+					})),
+				}));
+				toast.success("Default server updated");
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage);
+				console.error("[Settings Error]", err);
+			}
+		} else {
+			setSettings((prev) => ({
+				...prev,
+				defaultServer: url,
+				servers: prev.servers.map((s) => ({ ...s, isDefault: s.url === url })),
+			}));
 		}
-		setSettings((prev) => ({
-			...prev,
-			defaultServer: url,
-			servers: prev.servers.map((s) => ({ ...s, isDefault: s.url === url })),
-		}));
 	}, []);
 
 	const setAutostart = useCallback(async (enabled: boolean) => {
 		if (isTauri()) {
-			if (enabled) {
-				await autostartApi.enable();
-			} else {
-				await autostartApi.disable();
+			try {
+				if (enabled) {
+					await autostartApi.enable();
+				} else {
+					await autostartApi.disable();
+				}
+				setAutostartState(enabled);
+				toast.success(`Autostart ${enabled ? "enabled" : "disabled"}`);
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage, {
+					description: "Check system permissions and try again",
+				});
+				console.error("[Autostart Error]", err);
 			}
-			setAutostartState(enabled);
 		}
 	}, []);
 
 	const setMinimizeToTray = useCallback(async (enabled: boolean) => {
 		if (isTauri()) {
-			await settingsApi.setMinimizeToTray(enabled);
-			setSettings((prev) => ({ ...prev, minimizeToTray: enabled }));
+			try {
+				await settingsApi.setMinimizeToTray(enabled);
+				setSettings((prev) => ({ ...prev, minimizeToTray: enabled }));
+				toast.success(`Minimize to tray ${enabled ? "enabled" : "disabled"}`);
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage);
+				console.error("[Settings Error]", err);
+			}
 		}
 	}, []);
 
 	const setStartMinimized = useCallback(async (enabled: boolean) => {
 		if (isTauri()) {
-			await settingsApi.setStartMinimized(enabled);
-			setSettings((prev) => ({ ...prev, startMinimized: enabled }));
+			try {
+				await settingsApi.setStartMinimized(enabled);
+				setSettings((prev) => ({ ...prev, startMinimized: enabled }));
+				toast.success(`Start minimized ${enabled ? "enabled" : "disabled"}`);
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage);
+				console.error("[Settings Error]", err);
+			}
 		}
 	}, []);
 
@@ -366,8 +462,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const setNotificationMethod = useCallback(
 		async (method: NotificationDisplayMethod) => {
 			if (isTauri()) {
-				await settingsApi.setNotificationMethod(method);
-				setSettings((prev) => ({ ...prev, notificationMethod: method }));
+				try {
+					await settingsApi.setNotificationMethod(method);
+					setSettings((prev) => ({ ...prev, notificationMethod: method }));
+					toast.success("Notification method updated");
+				} catch (err) {
+					const classified = classifyError(err);
+					toast.error(classified.userMessage);
+					console.error("[Settings Error]", err);
+				}
 			}
 		},
 		[],
@@ -375,44 +478,88 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 	const setNotificationForceDisplay = useCallback(async (enabled: boolean) => {
 		if (isTauri()) {
-			await settingsApi.setNotificationForceDisplay(enabled);
-			setSettings((prev) => ({ ...prev, notificationForceDisplay: enabled }));
+			try {
+				await settingsApi.setNotificationForceDisplay(enabled);
+				setSettings((prev) => ({ ...prev, notificationForceDisplay: enabled }));
+				toast.success(`Force display ${enabled ? "enabled" : "disabled"}`);
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage);
+				console.error("[Settings Error]", err);
+			}
 		}
 	}, []);
 
 	const setNotificationShowActions = useCallback(async (enabled: boolean) => {
 		if (isTauri()) {
-			await settingsApi.setNotificationShowActions(enabled);
-			setSettings((prev) => ({ ...prev, notificationShowActions: enabled }));
+			try {
+				await settingsApi.setNotificationShowActions(enabled);
+				setSettings((prev) => ({ ...prev, notificationShowActions: enabled }));
+				toast.success(`Show actions ${enabled ? "enabled" : "disabled"}`);
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage);
+				console.error("[Settings Error]", err);
+			}
 		}
 	}, []);
 
 	const setNotificationShowImages = useCallback(async (enabled: boolean) => {
 		if (isTauri()) {
-			await settingsApi.setNotificationShowImages(enabled);
-			setSettings((prev) => ({ ...prev, notificationShowImages: enabled }));
+			try {
+				await settingsApi.setNotificationShowImages(enabled);
+				setSettings((prev) => ({ ...prev, notificationShowImages: enabled }));
+				toast.success(`Show images ${enabled ? "enabled" : "disabled"}`);
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage);
+				console.error("[Settings Error]", err);
+			}
 		}
 	}, []);
 
 	const setNotificationSound = useCallback(async (enabled: boolean) => {
 		if (isTauri()) {
-			await settingsApi.setNotificationSound(enabled);
-			setSettings((prev) => ({ ...prev, notificationSound: enabled }));
+			try {
+				await settingsApi.setNotificationSound(enabled);
+				setSettings((prev) => ({ ...prev, notificationSound: enabled }));
+				toast.success(`Notification sound ${enabled ? "enabled" : "disabled"}`);
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage);
+				console.error("[Settings Error]", err);
+			}
 		}
 	}, []);
 
 	// Message display settings actions
 	const setCompactView = useCallback(async (enabled: boolean) => {
 		if (isTauri()) {
-			await settingsApi.setCompactView(enabled);
-			setSettings((prev) => ({ ...prev, compactView: enabled }));
+			try {
+				await settingsApi.setCompactView(enabled);
+				setSettings((prev) => ({ ...prev, compactView: enabled }));
+				toast.success(`Compact view ${enabled ? "enabled" : "disabled"}`);
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage);
+				console.error("[Settings Error]", err);
+			}
 		}
 	}, []);
 
 	const setExpandNewMessages = useCallback(async (enabled: boolean) => {
 		if (isTauri()) {
-			await settingsApi.setExpandNewMessages(enabled);
-			setSettings((prev) => ({ ...prev, expandNewMessages: enabled }));
+			try {
+				await settingsApi.setExpandNewMessages(enabled);
+				setSettings((prev) => ({ ...prev, expandNewMessages: enabled }));
+				toast.success(
+					`Expand new messages ${enabled ? "enabled" : "disabled"}`,
+				);
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage);
+				console.error("[Settings Error]", err);
+			}
 		}
 	}, []);
 

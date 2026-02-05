@@ -1,4 +1,5 @@
 import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Toaster } from "sonner";
 import { AppErrorBoundary } from "@/components/common/ErrorBoundary";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { AppProvider } from "@/context/AppContext";
@@ -39,6 +40,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<AppErrorBoundary>
 					<ThemeProvider>
 						<AppProvider>{children}</AppProvider>
+						<Toaster position="top-right" richColors />
 					</ThemeProvider>
 				</AppErrorBoundary>
 				<Scripts />

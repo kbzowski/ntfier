@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { open } from "@tauri-apps/plugin-shell";
 import { Download, Image as ImageIcon } from "lucide-react";
 import { useCallback } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { classifyError } from "@/lib/error-classification";
 import { isTauri } from "@/lib/tauri";
 import { formatFileSize } from "@/lib/utils";
 
@@ -32,7 +34,18 @@ function ImagePreview() {
 				window.open(url, "_blank", "noopener,noreferrer");
 			}
 		} catch (err) {
-			console.error("Failed to open image URL:", err);
+			const classified = classifyError(err);
+			toast.error(classified.userMessage, {
+				description: "Failed to download image",
+				action: {
+					label: "Copy URL",
+					onClick: () => {
+						navigator.clipboard.writeText(url);
+						toast.success("URL copied to clipboard");
+					},
+				},
+			});
+			console.error("[Download image error]", err);
 		}
 	}, [url]);
 
