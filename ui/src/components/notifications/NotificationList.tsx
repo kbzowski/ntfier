@@ -1,5 +1,5 @@
 import { CheckCheck, Hash, Inbox } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -25,7 +25,6 @@ interface NotificationListProps {
 	onMarkAllAsRead: () => void;
 	onExpandedChange?: (id: string, expanded: boolean) => void;
 	compactView?: boolean;
-	expandNewMessages?: boolean;
 }
 
 export const NotificationList = memo(function NotificationList({
@@ -36,48 +35,21 @@ export const NotificationList = memo(function NotificationList({
 	onMarkAllAsRead,
 	onExpandedChange,
 	compactView = false,
-	expandNewMessages = true,
 }: NotificationListProps) {
 	const isAllView = !subscription;
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
-	const prevNotificationIdsRef = useRef<Set<string>>(new Set());
 
 	// Scroll to top when window is shown (tray icon click)
 	useTauriEvent("window:shown", () => {
 		scrollContainerRef.current?.scrollTo({ top: 0 });
 	});
 
-	// Detect new notifications and auto-expand if enabled
-	useEffect(() => {
-		if (!compactView) return;
-
-		const currentIds = new Set(notifications.map((n) => n.id));
-		const prevIds = prevNotificationIdsRef.current;
-
-		if (expandNewMessages) {
-			// Find newly added notification IDs
-			const newIds = [...currentIds].filter((id) => !prevIds.has(id));
-			if (newIds.length > 0) {
-				// Auto-expand new notifications and persist to database
-				for (const id of newIds) {
-					notificationsApi.setExpanded(id, true).catch(console.error);
-				}
-				// Notify parent to refresh notifications
-				if (onExpandedChange) {
-					for (const id of newIds) {
-						onExpandedChange(id, true);
-					}
-				}
-			}
-		}
-
-		prevNotificationIdsRef.current = currentIds;
-	}, [notifications, compactView, expandNewMessages, onExpandedChange]);
-
 	const handleExpandedChange = useCallback(
 		(notificationId: string, expanded: boolean) => {
 			// Persist expanded state to database
-			notificationsApi.setExpanded(notificationId, expanded).catch(console.error);
+			notificationsApi
+				.setExpanded(notificationId, expanded)
+				.catch(console.error);
 			// Notify parent to update local state
 			if (onExpandedChange) {
 				onExpandedChange(notificationId, expanded);

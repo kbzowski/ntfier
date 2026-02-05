@@ -12,6 +12,7 @@ import { useNotifications, useTauriEvent } from "@/hooks";
 import {
 	autostartApi,
 	isTauri,
+	notificationsApi,
 	settingsApi,
 	subscriptionsApi,
 	syncApi,
@@ -164,7 +165,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	// Listen for new notifications from backend
 	useTauriEvent<Notification>(
 		"notification:new",
-		notifications.addNotification,
+		useCallback(
+			(notification: Notification) => {
+				// Auto-expand new notifications in compact view if enabled
+				if (settings.compactView && settings.expandNewMessages) {
+					notification.isExpanded = true;
+					notificationsApi
+						.setExpanded(notification.id, true)
+						.catch(console.error);
+				}
+				notifications.addNotification(notification);
+			},
+			[
+				settings.compactView,
+				settings.expandNewMessages,
+				notifications.addNotification,
+			],
+		),
 	);
 
 	// Listen for subscriptions sync completion (backend syncs on startup)

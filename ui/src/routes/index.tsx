@@ -122,7 +122,6 @@ function App() {
 					onMarkAllAsRead={handleMarkAllAsRead}
 					onExpandedChange={setNotificationExpanded}
 					compactView={settings.compactView ?? false}
-					expandNewMessages={settings.expandNewMessages ?? true}
 				/>
 			</AppLayout>
 
