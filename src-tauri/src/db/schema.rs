@@ -48,9 +48,4 @@ diesel::table! {
 diesel::joinable!(subscriptions -> servers (server_id));
 diesel::joinable!(notifications -> subscriptions (subscription_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    notifications,
-    servers,
-    settings,
-    subscriptions,
-);
+diesel::allow_tables_to_appear_in_same_query!(notifications, servers, settings, subscriptions,);

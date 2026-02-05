@@ -10,6 +10,7 @@ pre-commit:
       run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
 
     ui-lint:
+      root: "ui"
       glob: "ui/src/**/*.{ts,tsx}"
-      run: cd ui && pnpm biome check --write {staged_files}
+      run: pnpm biome check --write {staged_files}
       stage_fixed: true

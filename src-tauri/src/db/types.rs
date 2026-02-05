@@ -58,7 +58,9 @@ impl<T> DerefMut for JsonVec<T> {
 }
 
 impl<T: DeserializeOwned> FromSql<Text, Sqlite> for JsonVec<T> {
-    fn from_sql(bytes: <Sqlite as diesel::backend::Backend>::RawValue<'_>) -> deserialize::Result<Self> {
+    fn from_sql(
+        bytes: <Sqlite as diesel::backend::Backend>::RawValue<'_>,
+    ) -> deserialize::Result<Self> {
         let s = <String as FromSql<Text, Sqlite>>::from_sql(bytes)?;
         let vec: Vec<T> = serde_json::from_str(&s).unwrap_or_default();
         Ok(Self(vec))

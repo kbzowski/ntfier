@@ -317,11 +317,11 @@ notificationShowActions?: boolean;
 /**
  * Show images in notification (Windows Enhanced only).
  */
-notificationShowImages?: boolean;
+notificationShowImages?: boolean; 
 /**
  * Play notification sound.
  */
-notificationSound?: boolean;
+notificationSound?: boolean; 
 /**
  * Show messages in collapsed accordion style.
  */

@@ -22,7 +22,10 @@ impl Database {
             .order(notifications::timestamp.desc())
             .load(&mut *conn)?;
 
-        Ok(rows.into_iter().map(NotificationRow::into_notification).collect())
+        Ok(rows
+            .into_iter()
+            .map(NotificationRow::into_notification)
+            .collect())
     }
 
     /// Checks if a notification with the given `ntfy_id` exists.

@@ -109,10 +109,7 @@ pub fn set_notification_show_images(
 #[tauri::command]
 #[specta::specta]
 pub fn set_notification_sound(db: State<'_, Database>, enabled: bool) -> Result<(), AppError> {
-    db.set_setting(
-        "notification_sound",
-        if enabled { "true" } else { "false" },
-    )
+    db.set_setting("notification_sound", if enabled { "true" } else { "false" })
 }
 
 #[tauri::command]
@@ -124,5 +121,8 @@ pub fn set_compact_view(db: State<'_, Database>, enabled: bool) -> Result<(), Ap
 #[tauri::command]
 #[specta::specta]
 pub fn set_expand_new_messages(db: State<'_, Database>, enabled: bool) -> Result<(), AppError> {
-    db.set_setting("expand_new_messages", if enabled { "true" } else { "false" })
+    db.set_setting(
+        "expand_new_messages",
+        if enabled { "true" } else { "false" },
+    )
 }
