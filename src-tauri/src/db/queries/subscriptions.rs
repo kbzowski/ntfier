@@ -135,6 +135,12 @@ impl Database {
 
     /// Toggles the mute state of a subscription.
     pub fn toggle_subscription_mute(&self, id: &str) -> Result<Subscription, AppError> {
+        // Get current state to determine if we're muting or unmuting
+        let was_muted = self
+            .get_subscription_by_id(id)?
+            .ok_or_else(|| AppError::NotFound(format!("Subscription {id} not found")))?
+            .muted;
+
         {
             let mut conn = self.conn()?;
 
@@ -142,6 +148,11 @@ impl Database {
             sql_query("UPDATE subscriptions SET muted = NOT muted WHERE id = ?")
                 .bind::<diesel::sql_types::Text, _>(id)
                 .execute(&mut *conn)?;
+        }
+
+        // If we just muted the subscription, mark all notifications as read
+        if !was_muted {
+            self.mark_all_notifications_read(id)?;
         }
 
         // Return updated subscription

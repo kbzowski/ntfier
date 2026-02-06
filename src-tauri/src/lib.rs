@@ -85,8 +85,8 @@ pub fn export_bindings() {
         .expect("Failed to export TypeScript bindings");
 
     // Prepend @ts-nocheck to suppress errors in auto-generated code
-    let contents = std::fs::read_to_string(bindings_path)
-        .expect("Failed to read generated bindings");
+    let contents =
+        std::fs::read_to_string(bindings_path).expect("Failed to read generated bindings");
     std::fs::write(bindings_path, format!("// @ts-nocheck\n{contents}"))
         .expect("Failed to write @ts-nocheck to bindings");
 

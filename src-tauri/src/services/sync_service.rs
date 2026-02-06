@@ -224,7 +224,12 @@ impl SyncService {
 
             let ntfy_id = msg.ntfy_id().to_string();
             let msg_time = msg.time;
-            let notification = msg.into_notification(sub.id.clone());
+            let mut notification = msg.into_notification(sub.id.clone());
+
+            // Auto-mark as read for muted topics
+            if sub.muted {
+                notification.read = true;
+            }
 
             if let Err(e) = db.insert_notification_with_ntfy_id(&notification, &ntfy_id) {
                 log::error!("Failed to insert notification: {e}");

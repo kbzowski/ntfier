@@ -316,7 +316,12 @@ impl ConnectionManager {
         }
 
         let ntfy_id = ntfy_msg.ntfy_id().to_string();
-        let notification = ntfy_msg.into_notification(subscription_id.to_string());
+        let mut notification = ntfy_msg.into_notification(subscription_id.to_string());
+
+        // Auto-mark as read for muted topics
+        if is_muted {
+            notification.read = true;
+        }
 
         if let Err(e) = db.insert_notification_with_ntfy_id(&notification, &ntfy_id) {
             log::error!("Failed to save notification: {e}");
