@@ -68,8 +68,8 @@ impl Database {
         sub.validate()?;
         let mut conn = self.conn()?;
 
-        let (id, server_url, topic, display_name) =
-            conn.transaction::<_, diesel::result::Error, _>(|conn| {
+        let (id, server_url, topic, display_name) = conn
+            .transaction::<_, diesel::result::Error, _>(|conn| {
                 // Get or create server
                 let server_id: String = servers::table
                     .filter(servers::url.eq(&sub.server_url))
@@ -145,18 +145,26 @@ impl Database {
         }
 
         // Return updated subscription
-        self.get_all_subscriptions()?
-            .into_iter()
-            .find(|s| s.id == id)
+        self.get_subscription_by_id(id)?
             .ok_or_else(|| AppError::NotFound(format!("Subscription {id} not found")))
     }
 
     /// Gets a subscription by ID.
     #[allow(dead_code)]
     pub fn get_subscription_by_id(&self, id: &str) -> Result<Option<Subscription>, AppError> {
-        Ok(self
-            .get_all_subscriptions()?
-            .into_iter()
-            .find(|s| s.id == id))
+        let mut conn = self.conn()?;
+
+        let rows: Vec<SubscriptionQueryRow> = sql_query(
+            "SELECT s.id, s.topic, srv.url as server_url, s.display_name, s.muted, s.last_sync,
+                    (SELECT MAX(n.timestamp) FROM notifications n WHERE n.subscription_id = s.id) as last_notif,
+                    (SELECT COUNT(*) FROM notifications n WHERE n.subscription_id = s.id AND n.read = 0) as unread
+             FROM subscriptions s
+             JOIN servers srv ON s.server_id = srv.id
+             WHERE s.id = ?",
+        )
+        .bind::<diesel::sql_types::Text, _>(id)
+        .load(&mut *conn)?;
+
+        Ok(rows.into_iter().next().map(Subscription::from))
     }
 }
