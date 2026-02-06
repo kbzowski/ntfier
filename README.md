@@ -10,18 +10,18 @@
 
 ## Features
 
-- **Real-time notifications** — Receive push notifications instantly via WebSocket
-- **Multiple servers** — Connect to multiple ntfy servers simultaneously
-- **Topic subscriptions** — Subscribe to multiple topics and manage them easily
-- **System tray** — Minimize to tray and receive notifications in the background
-- **Auto-start** — Launch automatically on system startup
-- **Notification history** — Browse and search past notifications
-- **Markdown support** — Rich text rendering for notification content
-- **Attachments** — View images and download attachments
-- **Priority levels** — Visual indicators for notification priority
-- **Dark/Light themes** — Multiple theme presets with system preference support
-- **Auto-updates** — Automatic update checking and installation
-- **Cross-platform** — Built with Tauri for Windows (macOS and Linux planned)
+- Real-time notifications via WebSocket
+- Connect to multiple ntfy servers at once
+- Subscribe to and manage multiple topics
+- System tray with background notifications
+- Auto-start on login
+- Notification history with search
+- Markdown rendering in notifications
+- Image previews and attachment downloads
+- Priority level indicators
+- Dark/light themes (follows system preference)
+- Auto-updates
+- Cross-platform via Tauri (Windows now, macOS/Linux planned)
 
 ## Screenshots
 
@@ -75,14 +75,14 @@ ntfy-desktop/
 
 ## Linting & Formatting
 
-**ui/**
+### UI
 ```bash
 pnpm ui:lint
 pnpm --filter ui format
 pnpm --filter ui check
 ```
 
-**src-tauri/**
+### Backend (src-tauri)
 ```bash
 cd src-tauri
 cargo fmt
