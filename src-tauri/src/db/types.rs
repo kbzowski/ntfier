@@ -62,7 +62,13 @@ impl<T: DeserializeOwned> FromSql<Text, Sqlite> for JsonVec<T> {
         bytes: <Sqlite as diesel::backend::Backend>::RawValue<'_>,
     ) -> deserialize::Result<Self> {
         let s = <String as FromSql<Text, Sqlite>>::from_sql(bytes)?;
-        let vec: Vec<T> = serde_json::from_str(&s).unwrap_or_default();
+        let vec: Vec<T> = match serde_json::from_str(&s) {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!("Failed to parse JSON from database, using empty default: {e}");
+                Vec::new()
+            }
+        };
         Ok(Self(vec))
     }
 }
