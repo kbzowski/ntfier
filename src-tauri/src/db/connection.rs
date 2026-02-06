@@ -1,5 +1,6 @@
 //! Database connection management with embedded migrations.
 
+use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
@@ -29,6 +30,9 @@ impl Database {
     pub fn new(path: &Path) -> Result<Self, AppError> {
         let database_url = path.to_string_lossy().to_string();
         let mut conn = SqliteConnection::establish(&database_url)?;
+
+        // Enable foreign key constraints (SQLite has them OFF by default)
+        conn.batch_execute("PRAGMA foreign_keys = ON")?;
 
         // Run pending migrations
         conn.run_pending_migrations(MIGRATIONS)
