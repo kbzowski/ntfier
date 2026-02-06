@@ -92,6 +92,9 @@ interface AppActions {
 	setCompactView: (enabled: boolean) => Promise<void>;
 	setExpandNewMessages: (enabled: boolean) => Promise<void>;
 
+	// Deletion settings
+	setDeleteLocalOnly: (enabled: boolean) => Promise<void>;
+
 	// Updates
 	setUpdateInfo: (info: UpdateInfo | null) => void;
 }
@@ -563,6 +566,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		}
 	}, []);
 
+	const setDeleteLocalOnly = useCallback(async (enabled: boolean) => {
+		if (isTauri()) {
+			try {
+				await settingsApi.setDeleteLocalOnly(enabled);
+				setSettings((prev) => ({ ...prev, deleteLocalOnly: enabled }));
+				toast.success(
+					`Delete only locally ${enabled ? "enabled" : "disabled"}`,
+				);
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage);
+				console.error("[Settings Error]", err);
+			}
+		}
+	}, []);
+
 	// Derived data
 	const currentNotifications = useMemo(() => {
 		if (!currentTopicId) {
@@ -623,6 +642,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setNotificationSound,
 		setCompactView,
 		setExpandNewMessages,
+		setDeleteLocalOnly,
 		setUpdateInfo,
 
 		// Derived

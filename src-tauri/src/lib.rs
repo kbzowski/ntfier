@@ -66,6 +66,7 @@ pub fn export_bindings() {
             commands::set_notification_sound,
             commands::set_compact_view,
             commands::set_expand_new_messages,
+            commands::set_delete_local_only,
             commands::sync_subscriptions,
             // Update
             commands::check_for_update,
@@ -77,11 +78,19 @@ pub fn export_bindings() {
     // Configure TypeScript export to handle i64 as number (safe for timestamps up to year 285,616)
     let ts_config = Typescript::default().bigint(BigIntExportBehavior::Number);
 
+    let bindings_path = "../ui/src/types/bindings.ts";
+
     builder
-        .export(ts_config, "../ui/src/types/bindings.ts")
+        .export(ts_config, bindings_path)
         .expect("Failed to export TypeScript bindings");
 
-    println!("TypeScript bindings exported to ../ui/src/types/bindings.ts");
+    // Prepend @ts-nocheck to suppress errors in auto-generated code
+    let contents = std::fs::read_to_string(bindings_path)
+        .expect("Failed to read generated bindings");
+    std::fs::write(bindings_path, format!("// @ts-nocheck\n{contents}"))
+        .expect("Failed to write @ts-nocheck to bindings");
+
+    println!("TypeScript bindings exported to {bindings_path}");
 }
 
 /// Main application entry point.
@@ -300,6 +309,7 @@ pub fn run() {
             commands::set_notification_sound,
             commands::set_compact_view,
             commands::set_expand_new_messages,
+            commands::set_delete_local_only,
             // Sync
             commands::sync_subscriptions,
             // Update

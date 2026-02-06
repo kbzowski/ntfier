@@ -6,6 +6,7 @@ import {
 	PanelBottomClose,
 	Power,
 	RefreshCw,
+	Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -151,6 +152,8 @@ interface BehaviorTabProps {
 	onMinimizeToTrayChange: (enabled: boolean) => void;
 	startMinimized: boolean;
 	onStartMinimizedChange: (enabled: boolean) => void;
+	deleteLocalOnly: boolean;
+	onDeleteLocalOnlyChange: (enabled: boolean) => void;
 	updateInfo: UpdateInfo | null;
 	onUpdateInfoChange: (info: UpdateInfo | null) => void;
 }
@@ -162,6 +165,8 @@ export function BehaviorTab({
 	onMinimizeToTrayChange,
 	startMinimized,
 	onStartMinimizedChange,
+	deleteLocalOnly,
+	onDeleteLocalOnlyChange,
 	updateInfo,
 	onUpdateInfoChange,
 }: BehaviorTabProps) {
@@ -193,6 +198,16 @@ export function BehaviorTab({
 				label="Start minimized"
 				icon={<Minimize2 className="h-4 w-4 text-muted-foreground" />}
 				description="Start the application minimized to system tray"
+				className="pt-2"
+			/>
+
+			<SettingCheckbox
+				id="delete-local-only"
+				checked={deleteLocalOnly}
+				onCheckedChange={onDeleteLocalOnlyChange}
+				label="Delete only locally"
+				icon={<Trash2 className="h-4 w-4 text-muted-foreground" />}
+				description="When disabled, deleting a notification also removes it from the ntfy server"
 				className="pt-2"
 			/>
 

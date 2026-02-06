@@ -1,5 +1,5 @@
-import { ChevronRight } from "lucide-react";
-import { memo } from "react";
+import { ChevronRight, Trash2 } from "lucide-react";
+import { type MouseEvent, memo } from "react";
 import { cn } from "@/lib/utils";
 import { PriorityBadge } from "./PriorityBadge";
 
@@ -10,6 +10,7 @@ interface NotificationHeaderProps {
 	read: boolean;
 	showChevron?: boolean;
 	isExpanded?: boolean;
+	onDelete?: () => void;
 }
 
 function formatTimestamp(timestamp: number): string {
@@ -36,7 +37,13 @@ export const NotificationHeader = memo(function NotificationHeader({
 	read,
 	showChevron,
 	isExpanded,
+	onDelete,
 }: NotificationHeaderProps) {
+	const handleDelete = (e: MouseEvent) => {
+		e.stopPropagation();
+		onDelete?.();
+	};
+
 	return (
 		<div className="flex items-start justify-between gap-3">
 			<div className="flex items-center gap-2 min-w-0">
@@ -58,6 +65,15 @@ export const NotificationHeader = memo(function NotificationHeader({
 				</h3>
 			</div>
 			<div className="flex items-center gap-2 shrink-0">
+				{onDelete && (
+					<button
+						type="button"
+						onClick={handleDelete}
+						className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-sm hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+					>
+						<Trash2 className="h-4 w-4" />
+					</button>
+				)}
 				<PriorityBadge priority={priority} />
 				<span className="text-xs text-muted-foreground whitespace-nowrap">
 					{formatTimestamp(timestamp)}

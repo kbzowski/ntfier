@@ -19,6 +19,7 @@ interface NotificationCardProps {
 	notification: NotificationType;
 	topicName?: string;
 	onMarkAsRead?: (id: string) => void;
+	onDelete?: (id: string) => void;
 	isCollapsible?: boolean;
 	isExpanded?: boolean;
 	onExpandedChange?: (expanded: boolean) => void;
@@ -40,7 +41,7 @@ function CardFrame({
 	return (
 		<Card
 			className={cn(
-				"transition-colors hover:bg-accent/50 border-l-4",
+				"group transition-colors hover:bg-accent/50 border-l-4",
 				borderColor,
 				isUnread && "bg-accent/20",
 				onClick && "cursor-pointer",
@@ -56,6 +57,7 @@ export const NotificationCard = memo(function NotificationCard({
 	notification,
 	topicName,
 	onMarkAsRead,
+	onDelete,
 	isCollapsible = false,
 	isExpanded = true,
 	onExpandedChange,
@@ -91,6 +93,7 @@ export const NotificationCard = memo(function NotificationCard({
 			read={notification.read}
 			showChevron={isCollapsible}
 			isExpanded={isExpanded}
+			onDelete={onDelete ? () => onDelete(notification.id) : undefined}
 		/>
 	);
 
@@ -112,7 +115,7 @@ export const NotificationCard = memo(function NotificationCard({
 			<Collapsible open={isExpanded} onOpenChange={handleExpandedChange}>
 				<Card
 					className={cn(
-						"transition-colors hover:bg-accent/50 border-l-4 py-0",
+						"group transition-colors hover:bg-accent/50 border-l-4 py-0",
 						borderColor,
 						!notification.read && "bg-accent/20",
 					)}

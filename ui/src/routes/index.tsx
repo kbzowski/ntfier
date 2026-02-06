@@ -33,6 +33,7 @@ function App() {
 		markAsRead,
 		markAllAsRead,
 		markAllAsReadGlobally,
+		deleteNotification,
 		setNotificationExpanded,
 		settings,
 		addServer,
@@ -49,6 +50,7 @@ function App() {
 		setNotificationSound,
 		setCompactView,
 		setExpandNewMessages,
+		setDeleteLocalOnly,
 		updateInfo,
 		setUpdateInfo,
 	} = useApp();
@@ -120,6 +122,7 @@ function App() {
 					notifications={currentNotifications}
 					onMarkAsRead={markAsRead}
 					onMarkAllAsRead={handleMarkAllAsRead}
+					onDelete={deleteNotification}
 					onExpandedChange={setNotificationExpanded}
 					compactView={settings.compactView ?? false}
 				/>
@@ -159,6 +162,8 @@ function App() {
 				onCompactViewChange={setCompactView}
 				expandNewMessages={settings.expandNewMessages ?? true}
 				onExpandNewMessagesChange={setExpandNewMessages}
+				deleteLocalOnly={settings.deleteLocalOnly ?? true}
+				onDeleteLocalOnlyChange={setDeleteLocalOnly}
 			/>
 
 			<AddSubscriptionDialog

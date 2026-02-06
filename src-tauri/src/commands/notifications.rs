@@ -3,7 +3,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::db::Database;
 use crate::error::AppError;
 use crate::models::Notification;
-use crate::services::TrayManager;
+use crate::services::{NtfyClient, TrayManager};
 
 /// Helper to refresh tray icon after unread count changes
 fn refresh_tray(app_handle: AppHandle) {
@@ -48,11 +48,51 @@ pub fn mark_all_as_read(
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_notification(
+pub async fn delete_notification(
     app_handle: AppHandle,
     db: State<'_, Database>,
     id: String,
 ) -> Result<(), AppError> {
+    // Check if we should also delete remotely
+    let settings = db.get_settings()?;
+    if !settings.delete_local_only {
+        if let Some((Some(ntfy_id), subscription_id)) = db.get_notification_meta(&id)? {
+            // Look up subscription to get server_url and topic
+            if let Some(subscription) = db.get_subscription_by_id(&subscription_id)? {
+                // Find credentials for this server
+                let servers = db.get_servers_with_credentials()?;
+                let server = servers
+                    .iter()
+                    .find(|s| s.url_matches(&subscription.server_url));
+
+                let (username, password) = server
+                    .and_then(|s| s.credentials())
+                    .map_or((None, None), |(u, p)| (Some(u), Some(p)));
+
+                match NtfyClient::new() {
+                    Ok(client) => {
+                        if let Err(e) = client
+                            .delete_message(
+                                &subscription.server_url,
+                                &subscription.topic,
+                                &ntfy_id,
+                                username,
+                                password,
+                            )
+                            .await
+                        {
+                            log::warn!("Failed to delete message remotely: {e}");
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to create HTTP client for remote delete: {e}");
+                    }
+                }
+            }
+        }
+    }
+
+    // Always delete locally
     db.delete_notification(&id)?;
     refresh_tray(app_handle);
     Ok(())

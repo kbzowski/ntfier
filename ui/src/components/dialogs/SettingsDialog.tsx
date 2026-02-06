@@ -53,6 +53,8 @@ interface SettingsDialogProps {
 	onCompactViewChange: (enabled: boolean) => void;
 	expandNewMessages: boolean;
 	onExpandNewMessagesChange: (enabled: boolean) => void;
+	deleteLocalOnly: boolean;
+	onDeleteLocalOnlyChange: (enabled: boolean) => void;
 }
 
 export function SettingsDialog({
@@ -89,6 +91,8 @@ export function SettingsDialog({
 	onCompactViewChange,
 	expandNewMessages,
 	onExpandNewMessagesChange,
+	deleteLocalOnly,
+	onDeleteLocalOnlyChange,
 }: SettingsDialogProps) {
 	const [version, setVersion] = useState<string>("");
 
@@ -147,6 +151,8 @@ export function SettingsDialog({
 							onMinimizeToTrayChange={onMinimizeToTrayChange}
 							startMinimized={startMinimized}
 							onStartMinimizedChange={onStartMinimizedChange}
+							deleteLocalOnly={deleteLocalOnly}
+							onDeleteLocalOnlyChange={onDeleteLocalOnlyChange}
 							updateInfo={updateInfo}
 							onUpdateInfoChange={onUpdateInfoChange}
 						/>

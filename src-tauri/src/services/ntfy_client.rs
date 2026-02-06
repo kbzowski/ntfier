@@ -101,6 +101,46 @@ impl NtfyClient {
         Ok(account)
     }
 
+    /// Delete a message from the ntfy server
+    pub async fn delete_message(
+        &self,
+        server_url: &str,
+        topic: &str,
+        message_id: &str,
+        username: Option<&str>,
+        password: Option<&str>,
+    ) -> Result<(), AppError> {
+        let base = normalize_url(server_url);
+        let url = format!("{base}/{topic}/{message_id}");
+
+        log::info!("Deleting message from: {url}");
+
+        let mut request = self.client.delete(&url);
+
+        if let (Some(user), Some(pass)) = (username, password) {
+            if !user.is_empty() {
+                request = request.header("Authorization", Self::create_auth_header(user, pass));
+            }
+        }
+
+        let response = request.send().await.map_err(|e| {
+            log::error!("Failed to delete message: {e}");
+            AppError::Connection(format!("Failed to delete message from {server_url}: {e}"))
+        })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            log::error!("Server returned {status} on delete: {body}");
+            return Err(AppError::Connection(format!(
+                "Failed to delete message: {status} - {body}"
+            )));
+        }
+
+        log::info!("Successfully deleted message {message_id} from {server_url}/{topic}");
+        Ok(())
+    }
+
     /// Fetch messages from a topic since a given timestamp
     /// If since is None, fetches all available messages (up to server limit)
     pub async fn get_messages(

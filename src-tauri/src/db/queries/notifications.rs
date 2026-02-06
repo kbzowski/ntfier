@@ -146,6 +146,19 @@ impl Database {
         Ok(())
     }
 
+    /// Gets `ntfy_id` and `subscription_id` for a notification (needed for remote delete).
+    pub fn get_notification_meta(&self, id: &str) -> Result<Option<(Option<String>, String)>, AppError> {
+        let mut conn = self.conn()?;
+
+        let result: Option<(Option<String>, String)> = notifications::table
+            .filter(notifications::id.eq(id))
+            .select((notifications::ntfy_id, notifications::subscription_id))
+            .first(&mut *conn)
+            .optional()?;
+
+        Ok(result)
+    }
+
     /// Deletes a notification.
     pub fn delete_notification(&self, id: &str) -> Result<(), AppError> {
         let mut conn = self.conn()?;

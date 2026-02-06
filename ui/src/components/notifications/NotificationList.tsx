@@ -1,5 +1,5 @@
 import { CheckCheck, Hash, Inbox } from "lucide-react";
-import { memo, useCallback, useMemo, useRef } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -23,6 +23,7 @@ interface NotificationListProps {
 	notifications: NotificationType[];
 	onMarkAsRead: (id: string) => void;
 	onMarkAllAsRead: () => void;
+	onDelete: (id: string) => void;
 	onExpandedChange?: (id: string, expanded: boolean) => void;
 	compactView?: boolean;
 }
@@ -33,16 +34,34 @@ export const NotificationList = memo(function NotificationList({
 	notifications,
 	onMarkAsRead,
 	onMarkAllAsRead,
+	onDelete,
 	onExpandedChange,
 	compactView = false,
 }: NotificationListProps) {
 	const isAllView = !subscription;
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
 	// Scroll to top when window is shown (tray icon click)
 	useTauriEvent("window:shown", () => {
 		scrollContainerRef.current?.scrollTo({ top: 0 });
 	});
+
+	const handleDelete = useCallback(
+		(id: string) => {
+			setDeletingIds((prev) => new Set(prev).add(id));
+			// Wait for animation to finish, then actually delete
+			setTimeout(() => {
+				setDeletingIds((prev) => {
+					const next = new Set(prev);
+					next.delete(id);
+					return next;
+				});
+				onDelete(id);
+			}, 300);
+		},
+		[onDelete],
+	);
 
 	const handleExpandedChange = useCallback(
 		(notificationId: string, expanded: boolean) => {
@@ -124,13 +143,21 @@ export const NotificationList = memo(function NotificationList({
 				>
 					<div className="p-4 space-y-3">
 						{notifications.map((notification, index) => (
-							<div key={notification.id}>
+							<div
+								key={notification.id}
+								className={
+									deletingIds.has(notification.id)
+										? "notification-deleting"
+										: undefined
+								}
+							>
 								<NotificationCard
 									notification={notification}
 									topicName={
 										isAllView ? topicNames.get(notification.topicId) : undefined
 									}
 									onMarkAsRead={onMarkAsRead}
+									onDelete={handleDelete}
 									isCollapsible={compactView}
 									isExpanded={!compactView || notification.isExpanded}
 									onExpandedChange={(expanded) =>

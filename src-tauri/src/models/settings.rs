@@ -125,6 +125,9 @@ pub struct AppSettings {
     /// Automatically expand newly received messages (when compact view is enabled).
     #[serde(default = "default_true")]
     pub expand_new_messages: bool,
+    /// Delete notifications only locally (when disabled, also deletes from ntfy server).
+    #[serde(default = "default_true")]
+    pub delete_local_only: bool,
 }
 
 const fn default_true() -> bool {
@@ -151,6 +154,7 @@ impl Default for AppSettings {
             notification_sound: true,
             compact_view: false,
             expand_new_messages: true,
+            delete_local_only: true,
         }
     }
 }

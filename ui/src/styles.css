@@ -164,3 +164,31 @@ code {
 [data-state="closed"] > .collapsible-content {
   animation: collapse-up 200ms ease-out;
 }
+
+/* Notification delete animation */
+@keyframes notification-delete {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+    max-height: 500px;
+  }
+  40% {
+    opacity: 0;
+    transform: translateX(30px);
+    max-height: 500px;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(30px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+}
+
+.notification-deleting {
+  animation: notification-delete 300ms ease-out forwards;
+  overflow: hidden;
+}

@@ -32,8 +32,10 @@ export const NotificationActions = memo(function NotificationActions({
 					action: {
 						label: "Copy URL",
 						onClick: () => {
-							navigator.clipboard.writeText(action.url);
-							toast.success("URL copied to clipboard");
+							if (action.url) {
+								navigator.clipboard.writeText(action.url);
+								toast.success("URL copied to clipboard");
+							}
 						},
 					},
 				});

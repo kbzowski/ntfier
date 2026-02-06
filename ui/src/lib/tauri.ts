@@ -201,6 +201,10 @@ export const settingsApi = {
 	setExpandNewMessages: async (enabled: boolean) => {
 		unwrap(await commands.setExpandNewMessages(enabled));
 	},
+
+	setDeleteLocalOnly: async (enabled: boolean) => {
+		unwrap(await commands.setDeleteLocalOnly(enabled));
+	},
 };
 
 // ===== Sync API =====

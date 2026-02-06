@@ -63,6 +63,9 @@ impl Database {
         let compact_view = self.get_setting_bool("compact_view", false)?;
         let expand_new_messages = self.get_setting_bool("expand_new_messages", true)?;
 
+        // Deletion settings
+        let delete_local_only = self.get_setting_bool("delete_local_only", true)?;
+
         let servers = self.get_servers_with_credentials()?;
         let default_server = self.get_default_server_url()?;
 
@@ -79,6 +82,7 @@ impl Database {
             notification_sound,
             compact_view,
             expand_new_messages,
+            delete_local_only,
         })
     }
 
