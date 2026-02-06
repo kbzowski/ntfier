@@ -18,6 +18,18 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 ///
 /// Uses a Mutex-protected connection for safe access from multiple Tauri commands.
 /// Migrations are run automatically on initialization.
+///
+/// # Design note: `std::sync::Mutex` in async context
+///
+/// This intentionally uses `std::sync::Mutex` rather than `tokio::sync::Mutex` because:
+/// - Diesel is synchronous and does not support async operations.
+/// - `SQLite` queries are fast (microseconds), so lock hold times are short and
+///   will not meaningfully block Tokio worker threads.
+/// - `Database` does not implement `Clone`, which limits `spawn_blocking` usage.
+/// - Desktop apps have low concurrency (single user, few concurrent commands).
+///
+/// If lock contention ever becomes measurable, consider wrapping DB access in
+/// `spawn_blocking` or switching to `tokio::sync::Mutex`.
 pub struct Database {
     conn: Mutex<SqliteConnection>,
 }
