@@ -1,6 +1,7 @@
 //! Server-related database queries.
 
 use diesel::prelude::*;
+use diesel::Connection;
 
 use crate::db::connection::Database;
 use crate::db::models::{NewServer, ServerRow};
@@ -80,36 +81,42 @@ impl Database {
 
     /// Removes a server and all its subscriptions.
     pub fn remove_server(&self, url: &str) -> Result<(), AppError> {
-        // Get username before deleting to clean up keychain
-        let username: Option<String> = {
-            let mut conn = self.conn()?;
-            servers::table
-                .filter(servers::url.eq(url))
-                .select(servers::username)
-                .first(&mut *conn)
-                .optional()?
-                .flatten()
-        };
-
-        // Delete password from OS keychain if we have a username
-        if let Some(ref username) = username {
-            let _ = credential_manager::delete_password(username, url);
-        }
-
         let mut conn = self.conn()?;
 
-        // First delete all subscriptions for this server
-        let server_ids: Vec<String> = servers::table
-            .filter(servers::url.eq(url))
-            .select(servers::id)
-            .load(&mut *conn)?;
+        // Run DB operations in a transaction
+        let username: Option<String> =
+            conn.transaction::<_, diesel::result::Error, _>(|conn| {
+            let username: Option<String> = servers::table
+                .filter(servers::url.eq(url))
+                .select(servers::username)
+                .first(conn)
+                .optional()?
+                .flatten();
 
-        for server_id in &server_ids {
-            diesel::delete(subscriptions::table.filter(subscriptions::server_id.eq(server_id)))
-                .execute(&mut *conn)?;
+            // Delete subscriptions for this server
+            let server_ids: Vec<String> = servers::table
+                .filter(servers::url.eq(url))
+                .select(servers::id)
+                .load(conn)?;
+
+            for server_id in &server_ids {
+                diesel::delete(
+                    subscriptions::table.filter(subscriptions::server_id.eq(server_id)),
+                )
+                .execute(conn)?;
+            }
+
+            diesel::delete(servers::table.filter(servers::url.eq(url))).execute(conn)?;
+
+            Ok(username)
+            })?;
+
+        // Clean up keychain after successful transaction (best-effort)
+        if let Some(ref username) = username {
+            if let Err(e) = credential_manager::delete_password(username, url) {
+                log::warn!("Failed to clean up keychain for {username}@{url}: {e}");
+            }
         }
-
-        diesel::delete(servers::table.filter(servers::url.eq(url))).execute(&mut *conn)?;
 
         Ok(())
     }
@@ -118,15 +125,19 @@ impl Database {
     pub fn set_default_server(&self, url: &str) -> Result<(), AppError> {
         let mut conn = self.conn()?;
 
-        // Clear all defaults
-        diesel::update(servers::table)
-            .set(servers::is_default.eq(0))
-            .execute(&mut *conn)?;
+        conn.transaction::<_, diesel::result::Error, _>(|conn| {
+            // Clear all defaults
+            diesel::update(servers::table)
+                .set(servers::is_default.eq(0))
+                .execute(conn)?;
 
-        // Set new default
-        diesel::update(servers::table.filter(servers::url.eq(url)))
-            .set(servers::is_default.eq(1))
-            .execute(&mut *conn)?;
+            // Set new default
+            diesel::update(servers::table.filter(servers::url.eq(url)))
+                .set(servers::is_default.eq(1))
+                .execute(conn)?;
+
+            Ok(())
+        })?;
 
         Ok(())
     }

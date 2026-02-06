@@ -2,10 +2,11 @@
 
 use diesel::prelude::*;
 use diesel::sql_query;
+use diesel::Connection;
 
 use crate::db::connection::Database;
 use crate::db::models::{NewServer, NewSubscription, SubscriptionQueryRow};
-use crate::db::schema::{notifications, servers, subscriptions};
+use crate::db::schema::{servers, subscriptions};
 use crate::error::AppError;
 use crate::models::{CreateSubscription, Subscription};
 
@@ -67,63 +68,64 @@ impl Database {
         sub.validate()?;
         let mut conn = self.conn()?;
 
-        // Get or create server
-        let server_id: String = servers::table
-            .filter(servers::url.eq(&sub.server_url))
-            .select(servers::id)
-            .first(&mut *conn)
-            .optional()?
-            .unwrap_or_else(|| {
-                let new_id = uuid::Uuid::new_v4().to_string();
-                let new_server = NewServer {
-                    id: &new_id,
-                    url: &sub.server_url,
-                    username: None,
-                    password: None,
-                    is_default: 0,
+        let (id, server_url, topic, display_name) =
+            conn.transaction::<_, diesel::result::Error, _>(|conn| {
+                // Get or create server
+                let server_id: String = servers::table
+                    .filter(servers::url.eq(&sub.server_url))
+                    .select(servers::id)
+                    .first(conn)
+                    .optional()?
+                    .unwrap_or_else(|| {
+                        let new_id = uuid::Uuid::new_v4().to_string();
+                        let new_server = NewServer {
+                            id: &new_id,
+                            url: &sub.server_url,
+                            username: None,
+                            password: None,
+                            is_default: 0,
+                        };
+
+                        diesel::insert_into(servers::table)
+                            .values(&new_server)
+                            .execute(conn)
+                            .ok();
+
+                        new_id
+                    });
+
+                let id = uuid::Uuid::new_v4().to_string();
+                let display_name_ref = sub.display_name.as_deref().filter(|s| !s.is_empty());
+
+                let new_subscription = NewSubscription {
+                    id: &id,
+                    server_id: &server_id,
+                    topic: &sub.topic,
+                    display_name: display_name_ref,
+                    muted: 0,
                 };
 
-                diesel::insert_into(servers::table)
-                    .values(&new_server)
-                    .execute(&mut *conn)
-                    .ok();
+                diesel::insert_into(subscriptions::table)
+                    .values(&new_subscription)
+                    .execute(conn)?;
 
-                new_id
-            });
-
-        let id = uuid::Uuid::new_v4().to_string();
-        let display_name_ref = sub.display_name.as_deref().filter(|s| !s.is_empty());
-
-        let new_subscription = NewSubscription {
-            id: &id,
-            server_id: &server_id,
-            topic: &sub.topic,
-            display_name: display_name_ref,
-            muted: 0,
-        };
-
-        diesel::insert_into(subscriptions::table)
-            .values(&new_subscription)
-            .execute(&mut *conn)?;
+                Ok((id, sub.server_url, sub.topic, sub.display_name))
+            })?;
 
         Ok(Subscription {
             id,
-            topic: sub.topic,
-            server_url: sub.server_url,
-            display_name: sub.display_name,
+            topic,
+            server_url,
+            display_name,
             unread_count: 0,
             last_notification: None,
             muted: false,
         })
     }
 
-    /// Deletes a subscription and all its notifications.
+    /// Deletes a subscription and all its notifications (via ON DELETE CASCADE).
     pub fn delete_subscription(&self, id: &str) -> Result<(), AppError> {
         let mut conn = self.conn()?;
-
-        // Delete notifications first (cascade)
-        diesel::delete(notifications::table.filter(notifications::subscription_id.eq(id)))
-            .execute(&mut *conn)?;
 
         diesel::delete(subscriptions::table.filter(subscriptions::id.eq(id)))
             .execute(&mut *conn)?;
