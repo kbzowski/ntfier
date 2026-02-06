@@ -232,9 +232,6 @@ pub fn run() {
             // Sync and connect on startup (deferred)
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                // Small delay to ensure state is ready
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
                 // Clean up old cached images (older than 24 hours)
                 services::image_cache::cleanup_old_images(24 * 60 * 60).await;
 
