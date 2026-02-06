@@ -84,8 +84,7 @@ impl Database {
         let mut conn = self.conn()?;
 
         // Run DB operations in a transaction
-        let username: Option<String> =
-            conn.transaction::<_, diesel::result::Error, _>(|conn| {
+        let username: Option<String> = conn.transaction::<_, diesel::result::Error, _>(|conn| {
             let username: Option<String> = servers::table
                 .filter(servers::url.eq(url))
                 .select(servers::username)
@@ -100,16 +99,14 @@ impl Database {
                 .load(conn)?;
 
             for server_id in &server_ids {
-                diesel::delete(
-                    subscriptions::table.filter(subscriptions::server_id.eq(server_id)),
-                )
-                .execute(conn)?;
+                diesel::delete(subscriptions::table.filter(subscriptions::server_id.eq(server_id)))
+                    .execute(conn)?;
             }
 
             diesel::delete(servers::table.filter(servers::url.eq(url))).execute(conn)?;
 
             Ok(username)
-            })?;
+        })?;
 
         // Clean up keychain after successful transaction (best-effort)
         if let Some(ref username) = username {
