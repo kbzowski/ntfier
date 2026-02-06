@@ -13,7 +13,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::{
     connect_async,
-    tungstenite::{client::IntoClientRequest, http::HeaderValue, Message},
+    tungstenite::{self, client::IntoClientRequest, http::HeaderValue, Message},
 };
 
 use crate::config::connection::{JITTER_MAX_SECS, RETRY_BACKOFF_SECS};
@@ -155,17 +155,31 @@ impl ConnectionManager {
                 log::info!("Connecting to WebSocket: {ws_url}");
 
                 let connect_result = if let Some(ref auth) = auth_header {
-                    let Ok(mut request) = ws_url.as_str().into_client_request() else {
-                        log::error!("Failed to create WebSocket request for URL: {ws_url}");
-                        continue;
-                    };
-                    let Ok(header_value) = HeaderValue::from_str(auth) else {
-                        log::error!("Failed to create Authorization header value");
-                        continue;
-                    };
-                    request.headers_mut().insert("Authorization", header_value);
-                    log::info!("Using auth header for WebSocket connection");
-                    connect_async(request).await
+                    match ws_url.as_str().into_client_request() {
+                        Ok(mut request) => match HeaderValue::from_str(auth) {
+                            Ok(header_value) => {
+                                request
+                                    .headers_mut()
+                                    .insert("Authorization", header_value);
+                                log::info!("Using auth header for WebSocket connection");
+                                connect_async(request).await
+                            }
+                            Err(e) => {
+                                log::error!("Invalid Authorization header: {e}");
+                                Err(tungstenite::Error::Io(std::io::Error::new(
+                                    std::io::ErrorKind::InvalidInput,
+                                    "Invalid auth header",
+                                )))
+                            }
+                        },
+                        Err(e) => {
+                            log::error!("Invalid WebSocket URL {ws_url}: {e}");
+                            Err(tungstenite::Error::Io(std::io::Error::new(
+                                std::io::ErrorKind::InvalidInput,
+                                "Invalid WebSocket URL",
+                            )))
+                        }
+                    }
                 } else {
                     log::info!("No auth header for WebSocket connection");
                     connect_async(&ws_url).await
