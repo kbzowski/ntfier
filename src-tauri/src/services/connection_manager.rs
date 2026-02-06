@@ -158,9 +158,7 @@ impl ConnectionManager {
                     match ws_url.as_str().into_client_request() {
                         Ok(mut request) => match HeaderValue::from_str(auth) {
                             Ok(header_value) => {
-                                request
-                                    .headers_mut()
-                                    .insert("Authorization", header_value);
+                                request.headers_mut().insert("Authorization", header_value);
                                 log::info!("Using auth header for WebSocket connection");
                                 connect_async(request).await
                             }
@@ -333,7 +331,11 @@ impl ConnectionManager {
         tray_manager.refresh_from_db(app_handle).await;
 
         if !is_muted {
-            Self::show_notification(app_handle, &notification).await;
+            let handle = app_handle.clone();
+            let notif = notification.clone();
+            tokio::spawn(async move {
+                Self::show_notification(&handle, &notif).await;
+            });
         }
     }
 
