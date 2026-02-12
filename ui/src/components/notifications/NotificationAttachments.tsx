@@ -215,6 +215,8 @@ export const NotificationAttachments = memo(function NotificationAttachments({
 	const [previewErrors, setPreviewErrors] = useState<Map<string, string>>(
 		() => new Map(),
 	);
+	const previewErrorsRef = useRef(previewErrors);
+	previewErrorsRef.current = previewErrors;
 	const [loadingPreview, setLoadingPreview] = useState<string | null>(null);
 	const [failedImages, setFailedImages] = useState<Set<string>>(
 		() => new Set(),
@@ -277,7 +279,7 @@ export const NotificationAttachments = memo(function NotificationAttachments({
 			});
 
 			// Clear any previous errors for this attachment
-			if (previewErrors.has(attachment.id)) {
+			if (previewErrorsRef.current.has(attachment.id)) {
 				setPreviewErrors((prev) => {
 					const next = new Map(prev);
 					next.delete(attachment.id);
@@ -402,7 +404,7 @@ export const NotificationAttachments = memo(function NotificationAttachments({
 				await openInBrowser(attachment.url);
 			}
 		},
-		[previewErrors, openInBrowser],
+		[openInBrowser],
 	);
 
 	const handleRetry = useCallback(
