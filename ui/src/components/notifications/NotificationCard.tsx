@@ -34,7 +34,7 @@ interface NotificationCardProps {
 	onDelete?: (id: string) => void;
 	isCollapsible?: boolean;
 	isExpanded?: boolean;
-	onExpandedChange?: (expanded: boolean) => void;
+	onExpandedChange?: (id: string, expanded: boolean) => void;
 }
 
 interface CardFrameProps {
@@ -100,7 +100,7 @@ export const NotificationCard = memo(function NotificationCard({
 
 	const handleExpandedChange = useCallback(
 		(expanded: boolean) => {
-			onExpandedChange?.(expanded);
+			onExpandedChange?.(notification.id, expanded);
 			if (expanded) {
 				onMarkAsRead?.(notification.id);
 			}

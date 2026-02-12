@@ -172,9 +172,7 @@ export const NotificationList = memo(function NotificationList({
 									onDelete={handleDelete}
 									isCollapsible={compactView}
 									isExpanded={!compactView || notification.isExpanded}
-									onExpandedChange={(expanded) =>
-										handleExpandedChange(notification.id, expanded)
-									}
+									onExpandedChange={handleExpandedChange}
 								/>
 								{index < notifications.length - 1 && (
 									<Separator className="my-3 opacity-0" />
