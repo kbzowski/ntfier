@@ -7,6 +7,55 @@ import { LazyImageWithFallback } from "@/components/ui/lazy-image";
 import { preprocessMarkdown } from "@/lib/markdownPreprocessor";
 import { cn } from "@/lib/utils";
 
+const REMARK_PLUGINS = [remarkGfm, remarkBreaks];
+const REHYPE_PLUGINS = [rehypeRaw];
+const MARKDOWN_COMPONENTS = {
+	img: ({ src, alt }: { src?: string; alt?: string }) => {
+		if (!src) return null;
+		return <LazyImageWithFallback src={src} alt={alt} />;
+	},
+	a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+		<a
+			href={href}
+			target="_blank"
+			rel="noopener noreferrer"
+			className="text-primary hover:underline"
+		>
+			{children}
+		</a>
+	),
+	code: ({
+		className,
+		children,
+		...props
+	}: {
+		className?: string;
+		children?: React.ReactNode;
+	}) => {
+		const isInline = !className;
+		if (isInline) {
+			return (
+				<code
+					className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono"
+					{...props}
+				>
+					{children}
+				</code>
+			);
+		}
+		return (
+			<code className={cn("text-xs font-mono", className)} {...props}>
+				{children}
+			</code>
+		);
+	},
+	pre: ({ children }: { children?: React.ReactNode }) => (
+		<pre className="bg-muted p-3 rounded-lg overflow-x-auto text-xs my-2">
+			{children}
+		</pre>
+	),
+};
+
 interface MarkdownContentProps {
 	content: string;
 	className?: string;
@@ -35,47 +84,9 @@ export const MarkdownContent = memo(function MarkdownContent({
 			)}
 		>
 			<ReactMarkdown
-				remarkPlugins={[remarkGfm, remarkBreaks]}
-				rehypePlugins={[rehypeRaw]}
-				components={{
-					img: ({ src, alt }) => {
-						if (!src) return null;
-						return <LazyImageWithFallback src={src} alt={alt} />;
-					},
-					a: ({ href, children }) => (
-						<a
-							href={href}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="text-primary hover:underline"
-						>
-							{children}
-						</a>
-					),
-					code: ({ className, children, ...props }) => {
-						const isInline = !className;
-						if (isInline) {
-							return (
-								<code
-									className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono"
-									{...props}
-								>
-									{children}
-								</code>
-							);
-						}
-						return (
-							<code className={cn("text-xs font-mono", className)} {...props}>
-								{children}
-							</code>
-						);
-					},
-					pre: ({ children }) => (
-						<pre className="bg-muted p-3 rounded-lg overflow-x-auto text-xs my-2">
-							{children}
-						</pre>
-					),
-				}}
+				remarkPlugins={REMARK_PLUGINS}
+				rehypePlugins={REHYPE_PLUGINS}
+				components={MARKDOWN_COMPONENTS}
 			>
 				{processedContent}
 			</ReactMarkdown>
