@@ -142,7 +142,7 @@ function generateUpdateJson() {
 
 	const updateJson = {
 		version: VERSION,
-		notes: `Release ${TAG_NAME}. See CHANGELOG.md for details.`,
+		notes: `Release ${TAG_NAME}. See release notes on GitHub for details.`,
 		pub_date: new Date().toISOString(),
 		platforms: platforms,
 	};
