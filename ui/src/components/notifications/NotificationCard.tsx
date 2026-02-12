@@ -1,11 +1,18 @@
-import { Hash } from "lucide-react";
+import { Copy, Hash } from "lucide-react";
 import { memo, type ReactNode, useCallback } from "react";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { PRIORITY_CONFIG } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Notification as NotificationType } from "@/types/ntfy";
@@ -68,6 +75,24 @@ export const NotificationCard = memo(function NotificationCard({
 		onMarkAsRead?.(notification.id);
 	}, [onMarkAsRead, notification.id]);
 
+	const handleCopyTitle = useCallback(async () => {
+		try {
+			await navigator.clipboard.writeText(notification.title);
+			toast.success("Title copied to clipboard");
+		} catch (error) {
+			toast.error("Failed to copy title to clipboard");
+		}
+	}, [notification.title]);
+
+	const handleCopyContent = useCallback(async () => {
+		try {
+			await navigator.clipboard.writeText(notification.message);
+			toast.success("Content copied to clipboard");
+		} catch (error) {
+			toast.error("Failed to copy content to clipboard");
+		}
+	}, [notification.message]);
+
 	const handleExpandedChange = useCallback(
 		(expanded: boolean) => {
 			onExpandedChange?.(expanded);
@@ -110,37 +135,65 @@ export const NotificationCard = memo(function NotificationCard({
 		</>
 	);
 
+	const contextMenuContent = (
+		<ContextMenuContent>
+			<ContextMenuItem disabled={!notification.title} onClick={handleCopyTitle}>
+				<Copy />
+				Copy title
+			</ContextMenuItem>
+			<ContextMenuItem
+				disabled={!notification.message}
+				onClick={handleCopyContent}
+			>
+				<Copy />
+				Copy content
+			</ContextMenuItem>
+		</ContextMenuContent>
+	);
+
 	if (isCollapsible) {
 		return (
-			<Collapsible open={isExpanded} onOpenChange={handleExpandedChange}>
-				<Card
-					className={cn(
-						"group transition-colors hover:bg-accent/50 border-l-4 py-0",
-						borderColor,
-						!notification.read && "bg-accent/20",
-					)}
-				>
-					<CollapsibleTrigger className="w-full text-left cursor-pointer block px-6 py-4">
-						{topicBadge}
-						{header}
-					</CollapsibleTrigger>
-					<CollapsibleContent className="collapsible-content overflow-hidden">
-						<div className="px-6 pb-4">{details}</div>
-					</CollapsibleContent>
-				</Card>
-			</Collapsible>
+			<ContextMenu>
+				<ContextMenuTrigger asChild>
+					<Collapsible open={isExpanded} onOpenChange={handleExpandedChange}>
+						<Card
+							className={cn(
+								"group transition-colors hover:bg-accent/50 border-l-4 py-0",
+								borderColor,
+								!notification.read && "bg-accent/20",
+							)}
+						>
+							<CollapsibleTrigger className="w-full text-left cursor-pointer block px-6 py-4">
+								{topicBadge}
+								{header}
+							</CollapsibleTrigger>
+							<CollapsibleContent className="collapsible-content overflow-hidden">
+								<div className="px-6 pb-4">{details}</div>
+							</CollapsibleContent>
+						</Card>
+					</Collapsible>
+				</ContextMenuTrigger>
+				{contextMenuContent}
+			</ContextMenu>
 		);
 	}
 
 	return (
-		<CardFrame
-			borderColor={borderColor}
-			isUnread={!notification.read}
-			onClick={handleClick}
-		>
-			{topicBadge}
-			{header}
-			{details}
-		</CardFrame>
+		<ContextMenu>
+			<ContextMenuTrigger asChild>
+				<div>
+					<CardFrame
+						borderColor={borderColor}
+						isUnread={!notification.read}
+						onClick={handleClick}
+					>
+						{topicBadge}
+						{header}
+						{details}
+					</CardFrame>
+				</div>
+			</ContextMenuTrigger>
+			{contextMenuContent}
+		</ContextMenu>
 	);
 });
