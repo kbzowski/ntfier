@@ -105,6 +105,12 @@ function App() {
 		[addSubscription, setCurrentTopicId],
 	);
 
+	const handleOpenSettings = useCallback(() => setSettingsOpen(true), []);
+	const handleOpenAddSubscription = useCallback(
+		() => setAddSubscriptionOpen(true),
+		[],
+	);
+
 	const handleMarkAllAsRead = useCallback(() => {
 		const topicId = currentTopicIdRef.current;
 		if (topicId) {
@@ -123,8 +129,8 @@ function App() {
 				onSelectTopic={setCurrentTopicId}
 				onToggleMute={toggleMute}
 				onRemoveSubscription={handleRemoveSubscription}
-				onOpenSettings={() => setSettingsOpen(true)}
-				onAddSubscription={() => setAddSubscriptionOpen(true)}
+				onOpenSettings={handleOpenSettings}
+				onAddSubscription={handleOpenAddSubscription}
 			>
 				<NotificationList
 					subscription={selectedSubscription ?? null}
