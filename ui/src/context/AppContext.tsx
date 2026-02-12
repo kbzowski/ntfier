@@ -153,6 +153,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		loadData();
 	}, []);
 
+	// Stable key that only changes when subscription IDs change
+	const _subscriptionIds = useMemo(
+		() => subscriptions.map((s) => s.id).join(","),
+		[subscriptions],
+	);
+
 	// Load notifications when topic changes
 	useEffect(() => {
 		if (currentTopicId) {
@@ -163,9 +169,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		}
 	}, [
 		currentTopicId,
-		subscriptions,
 		notifications.loadForTopic,
 		notifications.loadAllTopics,
+		subscriptions,
 	]);
 
 	// Listen for new notifications from backend
@@ -605,51 +611,91 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		}));
 	}, [subscriptions, notifications.byTopic, notifications.getUnreadCount]);
 
-	const value: AppContextValue = {
-		// State
-		subscriptions,
-		subscriptionsLoading,
-		notificationsByTopic: notifications.byTopic,
-		currentTopicId,
-		settings,
-		settingsLoading,
-		autostart,
-		updateInfo,
+	const value = useMemo<AppContextValue>(
+		() => ({
+			// State
+			subscriptions,
+			subscriptionsLoading,
+			notificationsByTopic: notifications.byTopic,
+			currentTopicId,
+			settings,
+			settingsLoading,
+			autostart,
+			updateInfo,
 
-		// Actions
-		addSubscription,
-		removeSubscription,
-		toggleMute,
-		refreshSubscriptions,
-		setCurrentTopicId,
-		markAsRead: notifications.markAsRead,
-		markAllAsRead: notifications.markAllAsRead,
-		markAllAsReadGlobally: notifications.markAllAsReadGlobally,
-		deleteNotification: notifications.deleteNotification,
-		setNotificationExpanded: notifications.setExpanded,
-		getUnreadCount: notifications.getUnreadCount,
-		getTotalUnread: notifications.getTotalUnread,
-		setTheme,
-		addServer,
-		removeServer,
-		setDefaultServer,
-		setAutostart,
-		setMinimizeToTray,
-		setStartMinimized,
-		setNotificationMethod,
-		setNotificationForceDisplay,
-		setNotificationShowActions,
-		setNotificationShowImages,
-		setNotificationSound,
-		setCompactView,
-		setExpandNewMessages,
-		setDeleteLocalOnly,
-		setUpdateInfo,
+			// Actions
+			addSubscription,
+			removeSubscription,
+			toggleMute,
+			refreshSubscriptions,
+			setCurrentTopicId,
+			markAsRead: notifications.markAsRead,
+			markAllAsRead: notifications.markAllAsRead,
+			markAllAsReadGlobally: notifications.markAllAsReadGlobally,
+			deleteNotification: notifications.deleteNotification,
+			setNotificationExpanded: notifications.setExpanded,
+			getUnreadCount: notifications.getUnreadCount,
+			getTotalUnread: notifications.getTotalUnread,
+			setTheme,
+			addServer,
+			removeServer,
+			setDefaultServer,
+			setAutostart,
+			setMinimizeToTray,
+			setStartMinimized,
+			setNotificationMethod,
+			setNotificationForceDisplay,
+			setNotificationShowActions,
+			setNotificationShowImages,
+			setNotificationSound,
+			setCompactView,
+			setExpandNewMessages,
+			setDeleteLocalOnly,
+			setUpdateInfo,
 
-		// Derived
-		currentNotifications,
-		subscriptionsWithUnread,
-	};
+			// Derived
+			currentNotifications,
+			subscriptionsWithUnread,
+		}),
+		[
+			subscriptions,
+			subscriptionsLoading,
+			notifications.byTopic,
+			currentTopicId,
+			settings,
+			settingsLoading,
+			autostart,
+			updateInfo,
+			addSubscription,
+			removeSubscription,
+			toggleMute,
+			refreshSubscriptions,
+			notifications.markAsRead,
+			notifications.markAllAsRead,
+			notifications.markAllAsReadGlobally,
+			notifications.deleteNotification,
+			notifications.setExpanded,
+			notifications.getUnreadCount,
+			notifications.getTotalUnread,
+			setTheme,
+			addServer,
+			removeServer,
+			setDefaultServer,
+			setAutostart,
+			setMinimizeToTray,
+			setStartMinimized,
+			setNotificationMethod,
+			setNotificationForceDisplay,
+			setNotificationShowActions,
+			setNotificationShowImages,
+			setNotificationSound,
+			setCompactView,
+			setExpandNewMessages,
+			setDeleteLocalOnly,
+			currentNotifications,
+			subscriptionsWithUnread,
+		],
+	);
 
 	return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
