@@ -88,10 +88,13 @@ export const NotificationList = memo(function NotificationList({
 		return map;
 	}, [subscriptions]);
 
-	const unreadCount = useMemo(
-		() => notifications.filter((n) => !n.read).length,
-		[notifications],
-	);
+	const unreadCount = useMemo(() => {
+		let count = 0;
+		for (const n of notifications) {
+			if (!n.read) count++;
+		}
+		return count;
+	}, [notifications]);
 
 	if (isAllView && subscriptions.length === 0) {
 		return <EmptyState type="no-topic" />;
