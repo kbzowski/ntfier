@@ -59,9 +59,9 @@ export const SidebarTopicList = memo(function SidebarTopicList({
 								key={subscription.id}
 								subscription={subscription}
 								isSelected={selectedTopicId === subscription.id}
-								onSelect={() => onSelectTopic(subscription.id)}
-								onToggleMute={() => onToggleMute(subscription.id)}
-								onRemove={() => onRemove(subscription.id)}
+								onSelect={onSelectTopic}
+								onToggleMute={onToggleMute}
+								onRemove={onRemove}
 							/>
 						))}
 			</div>

@@ -4,7 +4,7 @@ import Hash from "lucide-react/dist/esm/icons/hash";
 import MoreHorizontal from "lucide-react/dist/esm/icons/more-horizontal";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
 import VolumeX from "lucide-react/dist/esm/icons/volume-x";
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,9 +19,9 @@ import type { Subscription } from "@/types/ntfy";
 interface SidebarTopicItemProps {
 	subscription: Subscription;
 	isSelected: boolean;
-	onSelect: () => void;
-	onToggleMute: () => void;
-	onRemove: () => void;
+	onSelect: (id: string) => void;
+	onToggleMute: (id: string) => void;
+	onRemove: (id: string) => void;
 }
 
 export const SidebarTopicItem = memo(function SidebarTopicItem({
@@ -31,6 +31,19 @@ export const SidebarTopicItem = memo(function SidebarTopicItem({
 	onToggleMute,
 	onRemove,
 }: SidebarTopicItemProps) {
+	const handleSelect = useCallback(
+		() => onSelect(subscription.id),
+		[onSelect, subscription.id],
+	);
+	const handleToggleMute = useCallback(
+		() => onToggleMute(subscription.id),
+		[onToggleMute, subscription.id],
+	);
+	const handleRemove = useCallback(
+		() => onRemove(subscription.id),
+		[onRemove, subscription.id],
+	);
+
 	return (
 		<button
 			type="button"
@@ -40,7 +53,7 @@ export const SidebarTopicItem = memo(function SidebarTopicItem({
 					? "bg-sidebar-accent text-sidebar-accent-foreground"
 					: "hover:bg-sidebar-accent/50 text-sidebar-foreground",
 			)}
-			onClick={onSelect}
+			onClick={handleSelect}
 		>
 			<Hash className="h-4 w-4 shrink-0 text-muted-foreground" />
 			<span className="flex-1 truncate text-sm">
@@ -69,7 +82,7 @@ export const SidebarTopicItem = memo(function SidebarTopicItem({
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end">
-					<DropdownMenuItem onClick={onToggleMute}>
+					<DropdownMenuItem onClick={handleToggleMute}>
 						{subscription.muted ? (
 							<>
 								<Bell className="h-4 w-4 mr-2" />
@@ -83,7 +96,7 @@ export const SidebarTopicItem = memo(function SidebarTopicItem({
 						)}
 					</DropdownMenuItem>
 					<DropdownMenuItem
-						onClick={onRemove}
+						onClick={handleRemove}
 						className="text-destructive focus:text-destructive"
 					>
 						<Trash2 className="h-4 w-4 mr-2" />
