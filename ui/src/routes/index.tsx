@@ -15,6 +15,8 @@ const SettingsDialog = lazy(() =>
 import { NotificationList } from "@/components/notifications/NotificationList";
 import { useApp } from "@/context/AppContext";
 
+const noop = () => {};
+
 export const Route = createFileRoute("/")({ component: App });
 
 function App() {
@@ -209,8 +211,8 @@ function App() {
 
 			<UpdateToast
 				updateInfo={updateInfo}
-				onOpenSettings={() => setSettingsOpen(true)}
-				onDismiss={() => {}}
+				onOpenSettings={handleOpenSettings}
+				onDismiss={noop}
 			/>
 		</>
 	);
