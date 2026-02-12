@@ -298,7 +298,7 @@ export function useNotifications(subscriptions: Subscription[]) {
 	const getForTopic = useCallback(
 		(topicId: string) => {
 			const notifs = byTopic.get(topicId) || [];
-			return [...notifs].sort((a, b) => b.timestamp - a.timestamp);
+			return notifs.toSorted((a, b) => b.timestamp - a.timestamp);
 		},
 		[byTopic],
 	);
@@ -322,7 +322,7 @@ export function useNotifications(subscriptions: Subscription[]) {
 		for (const notifs of byTopic.values()) {
 			all.push(...notifs);
 		}
-		return all.sort((a, b) => b.timestamp - a.timestamp);
+		return all.toSorted((a, b) => b.timestamp - a.timestamp);
 	}, [byTopic]);
 
 	return {
