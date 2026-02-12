@@ -15,13 +15,18 @@ export function loadThemePreferences(): {
 		return { themeId: "dark", isSystemMode: true };
 	}
 
-	const savedThemeId = localStorage.getItem(THEME_STORAGE_KEY);
-	const savedSystemMode = localStorage.getItem(SYSTEM_MODE_KEY);
+	try {
+		const savedThemeId = localStorage.getItem(THEME_STORAGE_KEY);
+		const savedSystemMode = localStorage.getItem(SYSTEM_MODE_KEY);
 
-	return {
-		themeId: savedThemeId ?? "dark",
-		isSystemMode: savedSystemMode === null ? true : savedSystemMode === "true",
-	};
+		return {
+			themeId: savedThemeId ?? "dark",
+			isSystemMode:
+				savedSystemMode === null ? true : savedSystemMode === "true",
+		};
+	} catch {
+		return { themeId: "dark", isSystemMode: true };
+	}
 }
 
 /**
@@ -33,6 +38,10 @@ export function saveThemePreferences(
 ): void {
 	if (typeof window === "undefined") return;
 
-	localStorage.setItem(THEME_STORAGE_KEY, themeId);
-	localStorage.setItem(SYSTEM_MODE_KEY, String(isSystemMode));
+	try {
+		localStorage.setItem(THEME_STORAGE_KEY, themeId);
+		localStorage.setItem(SYSTEM_MODE_KEY, String(isSystemMode));
+	} catch {
+		// Silently fail — storage may be unavailable (incognito, quota exceeded)
+	}
 }
