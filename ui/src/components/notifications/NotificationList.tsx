@@ -153,6 +153,10 @@ export const NotificationList = memo(function NotificationList({
 										? "notification-deleting"
 										: undefined
 								}
+								style={{
+									contentVisibility: "auto",
+									containIntrinsicSize: "auto 120px",
+								}}
 							>
 								<NotificationCard
 									notification={notification}
