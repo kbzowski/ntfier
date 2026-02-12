@@ -79,7 +79,7 @@ export const NotificationCard = memo(function NotificationCard({
 		try {
 			await navigator.clipboard.writeText(notification.title);
 			toast.success("Title copied to clipboard");
-		} catch (error) {
+		} catch (_error) {
 			toast.error("Failed to copy title to clipboard");
 		}
 	}, [notification.title]);
@@ -88,7 +88,7 @@ export const NotificationCard = memo(function NotificationCard({
 		try {
 			await navigator.clipboard.writeText(notification.message);
 			toast.success("Content copied to clipboard");
-		} catch (error) {
+		} catch (_error) {
 			toast.error("Failed to copy content to clipboard");
 		}
 	}, [notification.message]);

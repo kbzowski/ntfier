@@ -11,6 +11,6 @@ pre-commit:
 
     ui-lint:
       root: "ui"
-      glob: "ui/src/**/*.{ts,tsx}"
-      run: pnpm biome check --write {staged_files}
+      glob: "ui/src/**/*.{js,jsx,ts,tsx,json,css}"
+      run: pnpm biome check --write --unsafe --staged --no-errors-on-unmatched
       stage_fixed: true
