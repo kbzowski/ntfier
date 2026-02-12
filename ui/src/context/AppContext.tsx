@@ -9,7 +9,8 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { mockSettings, mockSubscriptions } from "@/data/mock-data";
-import { useNotifications, useTauriEvent } from "@/hooks";
+import { useNotifications } from "@/hooks/useNotifications";
+import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { classifyError } from "@/lib/error-classification";
 import {
 	autostartApi,

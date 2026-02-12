@@ -1,5 +1,5 @@
 import { type RefObject, useState } from "react";
-import { useLazyImage } from "@/hooks";
+import { useLazyImage } from "@/hooks/useLazyImage";
 import { cn } from "@/lib/utils";
 
 interface LazyImageProps {
