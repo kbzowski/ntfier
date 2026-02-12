@@ -1,4 +1,6 @@
-import { CheckCheck, Hash, Inbox } from "lucide-react";
+import CheckCheck from "lucide-react/dist/esm/icons/check-check";
+import Hash from "lucide-react/dist/esm/icons/hash";
+import Inbox from "lucide-react/dist/esm/icons/inbox";
 import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";

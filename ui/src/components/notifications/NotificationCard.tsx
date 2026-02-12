@@ -1,4 +1,5 @@
-import { Copy, Hash } from "lucide-react";
+import Copy from "lucide-react/dist/esm/icons/copy";
+import Hash from "lucide-react/dist/esm/icons/hash";
 import { lazy, memo, type ReactNode, Suspense, useCallback } from "react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";

@@ -1,4 +1,7 @@
-import { Bell, Palette, Server, Settings2 } from "lucide-react";
+import Bell from "lucide-react/dist/esm/icons/bell";
+import Palette from "lucide-react/dist/esm/icons/palette";
+import Server from "lucide-react/dist/esm/icons/server";
+import Settings2 from "lucide-react/dist/esm/icons/settings-2";
 import { useEffect, useState } from "react";
 import {
 	Dialog,

@@ -1,4 +1,5 @@
-import { Bell, Inbox } from "lucide-react";
+import Bell from "lucide-react/dist/esm/icons/bell";
+import Inbox from "lucide-react/dist/esm/icons/inbox";
 
 interface EmptyStateProps {
 	type: "no-topic" | "no-notifications";

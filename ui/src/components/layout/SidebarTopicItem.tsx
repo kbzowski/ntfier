@@ -1,11 +1,9 @@
-import {
-	Bell,
-	BellOff,
-	Hash,
-	MoreHorizontal,
-	Trash2,
-	VolumeX,
-} from "lucide-react";
+import Bell from "lucide-react/dist/esm/icons/bell";
+import BellOff from "lucide-react/dist/esm/icons/bell-off";
+import Hash from "lucide-react/dist/esm/icons/hash";
+import MoreHorizontal from "lucide-react/dist/esm/icons/more-horizontal";
+import Trash2 from "lucide-react/dist/esm/icons/trash-2";
+import VolumeX from "lucide-react/dist/esm/icons/volume-x";
 import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

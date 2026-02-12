@@ -1,4 +1,4 @@
-import { Inbox } from "lucide-react";
+import Inbox from "lucide-react/dist/esm/icons/inbox";
 import { memo, useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";

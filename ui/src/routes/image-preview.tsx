@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { open } from "@tauri-apps/plugin-shell";
-import { Download, Image as ImageIcon } from "lucide-react";
+import Download from "lucide-react/dist/esm/icons/download";
+import ImageIcon from "lucide-react/dist/esm/icons/image";
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";

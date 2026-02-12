@@ -2,7 +2,7 @@
  * Inline error component for form fields and validation errors
  */
 
-import { AlertCircle } from "lucide-react";
+import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
 import { cn } from "@/lib/utils";
 
 interface InlineErrorProps {

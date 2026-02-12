@@ -1,14 +1,12 @@
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-shell";
-import {
-	AlertTriangle,
-	Download,
-	ExternalLink,
-	FileText,
-	Image as ImageIcon,
-	Loader2,
-	RefreshCw,
-} from "lucide-react";
+import AlertTriangle from "lucide-react/dist/esm/icons/alert-triangle";
+import Download from "lucide-react/dist/esm/icons/download";
+import ExternalLink from "lucide-react/dist/esm/icons/external-link";
+import FileText from "lucide-react/dist/esm/icons/file-text";
+import ImageIcon from "lucide-react/dist/esm/icons/image";
+import Loader2 from "lucide-react/dist/esm/icons/loader-2";
+import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";

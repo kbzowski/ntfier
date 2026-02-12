@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import Plus from "lucide-react/dist/esm/icons/plus";
 import { Button } from "@/components/ui/button";
 
 interface SidebarFooterProps {

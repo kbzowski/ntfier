@@ -1,4 +1,7 @@
-import { Bell, Monitor, Volume2, Zap } from "lucide-react";
+import Bell from "lucide-react/dist/esm/icons/bell";
+import Monitor from "lucide-react/dist/esm/icons/monitor";
+import Volume2 from "lucide-react/dist/esm/icons/volume-2";
+import Zap from "lucide-react/dist/esm/icons/zap";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";

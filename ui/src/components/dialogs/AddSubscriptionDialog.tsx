@@ -1,4 +1,5 @@
-import { ChevronDown, Server } from "lucide-react";
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
+import Server from "lucide-react/dist/esm/icons/server";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";

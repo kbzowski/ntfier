@@ -1,4 +1,4 @@
-import { Bell } from "lucide-react";
+import Bell from "lucide-react/dist/esm/icons/bell";
 import { memo, type ReactNode, useCallback, useMemo, useState } from "react";
 import {
 	Sheet,
