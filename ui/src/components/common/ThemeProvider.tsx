@@ -1,8 +1,10 @@
 import {
 	createContext,
 	type ReactNode,
+	useCallback,
 	useContext,
 	useEffect,
+	useMemo,
 	useState,
 } from "react";
 import type { ThemeDefinition } from "@/themes";
@@ -82,27 +84,28 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 		saveThemePreferences(themeId, isSystemMode);
 	}, [themeId, isSystemMode]);
 
-	const setThemeId = (id: string) => {
+	const setThemeId = useCallback((id: string) => {
 		setThemeIdState(id);
-	};
+	}, []);
 
-	const setSystemMode = (enabled: boolean) => {
+	const setSystemMode = useCallback((enabled: boolean) => {
 		setSystemModeState(enabled);
-	};
+	}, []);
+
+	const value = useMemo<ThemeContextValue>(
+		() => ({
+			themeId,
+			setThemeId,
+			currentTheme,
+			availableThemes: themes,
+			isSystemMode,
+			setSystemMode,
+		}),
+		[themeId, setThemeId, currentTheme, isSystemMode, setSystemMode],
+	);
 
 	return (
-		<ThemeContext.Provider
-			value={{
-				themeId,
-				setThemeId,
-				currentTheme,
-				availableThemes: themes,
-				isSystemMode,
-				setSystemMode,
-			}}
-		>
-			{children}
-		</ThemeContext.Provider>
+		<ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 	);
 }
 
