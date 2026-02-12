@@ -6,21 +6,6 @@ import { isTauri, notificationsApi } from "@/lib/tauri";
 import type { Notification, Subscription } from "@/types/ntfy";
 
 /**
- * Finds the topic ID for a notification by searching through all topics.
- */
-function findTopicForNotification(
-	byTopic: Map<string, Notification[]>,
-	notificationId: string,
-): string | undefined {
-	for (const [topicId, notifs] of byTopic) {
-		if (notifs.some((n) => n.id === notificationId)) {
-			return topicId;
-		}
-	}
-	return undefined;
-}
-
-/**
  * Manages notification state and operations.
  *
  * Handles loading, caching, and updating notifications for topics.
@@ -31,6 +16,8 @@ export function useNotifications(subscriptions: Subscription[]) {
 		new Map(),
 	);
 	const loadedTopicsRef = useRef<Set<string>>(new Set());
+	// Reverse index: notificationId → topicId for O(1) lookup
+	const notificationIndexRef = useRef<Map<string, string>>(new Map());
 
 	/**
 	 * Loads notifications for a topic if not already loaded.
@@ -47,10 +34,16 @@ export function useNotifications(subscriptions: Subscription[]) {
 			} else {
 				notifs = mockNotifications.filter((n) => n.topicId === topicId);
 			}
+			for (const n of notifs) {
+				notificationIndexRef.current.set(n.id, topicId);
+			}
 			setByTopic((prev) => new Map(prev).set(topicId, notifs));
 		} catch (err) {
 			console.error("Failed to load notifications:", err);
 			const filtered = mockNotifications.filter((n) => n.topicId === topicId);
+			for (const n of filtered) {
+				notificationIndexRef.current.set(n.id, topicId);
+			}
 			setByTopic((prev) => new Map(prev).set(topicId, filtered));
 			loadedTopicsRef.current.delete(topicId);
 		}
@@ -60,6 +53,7 @@ export function useNotifications(subscriptions: Subscription[]) {
 	 * Adds a new notification to the beginning of its topic's list.
 	 */
 	const addNotification = useCallback((notification: Notification) => {
+		notificationIndexRef.current.set(notification.id, notification.topicId);
 		setByTopic((prev) => {
 			const existing = prev.get(notification.topicId) || [];
 			return new Map(prev).set(notification.topicId, [
@@ -76,12 +70,11 @@ export function useNotifications(subscriptions: Subscription[]) {
 	const markAsRead = useCallback((id: string) => {
 		// Store previous state for rollback
 		let previousState: Map<string, Notification[]> | null = null;
-		let topicId: string | undefined;
+		const topicId = notificationIndexRef.current.get(id);
 
 		// Optimistic update - instant UI feedback
 		setByTopic((prev) => {
 			previousState = new Map(prev);
-			topicId = findTopicForNotification(prev, id);
 			if (!topicId) return prev;
 
 			const notifs = prev.get(topicId);
@@ -195,12 +188,11 @@ export function useNotifications(subscriptions: Subscription[]) {
 	const deleteNotification = useCallback((id: string) => {
 		// Store previous state for rollback
 		let previousState: Map<string, Notification[]> | null = null;
-		let topicId: string | undefined;
+		const topicId = notificationIndexRef.current.get(id);
 
 		// Optimistic update - instant UI feedback
 		setByTopic((prev) => {
 			previousState = new Map(prev);
-			topicId = findTopicForNotification(prev, id);
 			if (!topicId) return prev;
 
 			const notifs = prev.get(topicId);
@@ -209,6 +201,8 @@ export function useNotifications(subscriptions: Subscription[]) {
 			const filtered = notifs.filter((n) => n.id !== id);
 			return new Map(prev).set(topicId, filtered);
 		});
+
+		notificationIndexRef.current.delete(id);
 
 		// API call in background
 		if (isTauri()) {
@@ -231,9 +225,9 @@ export function useNotifications(subscriptions: Subscription[]) {
 	 * Uses optimistic UI update for instant feedback.
 	 */
 	const setExpanded = useCallback((id: string, expanded: boolean) => {
+		const topicId = notificationIndexRef.current.get(id);
 		// Optimistic update - instant UI feedback
 		setByTopic((prev) => {
-			const topicId = findTopicForNotification(prev, id);
 			if (!topicId) return prev;
 
 			const notifs = prev.get(topicId);
@@ -251,6 +245,12 @@ export function useNotifications(subscriptions: Subscription[]) {
 	 */
 	const clearTopic = useCallback((topicId: string) => {
 		setByTopic((prev) => {
+			const notifs = prev.get(topicId);
+			if (notifs) {
+				for (const n of notifs) {
+					notificationIndexRef.current.delete(n.id);
+				}
+			}
 			const next = new Map(prev);
 			next.delete(topicId);
 			return next;
