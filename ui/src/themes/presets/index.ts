@@ -41,10 +41,17 @@ export const themes: ThemeDefinition[] = [
 ];
 
 /**
+ * Index map for O(1) theme lookup by ID
+ */
+const themeMap = new Map<string, ThemeDefinition>(
+	themes.map((theme) => [theme.id, theme]),
+);
+
+/**
  * Get a theme by its ID
  */
 export function getThemeById(id: string): ThemeDefinition | undefined {
-	return themes.find((theme) => theme.id === id);
+	return themeMap.get(id);
 }
 
 /**
