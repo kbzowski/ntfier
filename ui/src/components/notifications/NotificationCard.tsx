@@ -1,5 +1,5 @@
 import { Copy, Hash } from "lucide-react";
-import { memo, type ReactNode, useCallback } from "react";
+import { lazy, memo, type ReactNode, Suspense, useCallback } from "react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -16,8 +16,12 @@ import {
 import { PRIORITY_CONFIG } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Notification as NotificationType } from "@/types/ntfy";
-import { MarkdownContent } from "./MarkdownContent";
 import { NotificationActions } from "./NotificationActions";
+
+const MarkdownContent = lazy(() =>
+	import("./MarkdownContent").then((m) => ({ default: m.MarkdownContent })),
+);
+
 import { NotificationAttachments } from "./NotificationAttachments";
 import { NotificationHeader } from "./NotificationHeader";
 import { NotificationTags } from "./NotificationTags";
@@ -126,7 +130,9 @@ export const NotificationCard = memo(function NotificationCard({
 		<>
 			{notification.message && (
 				<div className="mt-2 text-sm text-muted-foreground selectable">
-					<MarkdownContent content={notification.message} />
+					<Suspense fallback={<span>{notification.message}</span>}>
+						<MarkdownContent content={notification.message} />
+					</Suspense>
 				</div>
 			)}
 			<NotificationTags tags={notification.tags} />
