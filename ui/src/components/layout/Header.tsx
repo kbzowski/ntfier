@@ -1,5 +1,6 @@
 import Bell from "lucide-react/dist/esm/icons/bell";
 import Menu from "lucide-react/dist/esm/icons/menu";
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Tooltip,
@@ -14,7 +15,7 @@ interface HeaderProps {
 	onSettingsClick: () => void;
 }
 
-export function Header({
+export const Header = memo(function Header({
 	totalUnread,
 	onMenuClick,
 	onSettingsClick,
@@ -70,4 +71,4 @@ export function Header({
 			</TooltipProvider>
 		</header>
 	);
-}
+});
