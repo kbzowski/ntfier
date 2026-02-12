@@ -1,5 +1,5 @@
 import { Inbox } from "lucide-react";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { Subscription } from "@/types/ntfy";
@@ -13,7 +13,7 @@ interface SidebarTopicListProps {
 	onRemove: (id: string) => void;
 }
 
-export function SidebarTopicList({
+export const SidebarTopicList = memo(function SidebarTopicList({
 	subscriptions,
 	selectedTopicId,
 	onSelectTopic,
@@ -71,4 +71,4 @@ export function SidebarTopicList({
 			</div>
 		</ScrollArea>
 	);
-}
+});

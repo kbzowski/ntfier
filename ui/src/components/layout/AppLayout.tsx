@@ -1,5 +1,5 @@
 import { Bell } from "lucide-react";
-import { type ReactNode, useCallback, useMemo, useState } from "react";
+import { memo, type ReactNode, useCallback, useMemo, useState } from "react";
 import {
 	Sheet,
 	SheetContent,
@@ -22,7 +22,7 @@ interface AppLayoutProps {
 	onAddSubscription: () => void;
 }
 
-export function AppLayout({
+export const AppLayout = memo(function AppLayout({
 	children,
 	subscriptions,
 	selectedTopicId,
@@ -88,4 +88,4 @@ export function AppLayout({
 			</main>
 		</div>
 	);
-}
+});

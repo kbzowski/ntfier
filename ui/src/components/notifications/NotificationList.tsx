@@ -86,11 +86,14 @@ export const NotificationList = memo(function NotificationList({
 		return map;
 	}, [subscriptions]);
 
+	const unreadCount = useMemo(
+		() => notifications.filter((n) => !n.read).length,
+		[notifications],
+	);
+
 	if (isAllView && subscriptions.length === 0) {
 		return <EmptyState type="no-topic" />;
 	}
-
-	const unreadCount = notifications.filter((n) => !n.read).length;
 
 	return (
 		<div className="flex-1 flex flex-col min-h-0 overflow-hidden">
