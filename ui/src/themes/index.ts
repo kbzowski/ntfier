@@ -47,7 +47,11 @@ export { getDarkThemes, getLightThemes, getThemeById, themes } from "./presets";
 export { blueTheme } from "./presets/blue";
 export { darkTheme } from "./presets/dark";
 export { greenTheme } from "./presets/green";
+export { lavenderTheme } from "./presets/lavender";
 // Re-export presets
 export { lightTheme } from "./presets/light";
+export { mintTheme } from "./presets/mint";
 export { purpleTheme } from "./presets/purple";
 export { roseTheme } from "./presets/rose";
+export { sandTheme } from "./presets/sand";
+export { skyTheme } from "./presets/sky";

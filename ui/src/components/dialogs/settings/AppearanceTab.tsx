@@ -1,4 +1,5 @@
 import { Check, LayoutList, Monitor } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { SettingCheckbox } from "@/components/ui/setting-checkbox";
 import { cn } from "@/lib/utils";
@@ -16,95 +17,141 @@ interface AppearanceTabProps {
 	onExpandNewMessagesChange: (enabled: boolean) => void;
 }
 
-function ThemePreview({
-	theme,
-	isSelected,
-}: {
-	theme: ThemeDefinition;
-	isSelected: boolean;
-}) {
+function ThemePreview({ theme }: { theme: ThemeDefinition }) {
 	return (
-		<div
-			className="relative rounded-lg overflow-hidden border-2 transition-all"
-			style={{
-				borderColor: isSelected ? theme.colors.primary : "transparent",
-			}}
-		>
+		<div className="rounded-lg overflow-hidden border border-border">
 			<div
-				className="p-3 h-16"
+				className="h-28 flex"
 				style={{ backgroundColor: theme.colors.background }}
 			>
-				<div className="flex items-center gap-2">
+				{/* Sidebar */}
+				<div
+					className="w-[22%] h-full flex flex-col gap-1.5 p-1.5"
+					style={{
+						backgroundColor: theme.colors.sidebar,
+						borderRight: `1px solid ${theme.colors.sidebarBorder}`,
+					}}
+				>
 					<div
-						className="w-3 h-3 rounded-full"
-						style={{ backgroundColor: theme.colors.primary }}
+						className="w-full h-1.5 rounded-sm"
+						style={{ backgroundColor: theme.colors.sidebarPrimary }}
 					/>
 					<div
-						className="h-2 w-12 rounded"
-						style={{ backgroundColor: theme.colors.muted }}
+						className="w-3/4 h-1 rounded-sm"
+						style={{ backgroundColor: theme.colors.sidebarAccent }}
+					/>
+					<div
+						className="w-3/4 h-1 rounded-sm"
+						style={{ backgroundColor: theme.colors.sidebarAccent }}
 					/>
 				</div>
-				<div className="mt-2 flex gap-1">
+
+				{/* Main content area */}
+				<div className="flex-1 p-2 flex flex-col gap-1.5">
+					{/* Card */}
 					<div
-						className="h-1.5 w-8 rounded"
-						style={{ backgroundColor: theme.colors.mutedForeground }}
-					/>
-					<div
-						className="h-1.5 w-6 rounded"
-						style={{ backgroundColor: theme.colors.mutedForeground }}
-					/>
+						className="flex-1 rounded-md p-1.5 flex items-center gap-1.5"
+						style={{
+							backgroundColor: theme.colors.card,
+							border: `1px solid ${theme.colors.border}`,
+						}}
+					>
+						<div
+							className="w-2.5 h-2.5 rounded-full shrink-0"
+							style={{ backgroundColor: theme.colors.primary }}
+						/>
+						<div
+							className="h-1.5 w-full rounded-sm"
+							style={{ backgroundColor: theme.colors.muted }}
+						/>
+					</div>
+					{/* Secondary line */}
+					<div className="flex gap-1">
+						<div
+							className="h-1 w-6 rounded-sm"
+							style={{ backgroundColor: theme.colors.mutedForeground }}
+						/>
+						<div
+							className="h-1 w-4 rounded-sm"
+							style={{ backgroundColor: theme.colors.mutedForeground }}
+						/>
+					</div>
 				</div>
 			</div>
-			{isSelected && (
-				<div
-					className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center"
-					style={{ backgroundColor: theme.colors.primary }}
-				>
-					<Check
-						className="w-3 h-3"
-						style={{ color: theme.colors.primaryForeground }}
-					/>
-				</div>
-			)}
 		</div>
 	);
 }
 
-function ThemeSelector({
+function ThemeListItem({
+	theme,
+	isSelected,
+	disabled,
+	onSelect,
+	onHover,
+}: {
+	theme: ThemeDefinition;
+	isSelected: boolean;
+	disabled?: boolean;
+	onSelect: (id: string) => void;
+	onHover: (theme: ThemeDefinition | null) => void;
+}) {
+	return (
+		<button
+			type="button"
+			className={cn(
+				"flex items-center gap-2 py-1.5 px-2 rounded text-left transition-colors w-full",
+				"hover:bg-accent",
+				disabled && "opacity-50 pointer-events-none",
+			)}
+			onClick={() => onSelect(theme.id)}
+			onMouseEnter={() => onHover(theme)}
+			onMouseLeave={() => onHover(null)}
+			disabled={disabled}
+		>
+			<div
+				className="w-3 h-3 rounded-full border border-black/10 shrink-0"
+				style={{ backgroundColor: theme.colors.primary }}
+			/>
+			<span className="text-xs flex-1 truncate">{theme.name}</span>
+			{isSelected && (
+				<Check className="w-3 h-3 shrink-0 text-muted-foreground" />
+			)}
+		</button>
+	);
+}
+
+function ThemeList({
+	label,
 	themes,
 	selectedId,
 	onSelect,
+	onHover,
 	disabled,
 }: {
+	label: string;
 	themes: ThemeDefinition[];
 	selectedId: string;
 	onSelect: (id: string) => void;
+	onHover: (theme: ThemeDefinition | null) => void;
 	disabled?: boolean;
 }) {
 	return (
-		<div className="grid grid-cols-3 gap-3">
-			{themes.map((theme) => (
-				<button
-					key={theme.id}
-					type="button"
-					className={cn(
-						"text-left transition-all rounded-lg select-none",
-						"hover:ring-2 hover:ring-ring hover:ring-offset-2",
-						"focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-						disabled && "opacity-50 pointer-events-none",
-					)}
-					onClick={() => onSelect(theme.id)}
-					disabled={disabled}
-				>
-					<ThemePreview
+		<div className="space-y-1">
+			<h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+				{label}
+			</h4>
+			<div className="grid grid-cols-2 gap-x-1">
+				{themes.map((theme) => (
+					<ThemeListItem
+						key={theme.id}
 						theme={theme}
 						isSelected={!disabled && selectedId === theme.id}
+						disabled={disabled}
+						onSelect={onSelect}
+						onHover={onHover}
 					/>
-					<p className="mt-1.5 text-xs font-medium text-center truncate">
-						{theme.name}
-					</p>
-				</button>
-			))}
+				))}
+			</div>
 		</div>
 	);
 }
@@ -120,14 +167,46 @@ export function AppearanceTab({
 	expandNewMessages,
 	onExpandNewMessagesChange,
 }: AppearanceTabProps) {
+	const [previewTheme, setPreviewTheme] = useState<ThemeDefinition | null>(
+		null,
+	);
+
+	const lightThemes = useMemo(
+		() => availableThemes.filter((t) => !t.isDark),
+		[availableThemes],
+	);
+	const darkThemes = useMemo(
+		() => availableThemes.filter((t) => t.isDark),
+		[availableThemes],
+	);
+
+	const displayedTheme =
+		previewTheme ??
+		availableThemes.find((t) => t.id === themeId) ??
+		availableThemes[0];
+
 	return (
 		<div className="space-y-4">
-			<ThemeSelector
-				themes={availableThemes}
-				selectedId={themeId}
-				onSelect={onThemeChange}
-				disabled={isSystemMode}
-			/>
+			<div className="space-y-3">
+				<ThemePreview theme={displayedTheme} />
+
+				<ThemeList
+					label="Light"
+					themes={lightThemes}
+					selectedId={themeId}
+					onSelect={onThemeChange}
+					onHover={setPreviewTheme}
+					disabled={isSystemMode}
+				/>
+				<ThemeList
+					label="Dark"
+					themes={darkThemes}
+					selectedId={themeId}
+					onSelect={onThemeChange}
+					onHover={setPreviewTheme}
+					disabled={isSystemMode}
+				/>
+			</div>
 
 			<SettingCheckbox
 				id="system-mode"
