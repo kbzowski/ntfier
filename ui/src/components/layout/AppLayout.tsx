@@ -44,13 +44,13 @@ export const AppLayout = memo(function AppLayout({
 
 	const handleMenuClick = useCallback(() => setDrawerOpen(true), []);
 
-	const totalUnread = useMemo(
-		() =>
-			subscriptions
-				.filter((s) => !s.muted)
-				.reduce((sum, s) => sum + s.unreadCount, 0),
-		[subscriptions],
-	);
+	const totalUnread = useMemo(() => {
+		let total = 0;
+		for (const s of subscriptions) {
+			if (!s.muted) total += s.unreadCount;
+		}
+		return total;
+	}, [subscriptions]);
 
 	return (
 		<div className="flex h-screen bg-background">
@@ -65,6 +65,7 @@ export const AppLayout = memo(function AppLayout({
 					<SidebarTopicList
 						subscriptions={subscriptions}
 						selectedTopicId={selectedTopicId}
+						totalUnread={totalUnread}
 						onSelectTopic={handleSelectTopic}
 						onToggleMute={onToggleMute}
 						onRemove={onRemoveSubscription}

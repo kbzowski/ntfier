@@ -1,13 +1,22 @@
 import Inbox from "lucide-react/dist/esm/icons/inbox";
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { Subscription } from "@/types/ntfy";
 import { SidebarTopicItem } from "./SidebarTopicItem";
 
+const EMPTY_STATE = (
+	<div className="px-4 py-8 text-center text-muted-foreground text-sm">
+		No subscriptions yet.
+		<br />
+		Add a topic to get started.
+	</div>
+);
+
 interface SidebarTopicListProps {
 	subscriptions: Subscription[];
 	selectedTopicId: string | null;
+	totalUnread: number;
 	onSelectTopic: (id: string | null) => void;
 	onToggleMute: (id: string) => void;
 	onRemove: (id: string) => void;
@@ -16,18 +25,11 @@ interface SidebarTopicListProps {
 export const SidebarTopicList = memo(function SidebarTopicList({
 	subscriptions,
 	selectedTopicId,
+	totalUnread,
 	onSelectTopic,
 	onToggleMute,
 	onRemove,
 }: SidebarTopicListProps) {
-	const totalUnread = useMemo(
-		() =>
-			subscriptions
-				.filter((s) => !s.muted)
-				.reduce((sum, s) => sum + s.unreadCount, 0),
-		[subscriptions],
-	);
-
 	return (
 		<ScrollArea className="flex-1">
 			<div className="py-2">
@@ -50,24 +52,18 @@ export const SidebarTopicList = memo(function SidebarTopicList({
 					)}
 				</button>
 
-				{subscriptions.length === 0 ? (
-					<div className="px-4 py-8 text-center text-muted-foreground text-sm">
-						No subscriptions yet.
-						<br />
-						Add a topic to get started.
-					</div>
-				) : (
-					subscriptions.map((subscription) => (
-						<SidebarTopicItem
-							key={subscription.id}
-							subscription={subscription}
-							isSelected={selectedTopicId === subscription.id}
-							onSelect={() => onSelectTopic(subscription.id)}
-							onToggleMute={() => onToggleMute(subscription.id)}
-							onRemove={() => onRemove(subscription.id)}
-						/>
-					))
-				)}
+				{subscriptions.length === 0
+					? EMPTY_STATE
+					: subscriptions.map((subscription) => (
+							<SidebarTopicItem
+								key={subscription.id}
+								subscription={subscription}
+								isSelected={selectedTopicId === subscription.id}
+								onSelect={() => onSelectTopic(subscription.id)}
+								onToggleMute={() => onToggleMute(subscription.id)}
+								onRemove={() => onRemove(subscription.id)}
+							/>
+						))}
 			</div>
 		</ScrollArea>
 	);
