@@ -45,11 +45,10 @@ function resolveTheme(
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-	const [themeId, setThemeIdState] = useState<string>(
-		() => getInitialState().themeId,
-	);
+	const [initialState] = useState(getInitialState);
+	const [themeId, setThemeIdState] = useState<string>(initialState.themeId);
 	const [isSystemMode, setSystemModeState] = useState<boolean>(
-		() => getInitialState().isSystemMode,
+		initialState.isSystemMode,
 	);
 
 	const [currentTheme, setCurrentTheme] = useState<ThemeDefinition>(() =>
