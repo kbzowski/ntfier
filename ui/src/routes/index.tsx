@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense, useCallback, useState } from "react";
+import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import { useTheme } from "@/components/common/ThemeProvider";
 import { UpdateToast } from "@/components/common/UpdateToast";
 import { AddSubscriptionDialog } from "@/components/dialogs/AddSubscriptionDialog";
@@ -61,6 +61,9 @@ function App() {
 		setUpdateInfo,
 	} = useApp();
 
+	const currentTopicIdRef = useRef(currentTopicId);
+	currentTopicIdRef.current = currentTopicId;
+
 	const selectedSubscription = subscriptionsWithUnread.find(
 		(sub) => sub.id === currentTopicId,
 	);
@@ -103,13 +106,14 @@ function App() {
 	);
 
 	const handleMarkAllAsRead = useCallback(() => {
-		if (currentTopicId) {
-			markAllAsRead(currentTopicId);
+		const topicId = currentTopicIdRef.current;
+		if (topicId) {
+			markAllAsRead(topicId);
 		} else {
 			// In "All notifications" view - mark all across all topics
 			markAllAsReadGlobally();
 		}
-	}, [markAllAsRead, markAllAsReadGlobally, currentTopicId]);
+	}, [markAllAsRead, markAllAsReadGlobally]);
 
 	return (
 		<>
