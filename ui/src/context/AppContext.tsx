@@ -5,6 +5,7 @@ import {
 	useContext,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 import { toast } from "sonner";
@@ -154,24 +155,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	}, []);
 
 	// Stable key that only changes when subscription IDs change
-	const _subscriptionIds = useMemo(
+	const subscriptionIds = useMemo(
 		() => subscriptions.map((s) => s.id).join(","),
 		[subscriptions],
 	);
 
-	// Load notifications when topic changes
+	// Keep a ref to subscriptions so the effect can read the latest value
+	// without depending on the full array
+	const subscriptionsRef = useRef(subscriptions);
+	subscriptionsRef.current = subscriptions;
+
+	// Load notifications when topic changes or subscription list changes.
+	// subscriptionIds is intentionally in deps to trigger re-fetch when
+	// subscriptions are added/removed, while subscriptionsRef avoids
+	// re-triggering on mute/unread changes.
 	useEffect(() => {
 		if (currentTopicId) {
 			notifications.loadForTopic(currentTopicId);
-		} else if (subscriptions.length > 0) {
-			// Load all notifications for the "All" view
-			notifications.loadAllTopics(subscriptions);
+		} else if (subscriptionIds) {
+			notifications.loadAllTopics(subscriptionsRef.current);
 		}
 	}, [
 		currentTopicId,
 		notifications.loadForTopic,
 		notifications.loadAllTopics,
-		subscriptions,
+		subscriptionIds,
 	]);
 
 	// Listen for new notifications from backend
