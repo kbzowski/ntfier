@@ -263,8 +263,13 @@ export function useNotifications(subscriptions: Subscription[]) {
 	 */
 	const getUnreadCount = useCallback(
 		(subscriptionId: string) => {
-			const notifs = byTopic.get(subscriptionId) || [];
-			return notifs.filter((n) => !n.read).length;
+			const notifs = byTopic.get(subscriptionId);
+			if (!notifs) return 0;
+			let count = 0;
+			for (const n of notifs) {
+				if (!n.read) count++;
+			}
+			return count;
 		},
 		[byTopic],
 	);
@@ -276,8 +281,12 @@ export function useNotifications(subscriptions: Subscription[]) {
 		let total = 0;
 		for (const sub of subscriptions) {
 			if (!sub.muted) {
-				const notifs = byTopic.get(sub.id) || [];
-				total += notifs.filter((n) => !n.read).length;
+				const notifs = byTopic.get(sub.id);
+				if (notifs) {
+					for (const n of notifs) {
+						if (!n.read) total++;
+					}
+				}
 			}
 		}
 		return total;
