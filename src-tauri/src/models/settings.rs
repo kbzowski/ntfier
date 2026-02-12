@@ -88,6 +88,27 @@ impl ServerConfig {
     }
 }
 
+/// Notification-specific settings.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct NotificationSettings {
+    /// Notification display method.
+    #[serde(default)]
+    pub notification_method: NotificationDisplayMethod,
+    /// Force display even when Focus Assist is on (Windows Enhanced only).
+    #[serde(default)]
+    pub notification_force_display: bool,
+    /// Show action buttons in notification (Windows Enhanced only).
+    #[serde(default = "default_true")]
+    pub notification_show_actions: bool,
+    /// Show images in notification (Windows Enhanced only).
+    #[serde(default = "default_true")]
+    pub notification_show_images: bool,
+    /// Play notification sound.
+    #[serde(default = "default_true")]
+    pub notification_sound: bool,
+}
+
 /// Application-wide settings.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]

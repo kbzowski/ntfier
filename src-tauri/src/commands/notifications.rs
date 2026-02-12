@@ -54,8 +54,8 @@ pub async fn delete_notification(
     id: String,
 ) -> Result<(), AppError> {
     // Check if we should also delete remotely
-    let settings = db.get_settings()?;
-    if !settings.delete_local_only {
+    let delete_local_only = db.get_delete_local_only()?;
+    if !delete_local_only {
         if let Some((Some(ntfy_id), subscription_id)) = db.get_notification_meta(&id)? {
             // Look up subscription to get server_url and topic
             if let Some(subscription) = db.get_subscription_by_id(&subscription_id)? {

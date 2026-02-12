@@ -193,10 +193,7 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") {
                 // Check if should start minimized
                 let db: tauri::State<Database> = app.state();
-                let start_minimized = db
-                    .get_settings()
-                    .map(|s| s.start_minimized)
-                    .unwrap_or(false);
+                let start_minimized = db.get_start_minimized().unwrap_or(false);
 
                 // Also check for --minimized command line argument (from autostart)
                 let args: Vec<String> = std::env::args().collect();
@@ -212,10 +209,7 @@ pub fn run() {
                 let app_handle = app.handle().clone();
                 window.on_window_event(move |event| {
                     let db: tauri::State<Database> = app_handle.state();
-                    let minimize_to_tray = db
-                        .get_settings()
-                        .map(|s| s.minimize_to_tray)
-                        .unwrap_or(true);
+                    let minimize_to_tray = db.get_minimize_to_tray().unwrap_or(true);
 
                     match event {
                         tauri::WindowEvent::CloseRequested { api, .. } => {

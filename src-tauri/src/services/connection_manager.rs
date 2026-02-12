@@ -19,10 +19,9 @@ use tokio_tungstenite::{
 use crate::config::connection::{JITTER_MAX_SECS, RETRY_BACKOFF_SECS};
 use crate::db::Database;
 use crate::error::AppError;
-#[cfg(windows)]
-use crate::models::AppSettings;
 use crate::models::{
-    normalize_url, Notification, NotificationDisplayMethod, NtfyMessage, Subscription,
+    normalize_url, Notification, NotificationDisplayMethod, NotificationSettings, NtfyMessage,
+    Subscription,
 };
 use crate::services::TrayManager;
 
@@ -347,7 +346,7 @@ impl ConnectionManager {
     /// Shows a notification using the configured display method.
     pub async fn show_notification(app_handle: &AppHandle, notification: &Notification) {
         let db: tauri::State<'_, Database> = app_handle.state();
-        let Ok(settings) = db.get_settings() else {
+        let Ok(settings) = db.get_notification_settings() else {
             // Fallback to native if settings can't be read
             Self::show_native_notification(app_handle, notification, None);
             return;
@@ -427,7 +426,7 @@ impl ConnectionManager {
     fn show_native_notification(
         app_handle: &AppHandle,
         notification: &Notification,
-        settings: Option<&AppSettings>,
+        settings: Option<&NotificationSettings>,
     ) {
         use tauri_plugin_notification::NotificationExt;
 
@@ -465,7 +464,7 @@ impl ConnectionManager {
     async fn show_winrt_notification(
         app_handle: &AppHandle,
         notification: &Notification,
-        settings: &AppSettings,
+        settings: &NotificationSettings,
     ) {
         use crate::services::image_cache::{self, CachedImage};
 
@@ -488,7 +487,7 @@ impl ConnectionManager {
     fn show_winrt_notification_sync(
         app_handle: &AppHandle,
         notification: &Notification,
-        settings: &AppSettings,
+        settings: &NotificationSettings,
         cached_image: Option<crate::services::image_cache::CachedImage>,
     ) {
         use crate::services::image_cache::ImageOrientation;

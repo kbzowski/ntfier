@@ -6,7 +6,7 @@ use crate::db::connection::Database;
 use crate::db::models::SettingRow;
 use crate::db::schema::settings;
 use crate::error::AppError;
-use crate::models::{AppSettings, NotificationDisplayMethod, ThemeMode};
+use crate::models::{AppSettings, NotificationDisplayMethod, NotificationSettings, ThemeMode};
 
 impl Database {
     /// Gets a string setting with a default fallback.
@@ -33,6 +33,44 @@ impl Database {
             .optional()?;
 
         Ok(result.map_or(default, |v| v == "true"))
+    }
+
+    /// Gets notification-specific settings only (does not fetch server credentials).
+    /// Use this when displaying notifications to avoid unnecessary credential lookups.
+    pub fn get_notification_settings(&self) -> Result<NotificationSettings, AppError> {
+        let notification_method_str = self.get_setting_string("notification_method", "native")?;
+        let notification_method = match notification_method_str.as_str() {
+            "windows_enhanced" => NotificationDisplayMethod::WindowsEnhanced,
+            _ => NotificationDisplayMethod::Native,
+        };
+        let notification_force_display =
+            self.get_setting_bool("notification_force_display", false)?;
+        let notification_show_actions = self.get_setting_bool("notification_show_actions", true)?;
+        let notification_show_images = self.get_setting_bool("notification_show_images", true)?;
+        let notification_sound = self.get_setting_bool("notification_sound", true)?;
+
+        Ok(NotificationSettings {
+            notification_method,
+            notification_force_display,
+            notification_show_actions,
+            notification_show_images,
+            notification_sound,
+        })
+    }
+
+    /// Gets the `start_minimized` setting.
+    pub fn get_start_minimized(&self) -> Result<bool, AppError> {
+        self.get_setting_bool("start_minimized", false)
+    }
+
+    /// Gets the `minimize_to_tray` setting.
+    pub fn get_minimize_to_tray(&self) -> Result<bool, AppError> {
+        self.get_setting_bool("minimize_to_tray", true)
+    }
+
+    /// Gets the `delete_local_only` setting.
+    pub fn get_delete_local_only(&self) -> Result<bool, AppError> {
+        self.get_setting_bool("delete_local_only", true)
     }
 
     /// Gets all application settings.
