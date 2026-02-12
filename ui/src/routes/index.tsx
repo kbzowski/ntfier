@@ -1,11 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import { useTheme } from "@/components/common/ThemeProvider";
 import { UpdateToast } from "@/components/common/UpdateToast";
 import { AddSubscriptionDialog } from "@/components/dialogs/AddSubscriptionDialog";
 import { ConfirmDialog } from "@/components/dialogs/ConfirmDialog";
-import { SettingsDialog } from "@/components/dialogs/SettingsDialog";
 import { AppLayout } from "@/components/layout/AppLayout";
+
+const SettingsDialog = lazy(() =>
+	import("@/components/dialogs/SettingsDialog").then((m) => ({
+		default: m.SettingsDialog,
+	})),
+);
+
 import { NotificationList } from "@/components/notifications/NotificationList";
 import { useApp } from "@/context/AppContext";
 
@@ -128,43 +134,45 @@ function App() {
 				/>
 			</AppLayout>
 
-			<SettingsDialog
-				open={settingsOpen}
-				onOpenChange={setSettingsOpen}
-				themeId={themeId}
-				onThemeChange={setThemeId}
-				isSystemMode={isSystemMode}
-				onSystemModeChange={setSystemMode}
-				availableThemes={availableThemes}
-				servers={settings.servers}
-				onAddServer={handleAddServer}
-				onRemoveServer={removeServer}
-				onSetDefaultServer={setDefaultServer}
-				autostart={autostart}
-				onAutostartChange={setAutostart}
-				minimizeToTray={settings.minimizeToTray ?? true}
-				onMinimizeToTrayChange={setMinimizeToTray}
-				startMinimized={settings.startMinimized ?? false}
-				onStartMinimizedChange={setStartMinimized}
-				updateInfo={updateInfo}
-				onUpdateInfoChange={setUpdateInfo}
-				notificationMethod={settings.notificationMethod ?? "native"}
-				onNotificationMethodChange={setNotificationMethod}
-				notificationForceDisplay={settings.notificationForceDisplay ?? false}
-				onNotificationForceDisplayChange={setNotificationForceDisplay}
-				notificationShowActions={settings.notificationShowActions ?? true}
-				onNotificationShowActionsChange={setNotificationShowActions}
-				notificationShowImages={settings.notificationShowImages ?? true}
-				onNotificationShowImagesChange={setNotificationShowImages}
-				notificationSound={settings.notificationSound ?? true}
-				onNotificationSoundChange={setNotificationSound}
-				compactView={settings.compactView ?? false}
-				onCompactViewChange={setCompactView}
-				expandNewMessages={settings.expandNewMessages ?? true}
-				onExpandNewMessagesChange={setExpandNewMessages}
-				deleteLocalOnly={settings.deleteLocalOnly ?? true}
-				onDeleteLocalOnlyChange={setDeleteLocalOnly}
-			/>
+			<Suspense fallback={null}>
+				<SettingsDialog
+					open={settingsOpen}
+					onOpenChange={setSettingsOpen}
+					themeId={themeId}
+					onThemeChange={setThemeId}
+					isSystemMode={isSystemMode}
+					onSystemModeChange={setSystemMode}
+					availableThemes={availableThemes}
+					servers={settings.servers}
+					onAddServer={handleAddServer}
+					onRemoveServer={removeServer}
+					onSetDefaultServer={setDefaultServer}
+					autostart={autostart}
+					onAutostartChange={setAutostart}
+					minimizeToTray={settings.minimizeToTray ?? true}
+					onMinimizeToTrayChange={setMinimizeToTray}
+					startMinimized={settings.startMinimized ?? false}
+					onStartMinimizedChange={setStartMinimized}
+					updateInfo={updateInfo}
+					onUpdateInfoChange={setUpdateInfo}
+					notificationMethod={settings.notificationMethod ?? "native"}
+					onNotificationMethodChange={setNotificationMethod}
+					notificationForceDisplay={settings.notificationForceDisplay ?? false}
+					onNotificationForceDisplayChange={setNotificationForceDisplay}
+					notificationShowActions={settings.notificationShowActions ?? true}
+					onNotificationShowActionsChange={setNotificationShowActions}
+					notificationShowImages={settings.notificationShowImages ?? true}
+					onNotificationShowImagesChange={setNotificationShowImages}
+					notificationSound={settings.notificationSound ?? true}
+					onNotificationSoundChange={setNotificationSound}
+					compactView={settings.compactView ?? false}
+					onCompactViewChange={setCompactView}
+					expandNewMessages={settings.expandNewMessages ?? true}
+					onExpandNewMessagesChange={setExpandNewMessages}
+					deleteLocalOnly={settings.deleteLocalOnly ?? true}
+					onDeleteLocalOnlyChange={setDeleteLocalOnly}
+				/>
+			</Suspense>
 
 			<AddSubscriptionDialog
 				open={addSubscriptionOpen}
