@@ -37,16 +37,23 @@ pub enum AppError {
     Updater(String),
 }
 
-// Conversion from Diesel errors
+// Conversion from Diesel errors — log full detail, return generic message to frontend
 impl From<diesel::result::Error> for AppError {
     fn from(err: diesel::result::Error) -> Self {
-        Self::Database(err.to_string())
+        log::error!("Diesel error: {err}");
+        match err {
+            diesel::result::Error::NotFound => {
+                Self::NotFound("Requested resource not found".to_string())
+            }
+            _ => Self::Database("Database operation failed".to_string()),
+        }
     }
 }
 
 impl From<diesel::ConnectionError> for AppError {
     fn from(err: diesel::ConnectionError) -> Self {
-        Self::Database(err.to_string())
+        log::error!("Diesel connection error: {err}");
+        Self::Database("Database connection failed".to_string())
     }
 }
 
