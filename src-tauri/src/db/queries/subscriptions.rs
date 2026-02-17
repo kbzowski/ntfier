@@ -66,27 +66,28 @@ impl Database {
         let (id, server_url, topic, display_name) = conn
             .transaction::<_, diesel::result::Error, _>(|conn| {
                 // Get or create server
-                let server_id: String = servers::table
+                let server_id: String = if let Some(id) = servers::table
                     .filter(servers::url.eq(&sub.server_url))
                     .select(servers::id)
                     .first(conn)
                     .optional()?
-                    .unwrap_or_else(|| {
-                        let new_id = uuid::Uuid::new_v4().to_string();
-                        let new_server = NewServer {
-                            id: &new_id,
-                            url: &sub.server_url,
-                            username: None,
-                            is_default: 0,
-                        };
+                {
+                    id
+                } else {
+                    let new_id = uuid::Uuid::new_v4().to_string();
+                    let new_server = NewServer {
+                        id: &new_id,
+                        url: &sub.server_url,
+                        username: None,
+                        is_default: 0,
+                    };
 
-                        diesel::insert_into(servers::table)
-                            .values(&new_server)
-                            .execute(conn)
-                            .ok();
+                    diesel::insert_into(servers::table)
+                        .values(&new_server)
+                        .execute(conn)?;
 
-                        new_id
-                    });
+                    new_id
+                };
 
                 let id = uuid::Uuid::new_v4().to_string();
                 let display_name_ref = sub.display_name.as_deref().filter(|s| !s.is_empty());
