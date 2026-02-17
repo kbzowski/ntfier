@@ -1,11 +1,9 @@
-import {
-	AlertCircle,
-	Eye,
-	EyeOff,
-	Loader2,
-	Server,
-	Trash2,
-} from "lucide-react";
+import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
+import Eye from "lucide-react/dist/esm/icons/eye";
+import EyeOff from "lucide-react/dist/esm/icons/eye-off";
+import Loader2 from "lucide-react/dist/esm/icons/loader-2";
+import Server from "lucide-react/dist/esm/icons/server";
+import Trash2 from "lucide-react/dist/esm/icons/trash-2";
 import {
 	AlertDialog,
 	AlertDialogAction,

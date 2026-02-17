@@ -1,13 +1,11 @@
-import {
-	CheckCircle2,
-	Download,
-	Loader2,
-	Minimize2,
-	PanelBottomClose,
-	Power,
-	RefreshCw,
-	Trash2,
-} from "lucide-react";
+import CheckCircle2 from "lucide-react/dist/esm/icons/check-circle-2";
+import Download from "lucide-react/dist/esm/icons/download";
+import Loader2 from "lucide-react/dist/esm/icons/loader-2";
+import Minimize2 from "lucide-react/dist/esm/icons/minimize-2";
+import PanelBottomClose from "lucide-react/dist/esm/icons/panel-bottom-close";
+import Power from "lucide-react/dist/esm/icons/power";
+import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
+import Trash2 from "lucide-react/dist/esm/icons/trash-2";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
