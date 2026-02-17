@@ -10,20 +10,21 @@ use crate::db::schema::{servers, subscriptions};
 use crate::error::AppError;
 use crate::models::{CreateSubscription, Subscription};
 
+/// Base SELECT/FROM/JOIN shared by all subscription queries.
+const SUBSCRIPTION_BASE_QUERY: &str = "\
+    SELECT s.id, s.topic, srv.url as server_url, s.display_name, s.muted, s.last_sync, \
+           (SELECT MAX(n.timestamp) FROM notifications n WHERE n.subscription_id = s.id) as last_notif, \
+           (SELECT COUNT(*) FROM notifications n WHERE n.subscription_id = s.id AND n.read = 0) as unread \
+    FROM subscriptions s \
+    JOIN servers srv ON s.server_id = srv.id";
+
 impl Database {
     /// Returns all subscriptions ordered by most recent notification.
     pub fn get_all_subscriptions(&self) -> Result<Vec<Subscription>, AppError> {
         let mut conn = self.conn()?;
 
-        let rows: Vec<SubscriptionQueryRow> = sql_query(
-            "SELECT s.id, s.topic, srv.url as server_url, s.display_name, s.muted, s.last_sync,
-                    (SELECT MAX(n.timestamp) FROM notifications n WHERE n.subscription_id = s.id) as last_notif,
-                    (SELECT COUNT(*) FROM notifications n WHERE n.subscription_id = s.id AND n.read = 0) as unread
-             FROM subscriptions s
-             JOIN servers srv ON s.server_id = srv.id
-             ORDER BY last_notif DESC NULLS LAST",
-        )
-        .load(&mut *conn)?;
+        let query = format!("{SUBSCRIPTION_BASE_QUERY} ORDER BY last_notif DESC NULLS LAST");
+        let rows: Vec<SubscriptionQueryRow> = sql_query(query).load(&mut *conn)?;
 
         Ok(rows.into_iter().map(Subscription::from).collect())
     }
@@ -35,16 +36,10 @@ impl Database {
     ) -> Result<Option<(Subscription, Option<i64>)>, AppError> {
         let mut conn = self.conn()?;
 
-        let rows: Vec<SubscriptionQueryRow> = sql_query(
-            "SELECT s.id, s.topic, srv.url as server_url, s.display_name, s.muted, s.last_sync,
-                    (SELECT MAX(n.timestamp) FROM notifications n WHERE n.subscription_id = s.id) as last_notif,
-                    (SELECT COUNT(*) FROM notifications n WHERE n.subscription_id = s.id AND n.read = 0) as unread
-             FROM subscriptions s
-             JOIN servers srv ON s.server_id = srv.id
-             WHERE s.id = ?",
-        )
-        .bind::<diesel::sql_types::Text, _>(id)
-        .load(&mut *conn)?;
+        let query = format!("{SUBSCRIPTION_BASE_QUERY} WHERE s.id = ?");
+        let rows: Vec<SubscriptionQueryRow> = sql_query(query)
+            .bind::<diesel::sql_types::Text, _>(id)
+            .load(&mut *conn)?;
 
         Ok(rows.into_iter().next().map(|row| {
             let last_sync = row.last_sync;
@@ -164,16 +159,10 @@ impl Database {
     pub fn get_subscription_by_id(&self, id: &str) -> Result<Option<Subscription>, AppError> {
         let mut conn = self.conn()?;
 
-        let rows: Vec<SubscriptionQueryRow> = sql_query(
-            "SELECT s.id, s.topic, srv.url as server_url, s.display_name, s.muted, s.last_sync,
-                    (SELECT MAX(n.timestamp) FROM notifications n WHERE n.subscription_id = s.id) as last_notif,
-                    (SELECT COUNT(*) FROM notifications n WHERE n.subscription_id = s.id AND n.read = 0) as unread
-             FROM subscriptions s
-             JOIN servers srv ON s.server_id = srv.id
-             WHERE s.id = ?",
-        )
-        .bind::<diesel::sql_types::Text, _>(id)
-        .load(&mut *conn)?;
+        let query = format!("{SUBSCRIPTION_BASE_QUERY} WHERE s.id = ?");
+        let rows: Vec<SubscriptionQueryRow> = sql_query(query)
+            .bind::<diesel::sql_types::Text, _>(id)
+            .load(&mut *conn)?;
 
         Ok(rows.into_iter().next().map(Subscription::from))
     }
