@@ -4,6 +4,7 @@
 //! Handles automatic reconnection with exponential backoff on connection failures.
 
 use base64::{engine::general_purpose::STANDARD, Engine};
+use url::Url;
 use futures_util::StreamExt;
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use std::collections::HashMap;
@@ -280,18 +281,31 @@ impl ConnectionManager {
 
     /// Converts HTTP(S) URL to WebSocket URL for the subscription's topic.
     fn build_ws_url(subscription: &Subscription) -> Result<String, AppError> {
-        let base_url = &subscription.server_url;
-        let topic = &subscription.topic;
+        let mut parsed = Url::parse(&subscription.server_url)
+            .map_err(|e| AppError::InvalidUrl(format!("Invalid server URL: {e}")))?;
 
-        let ws_url = if base_url.starts_with("https://") {
-            format!("wss://{}/{}/ws", &base_url[8..], topic)
-        } else if base_url.starts_with("http://") {
-            format!("ws://{}/{}/ws", &base_url[7..], topic)
-        } else {
-            format!("wss://{base_url}/{topic}/ws")
+        let ws_scheme = match parsed.scheme() {
+            "https" => "wss",
+            "http" => "ws",
+            s => {
+                return Err(AppError::InvalidUrl(format!(
+                    "Unsupported URL scheme: {s}"
+                )))
+            }
         };
+        parsed
+            .set_scheme(ws_scheme)
+            .map_err(|()| AppError::InvalidUrl("Failed to set WebSocket scheme".to_string()))?;
 
-        Ok(ws_url)
+        // Ensure path ends with /<topic>/ws
+        let topic = &subscription.topic;
+        let mut path = parsed.path().trim_end_matches('/').to_string();
+        path.push('/');
+        path.push_str(topic);
+        path.push_str("/ws");
+        parsed.set_path(&path);
+
+        Ok(parsed.to_string())
     }
 
     async fn handle_notification(
