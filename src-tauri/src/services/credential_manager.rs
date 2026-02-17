@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use keyring::Entry;
-use log::info;
+use log::{debug, info};
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
@@ -24,7 +24,7 @@ fn create_entry(username: &str, server_url: &str) -> Result<Entry, AppError> {
 
 /// Store password in OS keychain and cache
 pub fn store_password(username: &str, server_url: &str, password: &str) -> Result<(), AppError> {
-    info!("Storing password for {username}@{server_url}");
+    debug!("Storing credential for server");
     let entry = create_entry(username, server_url)?;
     entry
         .set_password(password)
@@ -37,7 +37,7 @@ pub fn store_password(username: &str, server_url: &str, password: &str) -> Resul
         .map_err(|e| AppError::Credential(format!("Failed to lock credential cache: {e}")))?;
     cache.insert(cache_key, password.to_string());
 
-    info!("Password stored successfully");
+    info!("Credential stored successfully");
     Ok(())
 }
 
@@ -51,7 +51,7 @@ pub fn get_password(username: &str, server_url: &str) -> Result<Option<String>, 
             .lock()
             .map_err(|e| AppError::Credential(format!("Failed to lock credential cache: {e}")))?;
         if let Some(password) = cache.get(&cache_key) {
-            info!("Password retrieved from cache for {username}@{server_url}");
+            debug!("Credential retrieved from cache");
             return Ok(Some(password.clone()));
         }
     }
@@ -60,7 +60,7 @@ pub fn get_password(username: &str, server_url: &str) -> Result<Option<String>, 
     let entry = create_entry(username, server_url)?;
     match entry.get_password() {
         Ok(password) => {
-            info!("Password retrieved from keychain for {username}@{server_url}");
+            debug!("Credential retrieved from keychain");
 
             // Store in cache for future use
             let mut cache = get_cache().lock().map_err(|e| {
@@ -71,7 +71,7 @@ pub fn get_password(username: &str, server_url: &str) -> Result<Option<String>, 
             Ok(Some(password))
         }
         Err(keyring::Error::NoEntry) => {
-            info!("No password found for {username}@{server_url}");
+            debug!("No credential found in keychain");
             Ok(None)
         }
         Err(e) => Err(AppError::Credential(format!("Failed to get password: {e}"))),
@@ -80,7 +80,7 @@ pub fn get_password(username: &str, server_url: &str) -> Result<Option<String>, 
 
 /// Delete password from OS keychain and cache
 pub fn delete_password(username: &str, server_url: &str) -> Result<(), AppError> {
-    info!("Deleting password for {username}@{server_url}");
+    debug!("Deleting credential from keychain");
 
     // Remove from cache first
     let cache_key = (username.to_string(), server_url.to_string());
@@ -93,11 +93,11 @@ pub fn delete_password(username: &str, server_url: &str) -> Result<(), AppError>
     let entry = create_entry(username, server_url)?;
     match entry.delete_credential() {
         Ok(()) => {
-            info!("Password deleted successfully");
+            info!("Credential deleted successfully");
             Ok(())
         }
         Err(keyring::Error::NoEntry) => {
-            info!("No password to delete for {username}@{server_url}");
+            debug!("No credential to delete");
             Ok(())
         }
         Err(e) => Err(AppError::Credential(format!(
@@ -110,7 +110,7 @@ pub fn delete_password(username: &str, server_url: &str) -> Result<(), AppError>
 /// Useful for logout or security purposes
 #[allow(dead_code)]
 pub fn clear_cache() -> Result<(), AppError> {
-    info!("Clearing credential cache");
+    debug!("Clearing credential cache");
     let mut cache = get_cache()
         .lock()
         .map_err(|e| AppError::Credential(format!("Failed to lock credential cache: {e}")))?;
