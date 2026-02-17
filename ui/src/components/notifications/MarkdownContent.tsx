@@ -1,6 +1,7 @@
 import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { LazyImageWithFallback } from "@/components/ui/lazy-image";
@@ -8,7 +9,7 @@ import { preprocessMarkdown } from "@/lib/markdownPreprocessor";
 import { cn } from "@/lib/utils";
 
 const REMARK_PLUGINS = [remarkGfm, remarkBreaks];
-const REHYPE_PLUGINS = [rehypeRaw];
+const REHYPE_PLUGINS = [rehypeRaw, rehypeSanitize];
 const MARKDOWN_COMPONENTS = {
 	img: ({ src, alt }: { src?: string; alt?: string }) => {
 		if (!src) return null;
