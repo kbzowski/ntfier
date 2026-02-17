@@ -15,12 +15,24 @@ interface ImagePreviewSearch {
 	size?: string;
 }
 
+function isValidHttpUrl(value: string): boolean {
+	try {
+		const parsed = new URL(value);
+		return parsed.protocol === "http:" || parsed.protocol === "https:";
+	} catch {
+		return false;
+	}
+}
+
 export const Route = createFileRoute("/image-preview")({
-	validateSearch: (search: Record<string, unknown>): ImagePreviewSearch => ({
-		url: (search.url as string) ?? "",
-		name: (search.name as string) ?? "Image",
-		size: search.size as string | undefined,
-	}),
+	validateSearch: (search: Record<string, unknown>): ImagePreviewSearch => {
+		const url = (search.url as string) ?? "";
+		return {
+			url: isValidHttpUrl(url) ? url : "",
+			name: (search.name as string) ?? "Image",
+			size: search.size as string | undefined,
+		};
+	},
 	component: ImagePreview,
 });
 
@@ -28,6 +40,7 @@ function ImagePreview() {
 	const { url, name, size } = Route.useSearch();
 
 	const handleDownload = useCallback(async () => {
+		if (!url) return;
 		try {
 			if (isTauri()) {
 				await open(url);
@@ -49,6 +62,17 @@ function ImagePreview() {
 			console.error("[Download image error]", err);
 		}
 	}, [url]);
+
+	if (!url) {
+		return (
+			<div className="h-screen w-screen bg-black flex items-center justify-center">
+				<div className="text-center text-white/70">
+					<ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
+					<p className="text-sm">Invalid or missing image URL</p>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div
