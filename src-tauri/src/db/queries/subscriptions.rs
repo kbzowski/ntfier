@@ -82,7 +82,6 @@ impl Database {
                             id: &new_id,
                             url: &sub.server_url,
                             username: None,
-                            password: None,
                             is_default: 0,
                         };
 

@@ -78,7 +78,6 @@ impl Database {
                 id: &uuid::Uuid::new_v4().to_string(),
                 url: "https://ntfy.sh",
                 username: None,
-                password: None,
                 is_default: 1,
             };
 

@@ -25,8 +25,7 @@ impl Database {
                 let password = row
                     .username
                     .as_ref()
-                    .and_then(|u| credential_manager::get_password(u, &row.url).ok().flatten())
-                    .or(row.password);
+                    .and_then(|u| credential_manager::get_password(u, &row.url).ok().flatten());
 
                 ServerConfig {
                     url: row.url,
@@ -68,7 +67,6 @@ impl Database {
             id: &id,
             url: &server.url,
             username: server.username.as_deref(),
-            password: None, // Stored in keychain
             is_default: i32::from(server.is_default),
         };
 

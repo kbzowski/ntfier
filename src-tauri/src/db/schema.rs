@@ -5,7 +5,6 @@ diesel::table! {
         id -> Text,
         url -> Text,
         username -> Nullable<Text>,
-        password -> Nullable<Text>,
         is_default -> Integer,
     }
 }

@@ -19,7 +19,6 @@ pub struct ServerRow {
     pub id: String,
     pub url: String,
     pub username: Option<String>,
-    pub password: Option<String>,
     pub is_default: i32,
 }
 
@@ -30,7 +29,6 @@ pub struct NewServer<'a> {
     pub id: &'a str,
     pub url: &'a str,
     pub username: Option<&'a str>,
-    pub password: Option<&'a str>,
     pub is_default: i32,
 }
 

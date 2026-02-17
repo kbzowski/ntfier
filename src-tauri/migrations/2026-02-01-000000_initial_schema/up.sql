@@ -3,7 +3,6 @@ CREATE TABLE servers (
     id TEXT PRIMARY KEY NOT NULL,
     url TEXT NOT NULL UNIQUE,
     username TEXT,
-    password TEXT,
     is_default INTEGER NOT NULL DEFAULT 0
 );
 
