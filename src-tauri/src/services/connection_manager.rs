@@ -4,7 +4,6 @@
 //! Handles automatic reconnection with exponential backoff on connection failures.
 
 use base64::{engine::general_purpose::STANDARD, Engine};
-use url::Url;
 use futures_util::StreamExt;
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use std::collections::HashMap;
@@ -16,6 +15,7 @@ use tokio_tungstenite::{
     connect_async,
     tungstenite::{self, client::IntoClientRequest, http::HeaderValue, Message},
 };
+use url::Url;
 
 use crate::config::connection::{JITTER_MAX_SECS, RETRY_BACKOFF_SECS};
 use crate::db::Database;
@@ -287,11 +287,7 @@ impl ConnectionManager {
         let ws_scheme = match parsed.scheme() {
             "https" => "wss",
             "http" => "ws",
-            s => {
-                return Err(AppError::InvalidUrl(format!(
-                    "Unsupported URL scheme: {s}"
-                )))
-            }
+            s => return Err(AppError::InvalidUrl(format!("Unsupported URL scheme: {s}"))),
         };
         parsed
             .set_scheme(ws_scheme)
