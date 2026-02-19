@@ -58,6 +58,7 @@ rand = "0.8"
 
 # Secure credential storage
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+tauri-plugin-window-state = "2"
 
 # Windows-specific enhanced notifications
 [target.'cfg(windows)'.dependencies]
