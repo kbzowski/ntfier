@@ -53,7 +53,7 @@ function CardFrame({
 	return (
 		<Card
 			className={cn(
-				"group transition-colors hover:bg-accent/50 border-l-4",
+				"group transition-colors hover:bg-accent/50 border-l-4 py-3 gap-2",
 				borderColor,
 				isUnread && "bg-accent/20",
 				onClick && "cursor-pointer",

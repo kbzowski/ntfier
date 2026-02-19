@@ -3,7 +3,6 @@ import Hash from "lucide-react/dist/esm/icons/hash";
 import Inbox from "lucide-react/dist/esm/icons/inbox";
 import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
 	Tooltip,
 	TooltipContent,
@@ -149,8 +148,8 @@ export const NotificationList = memo(function NotificationList({
 					ref={scrollContainerRef}
 					className="flex-1 overflow-y-auto min-h-0"
 				>
-					<div className="p-4 space-y-3">
-						{notifications.map((notification, index) => (
+					<div className="p-3 space-y-1.5">
+						{notifications.map((notification) => (
 							<div
 								key={notification.id}
 								className={
@@ -160,7 +159,7 @@ export const NotificationList = memo(function NotificationList({
 								}
 								style={{
 									contentVisibility: "auto",
-									containIntrinsicSize: "auto 120px",
+									containIntrinsicSize: "auto 80px",
 								}}
 							>
 								<NotificationCard
@@ -174,9 +173,6 @@ export const NotificationList = memo(function NotificationList({
 									isExpanded={!compactView || notification.isExpanded}
 									onExpandedChange={handleExpandedChange}
 								/>
-								{index < notifications.length - 1 && (
-									<Separator className="my-3 opacity-0" />
-								)}
 							</div>
 						))}
 					</div>
