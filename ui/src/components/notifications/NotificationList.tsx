@@ -1,7 +1,15 @@
 import CheckCheck from "lucide-react/dist/esm/icons/check-check";
 import Hash from "lucide-react/dist/esm/icons/hash";
 import Inbox from "lucide-react/dist/esm/icons/inbox";
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import Star from "lucide-react/dist/esm/icons/star";
+import {
+	memo,
+	type ReactNode,
+	useCallback,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Tooltip,
@@ -18,6 +26,63 @@ import type {
 import { EmptyState } from "./EmptyState";
 import { NotificationCard } from "./NotificationCard";
 
+interface NotificationListHeaderProps {
+	icon: ReactNode;
+	title: string;
+	unreadCount: number;
+	onMarkAllAsRead: () => void;
+}
+
+const NotificationListHeader = memo(function NotificationListHeader({
+	icon,
+	title,
+	unreadCount,
+	onMarkAllAsRead,
+}: NotificationListHeaderProps) {
+	return (
+		<div className="flex items-center justify-between px-6 py-4 border-b border-border">
+			<div className="flex items-center gap-2">
+				{icon}
+				<h1 className="text-lg font-semibold">{title}</h1>
+				{unreadCount > 0 ? (
+					<span className="text-sm text-muted-foreground">
+						({unreadCount} unread)
+					</span>
+				) : null}
+			</div>
+			{unreadCount > 0 ? (
+				<TooltipProvider>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								variant="ghost"
+								size="sm"
+								className="gap-2"
+								onClick={onMarkAllAsRead}
+							>
+								<CheckCheck className="h-4 w-4" />
+								Mark all read
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent>
+							<p>Mark all notifications as read</p>
+						</TooltipContent>
+					</Tooltip>
+				</TooltipProvider>
+			) : null}
+		</div>
+	);
+});
+
+function getHeaderIcon(
+	isFavoritesView: boolean,
+	isAllView: boolean,
+): ReactNode {
+	if (isFavoritesView) return <Star className="h-5 w-5 text-yellow-500" />;
+	if (isAllView) return <Inbox className="h-5 w-5 text-muted-foreground" />;
+	return <Hash className="h-5 w-5 text-muted-foreground" />;
+}
+
 interface NotificationListProps {
 	subscription: Subscription | null;
 	subscriptions?: Subscription[];
@@ -25,8 +90,10 @@ interface NotificationListProps {
 	onMarkAsRead: (id: string) => void;
 	onMarkAllAsRead: () => void;
 	onDelete: (id: string) => void;
+	onToggleFavorite?: (id: string) => void;
 	onExpandedChange?: (id: string, expanded: boolean) => void;
 	compactView?: boolean;
+	isFavoritesView?: boolean;
 }
 
 export const NotificationList = memo(function NotificationList({
@@ -36,10 +103,12 @@ export const NotificationList = memo(function NotificationList({
 	onMarkAsRead,
 	onMarkAllAsRead,
 	onDelete,
+	onToggleFavorite,
 	onExpandedChange,
 	compactView = false,
+	isFavoritesView = false,
 }: NotificationListProps) {
-	const isAllView = !subscription;
+	const isAllView = !subscription && !isFavoritesView;
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
@@ -99,47 +168,21 @@ export const NotificationList = memo(function NotificationList({
 		return <EmptyState type="no-topic" />;
 	}
 
+	const showTopicName = isAllView || isFavoritesView;
+	const headerTitle = isFavoritesView
+		? "Favorites"
+		: isAllView
+			? "All Notifications"
+			: subscription?.displayName || subscription?.topic;
+
 	return (
 		<div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-			<div className="flex items-center justify-between px-6 py-4 border-b border-border">
-				<div className="flex items-center gap-2">
-					{isAllView ? (
-						<Inbox className="h-5 w-5 text-muted-foreground" />
-					) : (
-						<Hash className="h-5 w-5 text-muted-foreground" />
-					)}
-					<h1 className="text-lg font-semibold">
-						{isAllView
-							? "All Notifications"
-							: subscription.displayName || subscription.topic}
-					</h1>
-					{unreadCount > 0 && (
-						<span className="text-sm text-muted-foreground">
-							({unreadCount} unread)
-						</span>
-					)}
-				</div>
-				{unreadCount > 0 && (
-					<TooltipProvider>
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<Button
-									variant="ghost"
-									size="sm"
-									className="gap-2"
-									onClick={onMarkAllAsRead}
-								>
-									<CheckCheck className="h-4 w-4" />
-									Mark all read
-								</Button>
-							</TooltipTrigger>
-							<TooltipContent>
-								<p>Mark all notifications as read</p>
-							</TooltipContent>
-						</Tooltip>
-					</TooltipProvider>
-				)}
-			</div>
+			<NotificationListHeader
+				icon={getHeaderIcon(isFavoritesView, isAllView)}
+				title={headerTitle}
+				unreadCount={unreadCount}
+				onMarkAllAsRead={onMarkAllAsRead}
+			/>
 
 			{notifications.length === 0 ? (
 				<EmptyState type="no-notifications" />
@@ -165,10 +208,13 @@ export const NotificationList = memo(function NotificationList({
 								<NotificationCard
 									notification={notification}
 									topicName={
-										isAllView ? topicNames.get(notification.topicId) : undefined
+										showTopicName
+											? topicNames.get(notification.topicId)
+											: undefined
 									}
 									onMarkAsRead={onMarkAsRead}
 									onDelete={handleDelete}
+									onToggleFavorite={onToggleFavorite}
 									isCollapsible={compactView}
 									isExpanded={!compactView || notification.isExpanded}
 									onExpandedChange={handleExpandedChange}

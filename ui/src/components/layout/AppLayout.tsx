@@ -15,7 +15,11 @@ interface AppLayoutProps {
 	children: ReactNode;
 	subscriptions: Subscription[];
 	selectedTopicId: string | null;
+	currentView: "all" | "favorites";
+	favoritesCount: number;
+	favoritesEnabled: boolean;
 	onSelectTopic: (id: string | null) => void;
+	onSelectView: (view: "all" | "favorites") => void;
 	onToggleMute: (id: string) => void;
 	onRemoveSubscription: (id: string) => void;
 	onOpenSettings: () => void;
@@ -26,7 +30,11 @@ export const AppLayout = memo(function AppLayout({
 	children,
 	subscriptions,
 	selectedTopicId,
+	currentView,
+	favoritesCount,
+	favoritesEnabled,
 	onSelectTopic,
+	onSelectView,
 	onToggleMute,
 	onRemoveSubscription,
 	onOpenSettings,
@@ -40,6 +48,14 @@ export const AppLayout = memo(function AppLayout({
 			setDrawerOpen(false);
 		},
 		[onSelectTopic],
+	);
+
+	const handleSelectView = useCallback(
+		(view: "all" | "favorites") => {
+			onSelectView(view);
+			setDrawerOpen(false);
+		},
+		[onSelectView],
 	);
 
 	const handleMenuClick = useCallback(() => setDrawerOpen(true), []);
@@ -65,8 +81,12 @@ export const AppLayout = memo(function AppLayout({
 					<SidebarTopicList
 						subscriptions={subscriptions}
 						selectedTopicId={selectedTopicId}
+						currentView={currentView}
 						totalUnread={totalUnread}
+						favoritesCount={favoritesCount}
+						favoritesEnabled={favoritesEnabled}
 						onSelectTopic={handleSelectTopic}
+						onSelectView={handleSelectView}
 						onToggleMute={onToggleMute}
 						onRemove={onRemoveSubscription}
 					/>

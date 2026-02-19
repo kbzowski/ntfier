@@ -32,6 +32,7 @@ interface NotificationCardProps {
 	topicName?: string;
 	onMarkAsRead?: (id: string) => void;
 	onDelete?: (id: string) => void;
+	onToggleFavorite?: (id: string) => void;
 	isCollapsible?: boolean;
 	isExpanded?: boolean;
 	onExpandedChange?: (id: string, expanded: boolean) => void;
@@ -70,6 +71,7 @@ export const NotificationCard = memo(function NotificationCard({
 	topicName,
 	onMarkAsRead,
 	onDelete,
+	onToggleFavorite,
 	isCollapsible = false,
 	isExpanded = true,
 	onExpandedChange,
@@ -123,6 +125,10 @@ export const NotificationCard = memo(function NotificationCard({
 			read={notification.read}
 			showChevron={isCollapsible}
 			isExpanded={isExpanded}
+			isFavorite={notification.isFavorite}
+			onToggleFavorite={
+				onToggleFavorite ? () => onToggleFavorite(notification.id) : undefined
+			}
 			onDelete={onDelete ? () => onDelete(notification.id) : undefined}
 		/>
 	);

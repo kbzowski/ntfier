@@ -149,6 +149,9 @@ pub struct AppSettings {
     /// Delete notifications only locally (when disabled, also deletes from ntfy server).
     #[serde(default = "default_true")]
     pub delete_local_only: bool,
+    /// Enable favorites feature (star icon on notifications).
+    #[serde(default)]
+    pub favorites_enabled: bool,
 }
 
 const fn default_true() -> bool {
@@ -176,6 +179,7 @@ impl Default for AppSettings {
             compact_view: false,
             expand_new_messages: true,
             delete_local_only: true,
+            favorites_enabled: false,
         }
     }
 }

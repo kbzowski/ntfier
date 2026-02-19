@@ -79,6 +79,7 @@ pub struct NotificationRow {
     pub actions: JsonActions,
     pub attachments: JsonAttachments,
     pub is_expanded: i32,
+    pub is_favorite: i32,
 }
 
 impl NotificationRow {
@@ -96,6 +97,7 @@ impl NotificationRow {
             attachments: self.attachments.into_inner(),
             read: self.read == 1,
             is_expanded: self.is_expanded == 1,
+            is_favorite: self.is_favorite == 1,
         }
     }
 }
@@ -116,6 +118,7 @@ pub struct NewNotification<'a> {
     pub actions: JsonActions,
     pub attachments: JsonAttachments,
     pub is_expanded: i32,
+    pub is_favorite: i32,
 }
 
 // ===== Setting =====

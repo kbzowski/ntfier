@@ -104,6 +104,9 @@ impl Database {
         // Deletion settings
         let delete_local_only = self.get_setting_bool("delete_local_only", true)?;
 
+        // Favorites settings
+        let favorites_enabled = self.get_setting_bool("favorites_enabled", false)?;
+
         let servers = self.get_servers_with_credentials()?;
         let default_server = self.get_default_server_url()?;
 
@@ -121,6 +124,7 @@ impl Database {
             compact_view,
             expand_new_messages,
             delete_local_only,
+            favorites_enabled,
         })
     }
 

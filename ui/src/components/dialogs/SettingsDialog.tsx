@@ -58,6 +58,8 @@ interface SettingsDialogProps {
 	onExpandNewMessagesChange: (enabled: boolean) => void;
 	deleteLocalOnly: boolean;
 	onDeleteLocalOnlyChange: (enabled: boolean) => void;
+	favoritesEnabled: boolean;
+	onFavoritesEnabledChange: (enabled: boolean) => void;
 }
 
 export function SettingsDialog({
@@ -96,6 +98,8 @@ export function SettingsDialog({
 	onExpandNewMessagesChange,
 	deleteLocalOnly,
 	onDeleteLocalOnlyChange,
+	favoritesEnabled,
+	onFavoritesEnabledChange,
 }: SettingsDialogProps) {
 	const [version, setVersion] = useState<string>("");
 
@@ -143,6 +147,8 @@ export function SettingsDialog({
 							onCompactViewChange={onCompactViewChange}
 							expandNewMessages={expandNewMessages}
 							onExpandNewMessagesChange={onExpandNewMessagesChange}
+							favoritesEnabled={favoritesEnabled}
+							onFavoritesEnabledChange={onFavoritesEnabledChange}
 						/>
 					</TabsContent>
 

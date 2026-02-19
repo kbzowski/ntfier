@@ -42,8 +42,13 @@ function App() {
 		markAllAsRead,
 		markAllAsReadGlobally,
 		deleteNotification,
+		toggleFavorite,
 		setNotificationExpanded,
+		currentView,
+		setCurrentView,
+		favoritesCount,
 		settings,
+		setFavoritesEnabled,
 		addServer,
 		removeServer,
 		setDefaultServer,
@@ -128,21 +133,31 @@ function App() {
 			<AppLayout
 				subscriptions={subscriptionsWithUnread}
 				selectedTopicId={currentTopicId}
+				currentView={currentView}
+				favoritesCount={favoritesCount}
+				favoritesEnabled={settings.favoritesEnabled ?? false}
 				onSelectTopic={setCurrentTopicId}
+				onSelectView={setCurrentView}
 				onToggleMute={toggleMute}
 				onRemoveSubscription={handleRemoveSubscription}
 				onOpenSettings={handleOpenSettings}
 				onAddSubscription={handleOpenAddSubscription}
 			>
 				<NotificationList
-					subscription={selectedSubscription ?? null}
+					subscription={
+						currentView === "favorites" ? null : (selectedSubscription ?? null)
+					}
 					subscriptions={subscriptionsWithUnread}
 					notifications={currentNotifications}
 					onMarkAsRead={markAsRead}
 					onMarkAllAsRead={handleMarkAllAsRead}
 					onDelete={deleteNotification}
+					onToggleFavorite={
+						settings.favoritesEnabled ? toggleFavorite : undefined
+					}
 					onExpandedChange={setNotificationExpanded}
 					compactView={settings.compactView ?? false}
+					isFavoritesView={currentView === "favorites"}
 				/>
 			</AppLayout>
 
@@ -183,6 +198,8 @@ function App() {
 					onExpandNewMessagesChange={setExpandNewMessages}
 					deleteLocalOnly={settings.deleteLocalOnly ?? true}
 					onDeleteLocalOnlyChange={setDeleteLocalOnly}
+					favoritesEnabled={settings.favoritesEnabled ?? false}
+					onFavoritesEnabledChange={setFavoritesEnabled}
 				/>
 			</Suspense>
 

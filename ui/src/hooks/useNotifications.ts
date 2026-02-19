@@ -221,6 +221,46 @@ export function useNotifications(subscriptions: Subscription[]) {
 	}, []);
 
 	/**
+	 * Toggles the favorite state of a notification.
+	 * Uses optimistic UI update for instant feedback with rollback on error.
+	 */
+	const toggleFavorite = useCallback((id: string) => {
+		let previousState: Map<string, Notification[]> | null = null;
+		const topicId = notificationIndexRef.current.get(id);
+		let newFavorite = false;
+
+		setByTopic((prev) => {
+			previousState = new Map(prev);
+			if (!topicId) return prev;
+
+			const notifs = prev.get(topicId);
+			if (!notifs) return prev;
+
+			const updated = notifs.map((n) => {
+				if (n.id === id) {
+					newFavorite = !n.isFavorite;
+					return { ...n, isFavorite: newFavorite };
+				}
+				return n;
+			});
+			return new Map(prev).set(topicId, updated);
+		});
+
+		if (isTauri()) {
+			notificationsApi.setFavorite(id, newFavorite).catch((err) => {
+				if (previousState) {
+					setByTopic(previousState);
+				}
+				const classified = classifyError(err);
+				toast.error(classified.userMessage, {
+					description: "Failed to update favorite",
+				});
+				console.error("[Toggle favorite error]", err);
+			});
+		}
+	}, []);
+
+	/**
 	 * Sets the expanded state for a notification.
 	 * Uses optimistic UI update for instant feedback.
 	 */
@@ -298,7 +338,9 @@ export function useNotifications(subscriptions: Subscription[]) {
 	const getForTopic = useCallback(
 		(topicId: string) => {
 			const notifs = byTopic.get(topicId) || [];
-			return notifs.toSorted((a, b) => b.timestamp - a.timestamp);
+			return [...notifs].sort(
+				(a: Notification, b: Notification) => b.timestamp - a.timestamp,
+			);
 		},
 		[byTopic],
 	);
@@ -322,7 +364,24 @@ export function useNotifications(subscriptions: Subscription[]) {
 		for (const notifs of byTopic.values()) {
 			all.push(...notifs);
 		}
-		return all.toSorted((a, b) => b.timestamp - a.timestamp);
+		return all.sort(
+			(a: Notification, b: Notification) => b.timestamp - a.timestamp,
+		);
+	}, [byTopic]);
+
+	/**
+	 * Returns all favorite notifications from all topics, sorted by timestamp.
+	 */
+	const getFavoriteNotifications = useCallback(() => {
+		const all: Notification[] = [];
+		for (const notifs of byTopic.values()) {
+			for (const n of notifs) {
+				if (n.isFavorite) all.push(n);
+			}
+		}
+		return all.sort(
+			(a: Notification, b: Notification) => b.timestamp - a.timestamp,
+		);
 	}, [byTopic]);
 
 	return {
@@ -334,11 +393,13 @@ export function useNotifications(subscriptions: Subscription[]) {
 		markAllAsRead,
 		markAllAsReadGlobally,
 		deleteNotification,
+		toggleFavorite,
 		setExpanded,
 		clearTopic,
 		getUnreadCount,
 		getTotalUnread,
 		getForTopic,
 		getAllNotifications,
+		getFavoriteNotifications,
 	};
 }

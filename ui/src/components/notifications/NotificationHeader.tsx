@@ -1,4 +1,5 @@
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
+import Star from "lucide-react/dist/esm/icons/star";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
 import { type MouseEvent, memo } from "react";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,8 @@ interface NotificationHeaderProps {
 	read: boolean;
 	showChevron?: boolean;
 	isExpanded?: boolean;
+	isFavorite?: boolean;
+	onToggleFavorite?: () => void;
 	onDelete?: () => void;
 }
 
@@ -38,11 +41,18 @@ export const NotificationHeader = memo(function NotificationHeader({
 	read,
 	showChevron,
 	isExpanded,
+	isFavorite,
+	onToggleFavorite,
 	onDelete,
 }: NotificationHeaderProps) {
 	const handleDelete = (e: MouseEvent) => {
 		e.stopPropagation();
 		onDelete?.();
+	};
+
+	const handleToggleFavorite = (e: MouseEvent) => {
+		e.stopPropagation();
+		onToggleFavorite?.();
 	};
 
 	return (
@@ -66,6 +76,20 @@ export const NotificationHeader = memo(function NotificationHeader({
 				</h3>
 			</div>
 			<div className="flex items-center gap-2 shrink-0">
+				{onToggleFavorite && (
+					<button
+						type="button"
+						onClick={handleToggleFavorite}
+						className={cn(
+							"p-1 rounded-sm transition-opacity",
+							isFavorite
+								? "text-yellow-500 opacity-100"
+								: "opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-yellow-500",
+						)}
+					>
+						<Star className={cn("h-4 w-4", isFavorite && "fill-current")} />
+					</button>
+				)}
 				{onDelete && (
 					<button
 						type="button"

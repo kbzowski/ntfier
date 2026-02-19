@@ -1,6 +1,8 @@
 import {
 	createContext,
+	type Dispatch,
 	type ReactNode,
+	type SetStateAction,
 	useCallback,
 	useContext,
 	useEffect,
@@ -39,6 +41,7 @@ interface AppState {
 	// Notifications (keyed by subscription ID)
 	notificationsByTopic: Map<string, Notification[]>;
 	currentTopicId: string | null;
+	currentView: "all" | "favorites";
 
 	// Settings
 	settings: AppSettings;
@@ -63,11 +66,15 @@ interface AppActions {
 	// Topic selection
 	setCurrentTopicId: (id: string | null) => void;
 
+	// View selection
+	setCurrentView: (view: "all" | "favorites") => void;
+
 	// Notifications (optimistic updates - fire and forget)
 	markAsRead: (id: string) => void;
 	markAllAsRead: (subscriptionId: string) => void;
 	markAllAsReadGlobally: () => void;
 	deleteNotification: (id: string) => void;
+	toggleFavorite: (id: string) => void;
 	setNotificationExpanded: (id: string, expanded: boolean) => void;
 	getUnreadCount: (subscriptionId: string) => number;
 	getTotalUnread: () => number;
@@ -97,6 +104,9 @@ interface AppActions {
 	// Deletion settings
 	setDeleteLocalOnly: (enabled: boolean) => Promise<void>;
 
+	// Favorites settings
+	setFavoritesEnabled: (enabled: boolean) => Promise<void>;
+
 	// Updates
 	setUpdateInfo: (info: UpdateInfo | null) => void;
 }
@@ -105,15 +115,45 @@ interface AppContextValue extends AppState, AppActions {
 	// Derived data
 	currentNotifications: Notification[];
 	subscriptionsWithUnread: Subscription[];
+	favoritesCount: number;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
+
+type SetSettings = Dispatch<SetStateAction<AppSettings>>;
+
+/**
+ * Factory for boolean setting setters that follow the same pattern:
+ * call API → update local state → show toast → handle errors.
+ */
+function makeBooleanSettingSetter(
+	setSettings: SetSettings,
+	key: keyof AppSettings,
+	apiCall: (enabled: boolean) => Promise<unknown>,
+	label?: string,
+	onSuccess?: (enabled: boolean) => void,
+): (enabled: boolean) => Promise<void> {
+	return async (enabled: boolean) => {
+		if (!isTauri()) return;
+		try {
+			await apiCall(enabled);
+			setSettings((prev) => ({ ...prev, [key]: enabled }));
+			if (label) toast.success(`${label} ${enabled ? "enabled" : "disabled"}`);
+			onSuccess?.(enabled);
+		} catch (err) {
+			const classified = classifyError(err);
+			toast.error(classified.userMessage);
+			console.error("[Settings Error]", err);
+		}
+	};
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
 	// State
 	const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
 	const [subscriptionsLoading, setSubscriptionsLoading] = useState(true);
 	const [currentTopicId, setCurrentTopicId] = useState<string | null>(null);
+	const [currentView, setCurrentView] = useState<"all" | "favorites">("all");
 	const [settings, setSettings] = useState<AppSettings>(mockSettings);
 	const [settingsLoading, setSettingsLoading] = useState(true);
 	const [autostart, setAutostartState] = useState(false);
@@ -448,167 +488,131 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		}
 	}, []);
 
-	const setMinimizeToTray = useCallback(async (enabled: boolean) => {
-		if (isTauri()) {
-			try {
-				await settingsApi.setMinimizeToTray(enabled);
-				setSettings((prev) => ({ ...prev, minimizeToTray: enabled }));
-				toast.success(`Minimize to tray ${enabled ? "enabled" : "disabled"}`);
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage);
-				console.error("[Settings Error]", err);
-			}
-		}
-	}, []);
+	// Boolean settings setters - all follow the same pattern via factory
+	const {
+		setMinimizeToTray,
+		setStartMinimized,
+		setNotificationForceDisplay,
+		setNotificationShowActions,
+		setNotificationShowImages,
+		setNotificationSound,
+		setCompactView,
+		setExpandNewMessages,
+		setDeleteLocalOnly,
+		setFavoritesEnabled,
+	} = useMemo(
+		() => ({
+			setMinimizeToTray: makeBooleanSettingSetter(
+				setSettings,
+				"minimizeToTray",
+				settingsApi.setMinimizeToTray,
+				"Minimize to tray",
+			),
+			setStartMinimized: makeBooleanSettingSetter(
+				setSettings,
+				"startMinimized",
+				settingsApi.setStartMinimized,
+				"Start minimized",
+			),
+			setNotificationForceDisplay: makeBooleanSettingSetter(
+				setSettings,
+				"notificationForceDisplay",
+				settingsApi.setNotificationForceDisplay,
+				"Force display",
+			),
+			setNotificationShowActions: makeBooleanSettingSetter(
+				setSettings,
+				"notificationShowActions",
+				settingsApi.setNotificationShowActions,
+				"Show actions",
+			),
+			setNotificationShowImages: makeBooleanSettingSetter(
+				setSettings,
+				"notificationShowImages",
+				settingsApi.setNotificationShowImages,
+				"Show images",
+			),
+			setNotificationSound: makeBooleanSettingSetter(
+				setSettings,
+				"notificationSound",
+				settingsApi.setNotificationSound,
+				"Notification sound",
+			),
+			setCompactView: makeBooleanSettingSetter(
+				setSettings,
+				"compactView",
+				settingsApi.setCompactView,
+				"Compact view",
+			),
+			setExpandNewMessages: makeBooleanSettingSetter(
+				setSettings,
+				"expandNewMessages",
+				settingsApi.setExpandNewMessages,
+				"Expand new messages",
+			),
+			setDeleteLocalOnly: makeBooleanSettingSetter(
+				setSettings,
+				"deleteLocalOnly",
+				settingsApi.setDeleteLocalOnly,
+				"Delete only locally",
+			),
+			setFavoritesEnabled: makeBooleanSettingSetter(
+				setSettings,
+				"favoritesEnabled",
+				settingsApi.setFavoritesEnabled,
+				undefined,
+				(enabled) => {
+					if (!enabled) setCurrentView("all");
+				},
+			),
+		}),
+		[],
+	);
 
-	const setStartMinimized = useCallback(async (enabled: boolean) => {
-		if (isTauri()) {
-			try {
-				await settingsApi.setStartMinimized(enabled);
-				setSettings((prev) => ({ ...prev, startMinimized: enabled }));
-				toast.success(`Start minimized ${enabled ? "enabled" : "disabled"}`);
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage);
-				console.error("[Settings Error]", err);
-			}
-		}
-	}, []);
-
-	// Notification settings actions
+	// Notification method uses a different type signature
 	const setNotificationMethod = useCallback(
 		async (method: NotificationDisplayMethod) => {
-			if (isTauri()) {
-				try {
-					await settingsApi.setNotificationMethod(method);
-					setSettings((prev) => ({ ...prev, notificationMethod: method }));
-					toast.success("Notification method updated");
-				} catch (err) {
-					const classified = classifyError(err);
-					toast.error(classified.userMessage);
-					console.error("[Settings Error]", err);
-				}
+			if (!isTauri()) return;
+			try {
+				await settingsApi.setNotificationMethod(method);
+				setSettings((prev) => ({ ...prev, notificationMethod: method }));
+				toast.success("Notification method updated");
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage);
+				console.error("[Settings Error]", err);
 			}
 		},
 		[],
 	);
 
-	const setNotificationForceDisplay = useCallback(async (enabled: boolean) => {
-		if (isTauri()) {
-			try {
-				await settingsApi.setNotificationForceDisplay(enabled);
-				setSettings((prev) => ({ ...prev, notificationForceDisplay: enabled }));
-				toast.success(`Force display ${enabled ? "enabled" : "disabled"}`);
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage);
-				console.error("[Settings Error]", err);
-			}
-		}
-	}, []);
-
-	const setNotificationShowActions = useCallback(async (enabled: boolean) => {
-		if (isTauri()) {
-			try {
-				await settingsApi.setNotificationShowActions(enabled);
-				setSettings((prev) => ({ ...prev, notificationShowActions: enabled }));
-				toast.success(`Show actions ${enabled ? "enabled" : "disabled"}`);
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage);
-				console.error("[Settings Error]", err);
-			}
-		}
-	}, []);
-
-	const setNotificationShowImages = useCallback(async (enabled: boolean) => {
-		if (isTauri()) {
-			try {
-				await settingsApi.setNotificationShowImages(enabled);
-				setSettings((prev) => ({ ...prev, notificationShowImages: enabled }));
-				toast.success(`Show images ${enabled ? "enabled" : "disabled"}`);
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage);
-				console.error("[Settings Error]", err);
-			}
-		}
-	}, []);
-
-	const setNotificationSound = useCallback(async (enabled: boolean) => {
-		if (isTauri()) {
-			try {
-				await settingsApi.setNotificationSound(enabled);
-				setSettings((prev) => ({ ...prev, notificationSound: enabled }));
-				toast.success(`Notification sound ${enabled ? "enabled" : "disabled"}`);
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage);
-				console.error("[Settings Error]", err);
-			}
-		}
-	}, []);
-
-	// Message display settings actions
-	const setCompactView = useCallback(async (enabled: boolean) => {
-		if (isTauri()) {
-			try {
-				await settingsApi.setCompactView(enabled);
-				setSettings((prev) => ({ ...prev, compactView: enabled }));
-				toast.success(`Compact view ${enabled ? "enabled" : "disabled"}`);
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage);
-				console.error("[Settings Error]", err);
-			}
-		}
-	}, []);
-
-	const setExpandNewMessages = useCallback(async (enabled: boolean) => {
-		if (isTauri()) {
-			try {
-				await settingsApi.setExpandNewMessages(enabled);
-				setSettings((prev) => ({ ...prev, expandNewMessages: enabled }));
-				toast.success(
-					`Expand new messages ${enabled ? "enabled" : "disabled"}`,
-				);
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage);
-				console.error("[Settings Error]", err);
-			}
-		}
-	}, []);
-
-	const setDeleteLocalOnly = useCallback(async (enabled: boolean) => {
-		if (isTauri()) {
-			try {
-				await settingsApi.setDeleteLocalOnly(enabled);
-				setSettings((prev) => ({ ...prev, deleteLocalOnly: enabled }));
-				toast.success(
-					`Delete only locally ${enabled ? "enabled" : "disabled"}`,
-				);
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage);
-				console.error("[Settings Error]", err);
-			}
-		}
-	}, []);
-
 	// Derived data
 	const currentNotifications = useMemo(() => {
+		if (currentView === "favorites") {
+			return notifications.getFavoriteNotifications();
+		}
 		if (!currentTopicId) {
 			// Show all notifications when no topic selected
 			return notifications.getAllNotifications();
 		}
 		return notifications.getForTopic(currentTopicId);
 	}, [
+		currentView,
 		currentTopicId,
 		notifications.getForTopic,
 		notifications.getAllNotifications,
+		notifications.getFavoriteNotifications,
 	]);
+
+	const favoritesCount = useMemo(() => {
+		let count = 0;
+		for (const notifs of notifications.byTopic.values()) {
+			for (const n of notifs) {
+				if (n.isFavorite) count++;
+			}
+		}
+		return count;
+	}, [notifications.byTopic]);
 
 	const subscriptionsWithUnread = useMemo(() => {
 		return subscriptions.map((sub) => ({
@@ -626,6 +630,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			subscriptionsLoading,
 			notificationsByTopic: notifications.byTopic,
 			currentTopicId,
+			currentView,
 			settings,
 			settingsLoading,
 			autostart,
@@ -637,10 +642,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			toggleMute,
 			refreshSubscriptions,
 			setCurrentTopicId,
+			setCurrentView,
 			markAsRead: notifications.markAsRead,
 			markAllAsRead: notifications.markAllAsRead,
 			markAllAsReadGlobally: notifications.markAllAsReadGlobally,
 			deleteNotification: notifications.deleteNotification,
+			toggleFavorite: notifications.toggleFavorite,
 			setNotificationExpanded: notifications.setExpanded,
 			getUnreadCount: notifications.getUnreadCount,
 			getTotalUnread: notifications.getTotalUnread,
@@ -659,17 +666,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			setCompactView,
 			setExpandNewMessages,
 			setDeleteLocalOnly,
+			setFavoritesEnabled,
 			setUpdateInfo,
 
 			// Derived
 			currentNotifications,
 			subscriptionsWithUnread,
+			favoritesCount,
 		}),
 		[
 			subscriptions,
 			subscriptionsLoading,
 			notifications.byTopic,
 			currentTopicId,
+			currentView,
 			settings,
 			settingsLoading,
 			autostart,
@@ -682,6 +692,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			notifications.markAllAsRead,
 			notifications.markAllAsReadGlobally,
 			notifications.deleteNotification,
+			notifications.toggleFavorite,
 			notifications.setExpanded,
 			notifications.getUnreadCount,
 			notifications.getTotalUnread,
@@ -700,8 +711,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			setCompactView,
 			setExpandNewMessages,
 			setDeleteLocalOnly,
+			setFavoritesEnabled,
 			currentNotifications,
 			subscriptionsWithUnread,
+			favoritesCount,
 		],
 	);
 

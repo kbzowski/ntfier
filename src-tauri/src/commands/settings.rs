@@ -132,3 +132,9 @@ pub fn set_expand_new_messages(db: State<'_, Database>, enabled: bool) -> Result
 pub fn set_delete_local_only(db: State<'_, Database>, enabled: bool) -> Result<(), AppError> {
     db.set_setting("delete_local_only", if enabled { "true" } else { "false" })
 }
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_favorites_enabled(db: State<'_, Database>, enabled: bool) -> Result<(), AppError> {
+    db.set_setting("favorites_enabled", if enabled { "true" } else { "false" })
+}

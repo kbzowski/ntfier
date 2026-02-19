@@ -100,6 +100,24 @@ pub async fn delete_notification(
 
 #[tauri::command]
 #[specta::specta]
+pub fn set_notification_favorite(
+    db: State<'_, Database>,
+    id: String,
+    favorite: bool,
+) -> Result<(), AppError> {
+    db.set_notification_favorite(&id, favorite)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_favorite_notifications(
+    db: State<'_, Database>,
+) -> Result<Vec<Notification>, AppError> {
+    db.get_favorite_notifications()
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn set_notification_expanded(
     db: State<'_, Database>,
     id: String,

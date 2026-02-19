@@ -66,6 +66,7 @@ impl Database {
             actions: JsonActions::new(notification.actions.clone()),
             attachments: JsonAttachments::new(notification.attachments.clone()),
             is_expanded: i32::from(notification.is_expanded),
+            is_favorite: i32::from(notification.is_favorite),
         };
 
         diesel::replace_into(notifications::table)
@@ -102,6 +103,7 @@ impl Database {
             actions: JsonActions::new(notification.actions.clone()),
             attachments: JsonAttachments::new(notification.attachments.clone()),
             is_expanded: i32::from(notification.is_expanded),
+            is_favorite: i32::from(notification.is_favorite),
         };
 
         diesel::insert_or_ignore_into(notifications::table)
@@ -133,6 +135,32 @@ impl Database {
         .execute(&mut *conn)?;
 
         Ok(())
+    }
+
+    /// Sets the favorite state of a notification.
+    pub fn set_notification_favorite(&self, id: &str, favorite: bool) -> Result<(), AppError> {
+        let mut conn = self.conn()?;
+
+        diesel::update(notifications::table.filter(notifications::id.eq(id)))
+            .set(notifications::is_favorite.eq(i32::from(favorite)))
+            .execute(&mut *conn)?;
+
+        Ok(())
+    }
+
+    /// Gets all favorite notifications, ordered by timestamp descending.
+    pub fn get_favorite_notifications(&self) -> Result<Vec<Notification>, AppError> {
+        let mut conn = self.conn()?;
+
+        let rows: Vec<NotificationRow> = notifications::table
+            .filter(notifications::is_favorite.eq(1))
+            .order(notifications::timestamp.desc())
+            .load(&mut *conn)?;
+
+        Ok(rows
+            .into_iter()
+            .map(NotificationRow::into_notification)
+            .collect())
     }
 
     /// Sets the expanded state of a notification.

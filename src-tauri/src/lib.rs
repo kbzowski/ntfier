@@ -67,6 +67,9 @@ pub fn export_bindings() {
             commands::set_compact_view,
             commands::set_expand_new_messages,
             commands::set_delete_local_only,
+            commands::set_favorites_enabled,
+            commands::set_notification_favorite,
+            commands::get_favorite_notifications,
             commands::sync_subscriptions,
             // Update
             commands::check_for_update,
@@ -304,6 +307,9 @@ pub fn run() {
             commands::set_compact_view,
             commands::set_expand_new_messages,
             commands::set_delete_local_only,
+            commands::set_favorites_enabled,
+            commands::set_notification_favorite,
+            commands::get_favorite_notifications,
             // Sync
             commands::sync_subscriptions,
             // Update

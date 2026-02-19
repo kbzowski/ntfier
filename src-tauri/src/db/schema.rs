@@ -34,6 +34,7 @@ diesel::table! {
         actions -> Text,
         attachments -> Text,
         is_expanded -> Integer,
+        is_favorite -> Integer,
     }
 }
 

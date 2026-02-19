@@ -1,6 +1,7 @@
 import Check from "lucide-react/dist/esm/icons/check";
 import LayoutList from "lucide-react/dist/esm/icons/layout-list";
 import Monitor from "lucide-react/dist/esm/icons/monitor";
+import Star from "lucide-react/dist/esm/icons/star";
 import { useMemo, useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { SettingCheckbox } from "@/components/ui/setting-checkbox";
@@ -17,6 +18,8 @@ interface AppearanceTabProps {
 	onCompactViewChange: (enabled: boolean) => void;
 	expandNewMessages: boolean;
 	onExpandNewMessagesChange: (enabled: boolean) => void;
+	favoritesEnabled: boolean;
+	onFavoritesEnabledChange: (enabled: boolean) => void;
 }
 
 function ThemePreview({ theme }: { theme: ThemeDefinition }) {
@@ -168,6 +171,8 @@ export function AppearanceTab({
 	onCompactViewChange,
 	expandNewMessages,
 	onExpandNewMessagesChange,
+	favoritesEnabled,
+	onFavoritesEnabledChange,
 }: AppearanceTabProps) {
 	const [previewTheme, setPreviewTheme] = useState<ThemeDefinition | null>(
 		null,
@@ -250,6 +255,15 @@ export function AppearanceTab({
 						className="pt-2"
 					/>
 				)}
+
+				<SettingCheckbox
+					id="favorites-enabled"
+					checked={favoritesEnabled}
+					onCheckedChange={onFavoritesEnabledChange}
+					label="Enable favorites"
+					icon={<Star className="h-4 w-4 text-yellow-500" />}
+					description="Star notifications to save them in a dedicated Favorites view"
+				/>
 			</div>
 		</div>
 	);

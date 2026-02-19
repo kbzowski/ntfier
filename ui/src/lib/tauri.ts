@@ -138,6 +138,12 @@ export const notificationsApi = {
 
 	getUnreadCount: async (subscriptionId: string) =>
 		unwrap(await commands.getUnreadCount(subscriptionId)),
+
+	setFavorite: async (id: string, favorite: boolean) => {
+		unwrap(await commands.setNotificationFavorite(id, favorite));
+	},
+
+	getFavorites: async () => unwrap(await commands.getFavoriteNotifications()),
 };
 
 // ===== Settings API =====
@@ -204,6 +210,10 @@ export const settingsApi = {
 
 	setDeleteLocalOnly: async (enabled: boolean) => {
 		unwrap(await commands.setDeleteLocalOnly(enabled));
+	},
+
+	setFavoritesEnabled: async (enabled: boolean) => {
+		unwrap(await commands.setFavoritesEnabled(enabled));
 	},
 };
 

@@ -214,6 +214,30 @@ async setDeleteLocalOnly(enabled: boolean) : Promise<Result<null, AppError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async setFavoritesEnabled(enabled: boolean) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_favorites_enabled", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setNotificationFavorite(id: string, favorite: boolean) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_notification_favorite", { id, favorite }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getFavoriteNotifications() : Promise<Result<Notification[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_favorite_notifications") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * Sync subscriptions from a server that has user credentials
  */
@@ -342,7 +366,11 @@ expandNewMessages?: boolean;
 /**
  * Delete notifications only locally (when disabled, also deletes from ntfy server).
  */
-deleteLocalOnly?: boolean }
+deleteLocalOnly?: boolean;
+/**
+ * Enable favorites feature.
+ */
+favoritesEnabled?: boolean }
 /**
  * A file attachment on a notification.
  */
@@ -366,7 +394,11 @@ timestamp: number; actions: NotificationAction[]; attachments: Attachment[]; rea
 /**
  * Whether the notification is expanded in compact view mode.
  */
-isExpanded: boolean }
+isExpanded: boolean;
+/**
+ * Whether the notification is marked as a favorite.
+ */
+isFavorite: boolean }
 /**
  * An action button attached to a notification.
  */

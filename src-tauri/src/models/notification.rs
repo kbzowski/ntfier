@@ -52,6 +52,8 @@ pub struct Notification {
     pub read: bool,
     /// Whether the notification is expanded in compact view mode.
     pub is_expanded: bool,
+    /// Whether the notification is marked as favorite.
+    pub is_favorite: bool,
 }
 
 /// An action button attached to a notification.
@@ -176,6 +178,7 @@ impl NtfyMessage {
             attachments,
             read: false,
             is_expanded: false,
+            is_favorite: false,
         }
     }
 

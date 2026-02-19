@@ -62,6 +62,7 @@ export const mockNotifications: Notification[] = [
 		attachments: [],
 		read: false,
 		isExpanded: false,
+		isFavorite: false,
 	},
 	{
 		id: "notif-2",
@@ -84,6 +85,7 @@ export const mockNotifications: Notification[] = [
 		attachments: [],
 		read: false,
 		isExpanded: false,
+		isFavorite: false,
 	},
 	{
 		id: "notif-3",
@@ -98,6 +100,7 @@ export const mockNotifications: Notification[] = [
 		attachments: [],
 		read: true,
 		isExpanded: false,
+		isFavorite: false,
 	},
 	{
 		id: "notif-4",
@@ -135,6 +138,7 @@ export const mockNotifications: Notification[] = [
 		],
 		read: false,
 		isExpanded: false,
+		isFavorite: false,
 	},
 	{
 		id: "notif-5",
@@ -157,6 +161,7 @@ export const mockNotifications: Notification[] = [
 		attachments: [],
 		read: false,
 		isExpanded: false,
+		isFavorite: false,
 	},
 	{
 		id: "notif-6",
@@ -179,6 +184,7 @@ export const mockNotifications: Notification[] = [
 		attachments: [],
 		read: false,
 		isExpanded: false,
+		isFavorite: false,
 	},
 	{
 		id: "notif-7",
@@ -201,6 +207,7 @@ export const mockNotifications: Notification[] = [
 		attachments: [],
 		read: true,
 		isExpanded: false,
+		isFavorite: false,
 	},
 	{
 		id: "notif-8",
@@ -215,6 +222,7 @@ export const mockNotifications: Notification[] = [
 		attachments: [],
 		read: true,
 		isExpanded: false,
+		isFavorite: false,
 	},
 	{
 		id: "notif-9",
@@ -237,6 +245,7 @@ export const mockNotifications: Notification[] = [
 		attachments: [],
 		read: true,
 		isExpanded: false,
+		isFavorite: false,
 	},
 	{
 		id: "notif-10",
@@ -259,6 +268,7 @@ export const mockNotifications: Notification[] = [
 		],
 		read: false,
 		isExpanded: false,
+		isFavorite: false,
 	},
 	{
 		id: "notif-11",
@@ -273,6 +283,7 @@ export const mockNotifications: Notification[] = [
 		attachments: [],
 		read: false,
 		isExpanded: false,
+		isFavorite: false,
 	},
 	{
 		id: "notif-12",
@@ -303,6 +314,7 @@ export const mockNotifications: Notification[] = [
 		],
 		read: false,
 		isExpanded: false,
+		isFavorite: false,
 	},
 	{
 		id: "notif-13",
@@ -340,6 +352,7 @@ export const mockNotifications: Notification[] = [
 		],
 		read: false,
 		isExpanded: false,
+		isFavorite: false,
 	},
 ];
 
@@ -366,4 +379,9 @@ export const mockSettings: AppSettings = {
 	notificationForceDisplay: false,
 	notificationShowActions: true,
 	notificationShowImages: true,
+	notificationSound: true,
+	compactView: false,
+	expandNewMessages: true,
+	deleteLocalOnly: true,
+	favoritesEnabled: false,
 };
