@@ -76,45 +76,13 @@ jobs:
 
       - name: Generate changelog
         id: changelog
-        run: |
-          TAG_NAME="v${{ inputs.version }}"
-          PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]' | grep -v "$TAG_NAME" | head -1)
-          if [ -z "$PREV_TAG" ]; then
-            RANGE="$TAG_NAME"
-          else
-            RANGE="${PREV_TAG}..${TAG_NAME}"
-          fi
-
-          echo "Generating changelog for $RANGE"
-
-          CHANGELOG=""
-          add_section() {
-            local title="$1" prefix="$2"
-            local entries=$(git log "$RANGE" --pretty=format:"%s" --grep="^${prefix}" | sed "s/^${prefix}[:(][^)]*)[: ]*//" | sed "s/^${prefix}: //" | sed 's/^/- /')
-            if [ -n "$entries" ]; then
-              CHANGELOG="${CHANGELOG}### ${title}\n\n${entries}\n\n"
-            fi
-          }
-
-          add_section "Features" "feat"
-          add_section "Bug Fixes" "fix"
-          add_section "Performance" "perf"
-          add_section "Refactor" "refactor"
-          add_section "Documentation" "docs"
-
-          # Miscellaneous (chore, excluding release/version bumps)
-          MISC=$(git log "$RANGE" --pretty=format:"%s" --grep="^chore" | grep -v -E "^chore\((release|version)\)" | grep -v "^chore: version" | sed 's/^chore[:(][^)]*)[: ]*//' | sed 's/^chore: //' | sed 's/^/- /' || true)
-          if [ -n "$MISC" ]; then
-            CHANGELOG="${CHANGELOG}### Miscellaneous\n\n${MISC}\n\n"
-          fi
-
-          if [ -z "$CHANGELOG" ]; then
-            CHANGELOG="No notable changes."
-          fi
-
-          # Write to file for multi-line safety
-          echo -e "$CHANGELOG" > changelog.md
-        shell: bash
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: changelog.md
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and Release
         uses: tauri-apps/tauri-action@v0

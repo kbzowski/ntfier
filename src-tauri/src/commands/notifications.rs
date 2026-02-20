@@ -110,9 +110,7 @@ pub fn set_notification_favorite(
 
 #[tauri::command]
 #[specta::specta]
-pub fn get_favorite_notifications(
-    db: State<'_, Database>,
-) -> Result<Vec<Notification>, AppError> {
+pub fn get_favorite_notifications(db: State<'_, Database>) -> Result<Vec<Notification>, AppError> {
     db.get_favorite_notifications()
 }
 
