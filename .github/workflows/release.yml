@@ -103,7 +103,7 @@ jobs:
           add_section "Documentation" "docs"
 
           # Miscellaneous (chore, excluding release/version bumps)
-          MISC=$(git log "$RANGE" --pretty=format:"%s" --grep="^chore" | grep -v -E "^chore\((release|version)\)" | grep -v "^chore: version" | sed 's/^chore[:(][^)]*)[: ]*//' | sed 's/^chore: //' | sed 's/^/- /')
+          MISC=$(git log "$RANGE" --pretty=format:"%s" --grep="^chore" | grep -v -E "^chore\((release|version)\)" | grep -v "^chore: version" | sed 's/^chore[:(][^)]*)[: ]*//' | sed 's/^chore: //' | sed 's/^/- /' || true)
           if [ -n "$MISC" ]; then
             CHANGELOG="${CHANGELOG}### Miscellaneous\n\n${MISC}\n\n"
           fi
