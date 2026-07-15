@@ -6,7 +6,7 @@ authors = [""]
 license = ""
 repository = ""
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.88"
 
 [lib]
 name = "ntfier_lib"
@@ -31,19 +31,26 @@ serde_json = "1"
 serde_repr = "0.1"
 
 # Database (Diesel ORM with SQLite)
-diesel = { version = "2.2", features = ["sqlite"] }
-diesel_migrations = "2.2"
-libsqlite3-sys = { version = "0.30", features = ["bundled"] }
+diesel = { version = "2.3", features = ["sqlite"] }
+diesel_migrations = "2.3"
+# Not imported anywhere: forces the `bundled` feature on diesel's transitive dep.
+# Diesel has no bundled feature of its own (diesel-rs/diesel#3587).
+# Ceiling is 0.37 - diesel 2.3 requires libsqlite3-sys <0.38.
+libsqlite3-sys = { version = "0.37", features = ["bundled"] }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
 
 # WebSocket - use rustls instead of native-tls
-tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 futures-util = "0.3"
 
-# HTTP client - use rustls instead of native-tls
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# HTTP client - use rustls instead of native-tls.
+# `rustls-no-provider` (not `rustls`) keeps aws-lc-rs out of the build: plain `rustls`
+# forces it, which pulls aws-lc-sys + cmake + NASM. tauri-plugin-updater makes the same
+# choice. The provider is installed explicitly in lib.rs::run().
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 
 # Utilities
 log = "0.4"
@@ -51,23 +58,25 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 thiserror = "2"
 url = "2"
-pulldown-cmark = { version = "0.12", default-features = false }
+pulldown-cmark = { version = "0.13", default-features = false }
 base64 = "0.22"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
-rand = "0.8"
 
-# Secure credential storage
-keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+# Secure credential storage - platform-native backends ship in `default` since v4
+keyring = "4"
 tauri-plugin-window-state = "2"
 
 # Windows-specific enhanced notifications
 [target.'cfg(windows)'.dependencies]
-tauri-winrt-notification = "0.5"
+# Pinned to 0.7 to match what notify-rust pulls in via tauri-plugin-notification.
+# 0.8 needs windows 0.62 and would add a third copy of the windows crate.
+tauri-winrt-notification = "0.7"
 
-# Type-safe bindings between Rust and TypeScript
-specta = "=2.0.0-rc.22"
-tauri-specta = { version = "=2.0.0-rc.21", features = ["typescript"] }
-specta-typescript = "0.0.9"
+# Type-safe bindings between Rust and TypeScript.
+# These three hard-pin each other and must move as a unit.
+specta = "=2.0.0-rc.25"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["typescript"] }
+specta-typescript = "0.0.12"
 
 # Workspace lints configuration
 [lints.rust]

@@ -13,7 +13,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::{
     connect_async,
-    tungstenite::{self, client::IntoClientRequest, http::HeaderValue, Message},
+    tungstenite::{client::ClientRequestBuilder, http::Uri, Message},
 };
 use url::Url;
 
@@ -127,6 +127,9 @@ impl ConnectionManager {
         }
 
         let ws_url = Self::build_ws_url(subscription)?;
+        let ws_uri: Uri = ws_url
+            .parse()
+            .map_err(|e| AppError::InvalidUrl(format!("Invalid WebSocket URL {ws_url}: {e}")))?;
         let sub_id = subscription.id.clone();
         let is_muted = subscription.muted;
         let app_handle = self.app_handle.clone();
@@ -154,36 +157,12 @@ impl ConnectionManager {
 
                 log::info!("Connecting to WebSocket: {ws_url}");
 
-                let connect_result = if let Some(ref auth) = auth_header {
-                    match ws_url.as_str().into_client_request() {
-                        Ok(mut request) => match HeaderValue::from_str(auth) {
-                            Ok(header_value) => {
-                                request.headers_mut().insert("Authorization", header_value);
-                                log::info!("Using auth header for WebSocket connection");
-                                connect_async(request).await
-                            }
-                            Err(e) => {
-                                log::error!("Invalid Authorization header: {e}");
-                                Err(tungstenite::Error::Io(std::io::Error::new(
-                                    std::io::ErrorKind::InvalidInput,
-                                    "Invalid auth header",
-                                )))
-                            }
-                        },
-                        Err(e) => {
-                            log::error!("Invalid WebSocket URL {ws_url}: {e}");
-                            Err(tungstenite::Error::Io(std::io::Error::new(
-                                std::io::ErrorKind::InvalidInput,
-                                "Invalid WebSocket URL",
-                            )))
-                        }
-                    }
-                } else {
-                    log::info!("No auth header for WebSocket connection");
-                    connect_async(&ws_url).await
-                };
+                let mut request = ClientRequestBuilder::new(ws_uri.clone());
+                if let Some(ref auth) = auth_header {
+                    request = request.with_header("Authorization", auth);
+                }
 
-                match connect_result {
+                match connect_async(request).await {
                     Ok((ws_stream, _)) => {
                         log::info!("Connected to {ws_url}");
                         // Reset backoff on successful connection
@@ -231,7 +210,11 @@ impl ConnectionManager {
 
                 // Exponential backoff with jitter
                 let delay = RETRY_BACKOFF_SECS[reconnect_attempt.min(RETRY_BACKOFF_SECS.len() - 1)];
-                let jitter = rand::random::<u64>() % JITTER_MAX_SECS;
+                // ponytail: clock nanos are enough entropy to break up a thundering herd;
+                // this is not a cryptographic path, so it doesn't warrant a rand dependency.
+                let jitter = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |d| u64::from(d.subsec_nanos()) % JITTER_MAX_SECS);
                 let total_delay = delay + jitter;
 
                 log::info!(
@@ -454,7 +437,7 @@ impl ConnectionManager {
 
         // Add sound for notifications with priority >= Default (3) to ensure Windows shows them as toast popups
         // Respect notification_sound setting (defaults to true if settings unavailable)
-        let sound_enabled = settings.map_or(true, |s| s.notification_sound);
+        let sound_enabled = settings.is_none_or(|s| s.notification_sound);
         if sound_enabled && notification.priority as i32 >= 3 {
             builder = builder.sound("Default");
         }

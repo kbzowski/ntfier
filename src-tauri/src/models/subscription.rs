@@ -17,6 +17,7 @@ pub struct Subscription {
     pub display_name: Option<String>,
     pub unread_count: i32,
     /// Timestamp of the most recent notification (milliseconds).
+    #[specta(type = Option<specta_typescript::Number>)]
     pub last_notification: Option<i64>,
     /// Whether notifications from this subscription are muted.
     pub muted: bool,

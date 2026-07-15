@@ -46,6 +46,8 @@ pub struct Notification {
     pub priority: Priority,
     pub tags: Vec<String>,
     /// Unix timestamp in milliseconds.
+    /// Exported as a TS `number`: safe for millisecond timestamps until year 285,616.
+    #[specta(type = specta_typescript::Number)]
     pub timestamp: i64,
     pub actions: Vec<NotificationAction>,
     pub attachments: Vec<Attachment>,
@@ -74,9 +76,9 @@ pub struct Attachment {
     pub id: String,
     pub name: String,
     #[serde(rename = "type")]
-    #[specta(rename = "type")]
     pub attachment_type: String,
     pub url: String,
+    #[specta(type = Option<specta_typescript::Number>)]
     pub size: Option<i64>,
 }
 

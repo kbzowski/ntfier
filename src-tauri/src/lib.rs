@@ -30,6 +30,54 @@ use tauri::{
     Emitter, Manager,
 };
 
+/// The single source of truth for the command list.
+///
+/// Feeds both the Tauri invoke handler and the TypeScript binding export, so a
+/// command can never be registered with one and missing from the other.
+fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
+    tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
+        // Subscriptions
+        commands::get_subscriptions,
+        commands::add_subscription,
+        commands::remove_subscription,
+        commands::toggle_mute,
+        // Notifications
+        commands::get_notifications,
+        commands::mark_as_read,
+        commands::mark_all_as_read,
+        commands::delete_notification,
+        commands::set_notification_expanded,
+        commands::get_unread_count,
+        commands::get_total_unread_count,
+        // Settings
+        commands::get_settings,
+        commands::set_theme,
+        commands::add_server,
+        commands::remove_server,
+        commands::set_default_server,
+        commands::set_minimize_to_tray,
+        commands::set_start_minimized,
+        commands::set_notification_method,
+        commands::set_notification_force_display,
+        commands::set_notification_show_actions,
+        commands::set_notification_show_images,
+        commands::set_notification_sound,
+        commands::set_compact_view,
+        commands::set_expand_new_messages,
+        commands::set_delete_local_only,
+        commands::set_favorites_enabled,
+        commands::set_notification_favorite,
+        commands::get_favorite_notifications,
+        // Sync
+        commands::sync_subscriptions,
+        // Update
+        commands::check_for_update,
+        commands::install_update,
+        commands::get_app_version,
+        commands::get_app_version_display,
+    ])
+}
+
 /// Generate TypeScript bindings for all commands and types.
 ///
 /// This only runs in debug builds. If binding export fails, we want to
@@ -37,61 +85,16 @@ use tauri::{
 #[cfg(debug_assertions)]
 #[allow(clippy::expect_used)]
 pub fn export_bindings() {
-    use specta_typescript::{BigIntExportBehavior, Typescript};
-
-    let builder =
-        tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
-            commands::get_subscriptions,
-            commands::add_subscription,
-            commands::remove_subscription,
-            commands::toggle_mute,
-            commands::get_notifications,
-            commands::mark_as_read,
-            commands::mark_all_as_read,
-            commands::delete_notification,
-            commands::set_notification_expanded,
-            commands::get_unread_count,
-            commands::get_total_unread_count,
-            commands::get_settings,
-            commands::set_theme,
-            commands::add_server,
-            commands::remove_server,
-            commands::set_default_server,
-            commands::set_minimize_to_tray,
-            commands::set_start_minimized,
-            commands::set_notification_method,
-            commands::set_notification_force_display,
-            commands::set_notification_show_actions,
-            commands::set_notification_show_images,
-            commands::set_notification_sound,
-            commands::set_compact_view,
-            commands::set_expand_new_messages,
-            commands::set_delete_local_only,
-            commands::set_favorites_enabled,
-            commands::set_notification_favorite,
-            commands::get_favorite_notifications,
-            commands::sync_subscriptions,
-            // Update
-            commands::check_for_update,
-            commands::install_update,
-            commands::get_app_version,
-            commands::get_app_version_display,
-        ]);
-
-    // Configure TypeScript export to handle i64 as number (safe for timestamps up to year 285,616)
-    let ts_config = Typescript::default().bigint(BigIntExportBehavior::Number);
+    use specta_typescript::Typescript;
 
     let bindings_path = "../ui/src/types/bindings.ts";
 
-    builder
-        .export(ts_config, bindings_path)
+    specta_builder()
+        .export(
+            Typescript::default().header("// @ts-nocheck"),
+            bindings_path,
+        )
         .expect("Failed to export TypeScript bindings");
-
-    // Prepend @ts-nocheck to suppress errors in auto-generated code
-    let contents =
-        std::fs::read_to_string(bindings_path).expect("Failed to read generated bindings");
-    std::fs::write(bindings_path, format!("// @ts-nocheck\n{contents}"))
-        .expect("Failed to write @ts-nocheck to bindings");
 
     println!("TypeScript bindings exported to {bindings_path}");
 }
@@ -107,9 +110,16 @@ pub fn export_bindings() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 #[allow(clippy::expect_used)]
 pub fn run() {
+    // reqwest's `rustls-no-provider` panics on Client build unless a provider is already
+    // installed, and tauri-plugin-updater's reqwest makes the same demand. Err only means
+    // a provider is already installed, which is equally fine.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     // Export TypeScript bindings in debug mode
     #[cfg(debug_assertions)]
     export_bindings();
+
+    let specta = specta_builder();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -278,47 +288,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            // Subscriptions
-            commands::get_subscriptions,
-            commands::add_subscription,
-            commands::remove_subscription,
-            commands::toggle_mute,
-            // Notifications
-            commands::get_notifications,
-            commands::mark_as_read,
-            commands::mark_all_as_read,
-            commands::delete_notification,
-            commands::set_notification_expanded,
-            commands::get_unread_count,
-            commands::get_total_unread_count,
-            // Settings
-            commands::get_settings,
-            commands::set_theme,
-            commands::add_server,
-            commands::remove_server,
-            commands::set_default_server,
-            commands::set_minimize_to_tray,
-            commands::set_start_minimized,
-            commands::set_notification_method,
-            commands::set_notification_force_display,
-            commands::set_notification_show_actions,
-            commands::set_notification_show_images,
-            commands::set_notification_sound,
-            commands::set_compact_view,
-            commands::set_expand_new_messages,
-            commands::set_delete_local_only,
-            commands::set_favorites_enabled,
-            commands::set_notification_favorite,
-            commands::get_favorite_notifications,
-            // Sync
-            commands::sync_subscriptions,
-            // Update
-            commands::check_for_update,
-            commands::install_update,
-            commands::get_app_version,
-            commands::get_app_version_display,
-        ])
+        .invoke_handler(specta.invoke_handler())
         .run(tauri::generate_context!())
         .expect("error while running Ntfier");
 }

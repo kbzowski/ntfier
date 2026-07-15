@@ -1,4 +1,3 @@
-use base64::{engine::general_purpose::STANDARD, Engine};
 use reqwest::Client;
 use serde::Deserialize;
 use std::error::Error as StdError;
@@ -35,12 +34,6 @@ impl NtfyClient {
         Ok(Self { client })
     }
 
-    fn create_auth_header(username: &str, password: &str) -> String {
-        let credentials = format!("{username}:{password}");
-        let encoded = STANDARD.encode(credentials.as_bytes());
-        format!("Basic {encoded}")
-    }
-
     /// Fetch account info including subscriptions from ntfy server
     pub async fn get_account(
         &self,
@@ -51,12 +44,10 @@ impl NtfyClient {
         let url = format!("{}/v1/account", normalize_url(server_url));
         log::info!("Fetching account from: {url}");
 
-        let auth_header = Self::create_auth_header(username, password);
-
         let response = self
             .client
             .get(&url)
-            .header("Authorization", auth_header)
+            .basic_auth(username, Some(password))
             .send()
             .await
             .map_err(|e| {
@@ -119,7 +110,7 @@ impl NtfyClient {
 
         if let (Some(user), Some(pass)) = (username, password) {
             if !user.is_empty() {
-                request = request.header("Authorization", Self::create_auth_header(user, pass));
+                request = request.basic_auth(user, Some(pass));
             }
         }
 
@@ -168,7 +159,7 @@ impl NtfyClient {
         // Add auth header if credentials provided
         if let (Some(user), Some(pass)) = (username, password) {
             if !user.is_empty() {
-                request = request.header("Authorization", Self::create_auth_header(user, pass));
+                request = request.basic_auth(user, Some(pass));
             }
         }
 

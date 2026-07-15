@@ -23,7 +23,6 @@ import {
 	commands,
 	type Notification,
 	type NotificationDisplayMethod,
-	type Result,
 	type ServerConfig,
 	type Subscription,
 	type ThemeMode,
@@ -33,12 +32,12 @@ import {
 // Re-export types for consumers
 export type {
 	AppError,
+	AppSettings,
 	CreateSubscription,
-	ServerConfig,
-	Subscription,
 	Notification,
 	NotificationDisplayMethod,
-	AppSettings,
+	ServerConfig,
+	Subscription,
 	UpdateInfo,
 };
 
@@ -76,6 +75,9 @@ export function getErrorMessage(error: unknown): string {
 
 	return "An unknown error occurred";
 }
+
+// tauri-specta stopped exporting this alias in 2.0.0-rc.25; shape mirrors its `typedError` helper.
+type Result<T, E> = { status: "ok"; data: T } | { status: "error"; error: E };
 
 /**
  * Unwraps a Result from generated bindings, throwing on error.
