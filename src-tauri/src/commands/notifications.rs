@@ -6,7 +6,7 @@ use crate::models::Notification;
 use crate::services::{NtfyClient, TrayManager};
 
 /// Helper to refresh tray icon after unread count changes
-fn refresh_tray(app_handle: AppHandle) {
+pub fn refresh_tray(app_handle: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let tray_manager: tauri::State<TrayManager> = app_handle.state();
         tray_manager.refresh_from_db(&app_handle).await;

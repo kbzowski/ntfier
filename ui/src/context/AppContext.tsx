@@ -399,6 +399,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 					await ignoreRulesApi.add(pattern, subscriptionId);
 					await refreshIgnoreRules();
 					await refreshSubscriptions();
+					await notifications.reloadLoaded();
 				} catch (err) {
 					const classified = classifyError(err);
 					toast.error(classified.userMessage, {
@@ -408,7 +409,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 				}
 			}
 		},
-		[refreshIgnoreRules, refreshSubscriptions],
+		[refreshIgnoreRules, refreshSubscriptions, notifications.reloadLoaded],
 	);
 
 	const deleteIgnoreRule = useCallback(
@@ -418,6 +419,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 					await ignoreRulesApi.delete(id);
 					await refreshIgnoreRules();
 					await refreshSubscriptions();
+					await notifications.reloadLoaded();
 				} catch (err) {
 					const classified = classifyError(err);
 					toast.error(classified.userMessage, {
@@ -427,7 +429,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 				}
 			}
 		},
-		[refreshIgnoreRules, refreshSubscriptions],
+		[refreshIgnoreRules, refreshSubscriptions, notifications.reloadLoaded],
 	);
 
 	// Settings actions

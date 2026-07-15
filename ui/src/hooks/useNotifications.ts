@@ -280,6 +280,12 @@ export function useNotifications(subscriptions: Subscription[]) {
 		});
 	}, []);
 
+	const reloadLoaded = useCallback(async () => {
+		const ids = Array.from(loadedTopicsRef.current);
+		loadedTopicsRef.current.clear();
+		await Promise.all(ids.map(loadForTopic));
+	}, [loadForTopic]);
+
 	/**
 	 * Clears cached notifications for a topic (used when unsubscribing).
 	 */
@@ -395,6 +401,7 @@ export function useNotifications(subscriptions: Subscription[]) {
 		deleteNotification,
 		toggleFavorite,
 		setExpanded,
+		reloadLoaded,
 		clearTopic,
 		getUnreadCount,
 		getTotalUnread,
