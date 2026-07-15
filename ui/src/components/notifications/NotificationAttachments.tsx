@@ -218,7 +218,9 @@ export const NotificationAttachments = memo(function NotificationAttachments({
 		() => new Map(),
 	);
 	const previewErrorsRef = useRef(previewErrors);
-	previewErrorsRef.current = previewErrors;
+	useEffect(() => {
+		previewErrorsRef.current = previewErrors;
+	}, [previewErrors]);
 	const [loadingPreview, setLoadingPreview] = useState<string | null>(null);
 	const [failedImages, setFailedImages] = useState<Set<string>>(
 		() => new Set(),

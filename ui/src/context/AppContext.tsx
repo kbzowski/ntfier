@@ -227,7 +227,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	// Keep a ref to subscriptions so the effect can read the latest value
 	// without depending on the full array
 	const subscriptionsRef = useRef(subscriptions);
-	subscriptionsRef.current = subscriptions;
+	useEffect(() => {
+		subscriptionsRef.current = subscriptions;
+	}, [subscriptions]);
 
 	// Load notifications when topic changes or subscription list changes.
 	// subscriptionIds is intentionally in deps to trigger re-fetch when

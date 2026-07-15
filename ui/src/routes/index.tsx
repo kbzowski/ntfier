@@ -1,5 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense, useCallback, useRef, useState } from "react";
+import {
+	lazy,
+	Suspense,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { useTheme } from "@/components/common/ThemeProvider";
 import { UpdateToast } from "@/components/common/UpdateToast";
 import { AddSubscriptionDialog } from "@/components/dialogs/AddSubscriptionDialog";
@@ -69,7 +76,9 @@ function App() {
 	} = useApp();
 
 	const currentTopicIdRef = useRef(currentTopicId);
-	currentTopicIdRef.current = currentTopicId;
+	useEffect(() => {
+		currentTopicIdRef.current = currentTopicId;
+	}, [currentTopicId]);
 
 	const selectedSubscription = subscriptionsWithUnread.find(
 		(sub) => sub.id === currentTopicId,
