@@ -490,6 +490,26 @@ impl ConnectionManager {
         Self::show_winrt_notification_sync(app_handle, notification, settings, cached_image);
     }
 
+    /// Selects the toast sound, or `None` to silence it.
+    #[cfg(windows)]
+    const fn select_toast_sound(
+        sound_enabled: bool,
+        priority: i32,
+    ) -> Option<tauri_winrt_notification::Sound> {
+        use tauri_winrt_notification::Sound;
+
+        if !sound_enabled {
+            return None;
+        }
+        if priority >= 4 {
+            Some(Sound::SMS)
+        } else if priority >= 3 {
+            Some(Sound::Default)
+        } else {
+            None
+        }
+    }
+
     /// Synchronous part of `WinRT` notification display.
     ///
     /// Separated from async to avoid Send issues with Toast type.
@@ -501,7 +521,7 @@ impl ConnectionManager {
         cached_image: Option<crate::services::image_cache::CachedImage>,
     ) {
         use crate::services::image_cache::ImageOrientation;
-        use tauri_winrt_notification::{Duration, Scenario, Sound, Toast};
+        use tauri_winrt_notification::{Duration, Scenario, Toast};
 
         let title = if notification.title.is_empty() {
             "New notification"
@@ -527,19 +547,12 @@ impl ConnectionManager {
             toast = toast.duration(Duration::Long);
         }
 
-        // Sound based on priority (only if notification_sound is enabled)
-        if settings.notification_sound {
-            let sound = if notification.priority as i32 >= 4 {
-                Some(Sound::SMS) // Louder sound for high priority
-            } else if notification.priority as i32 >= 3 {
-                Some(Sound::Default)
-            } else {
-                None
-            };
-            if let Some(s) = sound {
-                toast = toast.sound(Some(s));
-            }
-        }
+        // Must always be called: an unset audio element makes Windows play the default
+        // toast sound, so silence requires an explicit `.sound(None)`.
+        toast = toast.sound(Self::select_toast_sound(
+            settings.notification_sound,
+            notification.priority as i32,
+        ));
 
         // Action buttons from ntfy (max 3 buttons supported by Windows)
         if settings.notification_show_actions && !notification.actions.is_empty() {
@@ -572,5 +585,43 @@ impl ConnectionManager {
             // Fallback to native notification on error
             Self::show_native_notification(app_handle, notification, Some(settings));
         }
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use tauri_winrt_notification::Sound;
+
+    #[test]
+    fn test_sound_disabled_is_silent_at_every_priority() {
+        for priority in 1..=5 {
+            assert!(
+                ConnectionManager::select_toast_sound(false, priority).is_none(),
+                "priority {priority} must be silent when sound is disabled"
+            );
+        }
+    }
+
+    #[test]
+    fn test_sound_enabled_uses_priority() {
+        assert!(matches!(
+            ConnectionManager::select_toast_sound(true, 5),
+            Some(Sound::SMS)
+        ));
+        assert!(matches!(
+            ConnectionManager::select_toast_sound(true, 4),
+            Some(Sound::SMS)
+        ));
+        assert!(matches!(
+            ConnectionManager::select_toast_sound(true, 3),
+            Some(Sound::Default)
+        ));
+    }
+
+    #[test]
+    fn test_sound_enabled_low_priority_is_silent() {
+        assert!(ConnectionManager::select_toast_sound(true, 2).is_none());
+        assert!(ConnectionManager::select_toast_sound(true, 1).is_none());
     }
 }
