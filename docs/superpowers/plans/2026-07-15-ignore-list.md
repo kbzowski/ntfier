@@ -17,6 +17,7 @@
 - No explanatory comments. Comment only a non-obvious *why*, a known ceiling, or a public API contract.
 - Commit messages must be terse — subject line, at most a short why. A `commit-msg` hook rejects long bodies.
 - `pnpm` only, never `npm`. Rust commands run from `src-tauri/`.
+- There is no root `ui:typecheck` script. Typecheck with `pnpm --filter ui typecheck` — the same command lefthook's `ui-typecheck` hook runs. `ui:lint` and `ui:test` do exist at the root.
 - Never commit to `main`. Work happens on `feat/ignore-list`.
 - A lefthook `pre-commit` hook runs `rust-fmt`, `rust-clippy`, `ui-typecheck`, and `ui-lint` on matching staged files. Do not bypass it.
 
@@ -493,7 +494,7 @@ Expected: `TypeScript bindings exported to ../ui/src/types/bindings.ts`. `git di
 Run: `cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test`
 Expected: no warnings, tests pass.
 
-Run: `pnpm ui:typecheck`
+Run: `pnpm --filter ui typecheck`
 Expected: no errors.
 
 - [ ] **Step 7: Commit**
@@ -627,7 +628,7 @@ Expected: `Notification` in `bindings.ts` gains `ignored: boolean`.
 Run: `cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test`
 Expected: clean.
 
-Run: `pnpm ui:typecheck`
+Run: `pnpm --filter ui typecheck`
 Expected: errors in `ui/src/data/mock-data.ts` if it constructs `Notification` literals — add `ignored: false` to each. Fix until clean.
 
 - [ ] **Step 8: Commit**
@@ -877,7 +878,7 @@ Add `ignoreRules`, `addIgnoreRule`, and `deleteIgnoreRule` to the `AppContextVal
 
 - [ ] **Step 5: Verify**
 
-Run: `pnpm ui:typecheck && pnpm ui:lint`
+Run: `pnpm --filter ui typecheck && pnpm ui:lint`
 Expected: clean.
 
 - [ ] **Step 6: Commit**
@@ -1013,7 +1014,7 @@ Check the `TabsList` layout: if it uses a fixed `grid-cols-4`, change it to `gri
 
 - [ ] **Step 3: Verify**
 
-Run: `pnpm ui:typecheck && pnpm ui:lint`
+Run: `pnpm --filter ui typecheck && pnpm ui:lint`
 Expected: clean.
 
 - [ ] **Step 4: Verify in the running app**
@@ -1247,7 +1248,7 @@ Move the existing `key` up to the wrapper if the card currently carries it.
 
 - [ ] **Step 5: Verify**
 
-Run: `pnpm ui:typecheck && pnpm ui:lint`
+Run: `pnpm --filter ui typecheck && pnpm ui:lint`
 Expected: clean.
 
 - [ ] **Step 6: Verify the whole feature in the running app**
@@ -1275,7 +1276,7 @@ git commit -m "feat: add ignore similar action and show ignored toggle"
 
 - [ ] `cd src-tauri && cargo test` passes.
 - [ ] `cd src-tauri && cargo clippy --all-targets -- -D warnings` is clean.
-- [ ] `pnpm ui:typecheck`, `pnpm ui:lint`, and `pnpm ui:test` pass.
+- [ ] `pnpm --filter ui typecheck`, `pnpm ui:lint`, and `pnpm ui:test` pass.
 - [ ] The Task 7 Step 6 walkthrough was performed against the running app and behaved as described.
 - [ ] `git diff main --stat` touches no file outside the spec's "Files touched" list.
 
