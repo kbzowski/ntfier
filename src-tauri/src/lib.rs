@@ -49,6 +49,10 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::set_notification_expanded,
         commands::get_unread_count,
         commands::get_total_unread_count,
+        // Ignore rules
+        commands::get_ignore_rules,
+        commands::add_ignore_rule,
+        commands::delete_ignore_rule,
         // Settings
         commands::get_settings,
         commands::set_theme,

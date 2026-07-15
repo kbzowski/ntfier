@@ -24,6 +24,9 @@ pub enum AppError {
     #[error("Not found: {0}")]
     NotFound(String),
 
+    #[error("Validation error: {0}")]
+    Validation(String),
+
     #[error("Invalid URL: {0}")]
     InvalidUrl(String),
 

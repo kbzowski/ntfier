@@ -172,7 +172,6 @@ impl From<SubscriptionQueryRow> for Subscription {
 // ===== Ignore rule =====
 
 /// An ignore rule row from the database (for querying).
-#[allow(dead_code)]
 #[derive(Debug, Clone, Queryable, Selectable)]
 #[diesel(table_name = ignore_rules)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -184,7 +183,6 @@ pub struct IgnoreRuleRow {
 }
 
 /// A new ignore rule to insert.
-#[allow(dead_code)]
 #[derive(Debug, Insertable)]
 #[diesel(table_name = ignore_rules)]
 pub struct NewIgnoreRule<'a> {

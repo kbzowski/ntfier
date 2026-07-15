@@ -16,6 +16,9 @@ export const commands = {
 	setNotificationExpanded: (id: string, expanded: boolean) => typedError<null, AppError>(__TAURI_INVOKE("set_notification_expanded", { id, expanded })),
 	getUnreadCount: (subscriptionId: string) => typedError<number, AppError>(__TAURI_INVOKE("get_unread_count", { subscriptionId })),
 	getTotalUnreadCount: () => typedError<number, AppError>(__TAURI_INVOKE("get_total_unread_count")),
+	getIgnoreRules: () => typedError<IgnoreRule[], AppError>(__TAURI_INVOKE("get_ignore_rules")),
+	addIgnoreRule: (pattern: string, subscriptionId: string | null) => typedError<IgnoreRule, AppError>(__TAURI_INVOKE("add_ignore_rule", { pattern, subscriptionId })),
+	deleteIgnoreRule: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_ignore_rule", { id })),
 	getSettings: () => typedError<AppSettings, AppError>(__TAURI_INVOKE("get_settings")),
 	setTheme: (theme: ThemeMode) => typedError<null, AppError>(__TAURI_INVOKE("set_theme", { theme })),
 	addServer: (server: ServerConfig) => typedError<null, AppError>(__TAURI_INVOKE("add_server", { server })),
@@ -77,7 +80,7 @@ export const commands = {
  *  type AppError = { Database: string } | { WebSocket: string } | ...
  *  ```
  */
-export type AppError = ({ Database: string }) & { Connection?: never; Credential?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; WebSocket?: never } | ({ WebSocket: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never } | ({ Serialization: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Updater?: never; WebSocket?: never } | ({ NotFound: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; Serialization?: never; Updater?: never; WebSocket?: never } | ({ InvalidUrl: string }) & { Connection?: never; Credential?: never; Database?: never; NotFound?: never; Serialization?: never; Updater?: never; WebSocket?: never } | ({ Connection: string }) & { Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; WebSocket?: never } | ({ Credential: string }) & { Connection?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; WebSocket?: never } | ({ Updater: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; WebSocket?: never };
+export type AppError = ({ Database: string }) & { Connection?: never; Credential?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ WebSocket: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; Validation?: never } | ({ Serialization: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ NotFound: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Validation: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; WebSocket?: never } | ({ InvalidUrl: string }) & { Connection?: never; Credential?: never; Database?: never; NotFound?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Connection: string }) & { Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Credential: string }) & { Connection?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Updater: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Validation?: never; WebSocket?: never };
 
 /**  Application-wide settings. */
 export type AppSettings = {
@@ -125,6 +128,19 @@ export type CreateSubscription = {
 	topic: string,
 	serverUrl: string,
 	displayName: string | null,
+};
+
+/**
+ *  A rule hiding notifications whose title contains `pattern`.
+ * 
+ *  `subscription_id` of `None` means the rule applies to every topic.
+ */
+export type IgnoreRule = {
+	id: string,
+	pattern: string,
+	subscriptionId: string | null,
+	/**  Unix timestamp in milliseconds. */
+	createdAt: number,
 };
 
 /**  A notification stored in the local database. */
