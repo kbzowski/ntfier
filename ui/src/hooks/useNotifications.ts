@@ -281,10 +281,12 @@ export function useNotifications(subscriptions: Subscription[]) {
 	}, []);
 
 	const reloadLoaded = useCallback(async () => {
-		const ids = Array.from(loadedTopicsRef.current);
+		const ids = Array.from(
+			new Set([...loadedTopicsRef.current, ...byTopic.keys()]),
+		);
 		loadedTopicsRef.current.clear();
 		await Promise.all(ids.map(loadForTopic));
-	}, [loadForTopic]);
+	}, [loadForTopic, byTopic]);
 
 	/**
 	 * Clears cached notifications for a topic (used when unsubscribing).
