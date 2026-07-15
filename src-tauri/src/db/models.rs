@@ -4,7 +4,7 @@
 
 use diesel::prelude::*;
 
-use super::schema::{notifications, servers, settings, subscriptions};
+use super::schema::{ignore_rules, notifications, servers, settings, subscriptions};
 use super::types::{JsonActions, JsonAttachments, JsonTags};
 use crate::models::{Notification, Priority, Subscription};
 
@@ -167,4 +167,29 @@ impl From<SubscriptionQueryRow> for Subscription {
             unread_count: row.unread as i32,
         }
     }
+}
+
+// ===== Ignore rule =====
+
+/// An ignore rule row from the database (for querying).
+#[allow(dead_code)]
+#[derive(Debug, Clone, Queryable, Selectable)]
+#[diesel(table_name = ignore_rules)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct IgnoreRuleRow {
+    pub id: String,
+    pub pattern: String,
+    pub subscription_id: Option<String>,
+    pub created_at: i64,
+}
+
+/// A new ignore rule to insert.
+#[allow(dead_code)]
+#[derive(Debug, Insertable)]
+#[diesel(table_name = ignore_rules)]
+pub struct NewIgnoreRule<'a> {
+    pub id: &'a str,
+    pub pattern: &'a str,
+    pub subscription_id: Option<&'a str>,
+    pub created_at: i64,
 }

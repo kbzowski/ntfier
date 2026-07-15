@@ -45,7 +45,23 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    ignore_rules (id) {
+        id -> Text,
+        pattern -> Text,
+        subscription_id -> Nullable<Text>,
+        created_at -> BigInt,
+    }
+}
+
 diesel::joinable!(subscriptions -> servers (server_id));
 diesel::joinable!(notifications -> subscriptions (subscription_id));
+diesel::joinable!(ignore_rules -> subscriptions (subscription_id));
 
-diesel::allow_tables_to_appear_in_same_query!(notifications, servers, settings, subscriptions,);
+diesel::allow_tables_to_appear_in_same_query!(
+    ignore_rules,
+    notifications,
+    servers,
+    settings,
+    subscriptions,
+);
