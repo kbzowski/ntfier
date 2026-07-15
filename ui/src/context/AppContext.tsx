@@ -394,18 +394,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 	const addIgnoreRule = useCallback(
 		async (pattern: string, subscriptionId: string | null) => {
-			await ignoreRulesApi.add(pattern, subscriptionId);
-			await refreshIgnoreRules();
-			await refreshSubscriptions();
+			if (isTauri()) {
+				await ignoreRulesApi.add(pattern, subscriptionId);
+				await refreshIgnoreRules();
+				await refreshSubscriptions();
+			}
 		},
 		[refreshIgnoreRules, refreshSubscriptions],
 	);
 
 	const deleteIgnoreRule = useCallback(
 		async (id: string) => {
-			await ignoreRulesApi.delete(id);
-			await refreshIgnoreRules();
-			await refreshSubscriptions();
+			if (isTauri()) {
+				await ignoreRulesApi.delete(id);
+				await refreshIgnoreRules();
+				await refreshSubscriptions();
+			}
 		},
 		[refreshIgnoreRules, refreshSubscriptions],
 	);
