@@ -1,4 +1,4 @@
-import { Bell, Palette, Server, Settings2 } from "lucide-react";
+import { Bell, EyeOff, Palette, Server, Settings2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
 	Dialog,
@@ -7,6 +7,8 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { isTauri } from "@/lib/tauri";
+import { cn } from "@/lib/utils";
 import type { ThemeDefinition } from "@/themes";
 import {
 	commands,
@@ -15,7 +17,12 @@ import {
 } from "@/types/bindings";
 import type { ServerConfig } from "@/types/ntfy";
 import { ServerConfigForm } from "./ServerConfigForm";
-import { AppearanceTab, BehaviorTab, NotificationsTab } from "./settings";
+import {
+	AppearanceTab,
+	BehaviorTab,
+	IgnoredTab,
+	NotificationsTab,
+} from "./settings";
 
 interface SettingsDialogProps {
 	open: boolean;
@@ -114,7 +121,12 @@ export function SettingsDialog({
 				</DialogHeader>
 
 				<Tabs defaultValue="appearance">
-					<TabsList className="grid w-full grid-cols-4">
+					<TabsList
+						className={cn(
+							"grid w-full",
+							isTauri() ? "grid-cols-5" : "grid-cols-4",
+						)}
+					>
 						<TabsTrigger value="appearance">
 							<Palette className="h-4 w-4 mr-1.5" />
 							Appearance
@@ -127,6 +139,12 @@ export function SettingsDialog({
 							<Bell className="h-4 w-4 mr-1.5" />
 							Notifications
 						</TabsTrigger>
+						{isTauri() ? (
+							<TabsTrigger value="ignored">
+								<EyeOff className="h-4 w-4" />
+								Ignored
+							</TabsTrigger>
+						) : null}
 						<TabsTrigger value="servers">
 							<Server className="h-4 w-4 mr-1.5" />
 							Servers
@@ -180,6 +198,12 @@ export function SettingsDialog({
 							onNotificationSoundChange={onNotificationSoundChange}
 						/>
 					</TabsContent>
+
+					{isTauri() ? (
+						<TabsContent value="ignored" className="mt-4">
+							<IgnoredTab />
+						</TabsContent>
+					) : null}
 
 					<TabsContent value="servers" className="mt-4">
 						<ServerConfigForm
