@@ -6,7 +6,7 @@
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::db::Database;
-use crate::models::{normalize_url, CreateSubscription};
+use crate::models::{is_ignored, normalize_url, CreateSubscription};
 use crate::services::{ConnectionManager, NtfyClient, TrayManager};
 
 /// Synchronization service for subscriptions and notifications.
@@ -214,6 +214,8 @@ impl SyncService {
 
         let mut new_notifications = Vec::new();
 
+        let rules = db.get_ignore_rules().unwrap_or_default();
+
         for msg in messages {
             if db
                 .notification_exists_by_ntfy_id(msg.ntfy_id())
@@ -225,6 +227,7 @@ impl SyncService {
             let ntfy_id = msg.ntfy_id().to_string();
             let msg_time = msg.time;
             let mut notification = msg.into_notification(sub.id.clone());
+            notification.ignored = is_ignored(&notification.title, &notification.topic_id, &rules);
 
             // Auto-mark as read for muted topics
             if sub.muted {
@@ -253,7 +256,7 @@ impl SyncService {
                 log::error!("Failed to emit notification event: {e}");
             }
 
-            if !sub.muted {
+            if !sub.muted && !notification.ignored {
                 ConnectionManager::show_notification(handle, notification).await;
             }
         }

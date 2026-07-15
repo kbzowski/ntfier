@@ -98,6 +98,7 @@ impl NotificationRow {
             read: self.read == 1,
             is_expanded: self.is_expanded == 1,
             is_favorite: self.is_favorite == 1,
+            ignored: false,
         }
     }
 }

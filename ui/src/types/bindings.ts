@@ -164,6 +164,11 @@ export type Notification = {
 	isExpanded: boolean,
 	/**  Whether the notification is marked as favorite. */
 	isFavorite: boolean,
+	/**
+	 *  Whether an ignore rule currently hides this notification.
+	 *  Computed on read, never stored.
+	 */
+	ignored: boolean,
 };
 
 /**  An action button attached to a notification. */

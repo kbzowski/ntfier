@@ -27,7 +27,6 @@ impl IgnoreRule {
 }
 
 /// Returns whether a notification title is hidden by any rule.
-#[allow(dead_code)]
 pub fn is_ignored(title: &str, topic_id: &str, rules: &[IgnoreRule]) -> bool {
     if rules.is_empty() {
         return false;

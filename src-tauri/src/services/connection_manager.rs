@@ -21,8 +21,8 @@ use crate::config::connection::{JITTER_MAX_SECS, RETRY_BACKOFF_SECS};
 use crate::db::Database;
 use crate::error::AppError;
 use crate::models::{
-    normalize_url, Notification, NotificationDisplayMethod, NotificationSettings, NtfyMessage,
-    Subscription,
+    is_ignored, normalize_url, Notification, NotificationDisplayMethod, NotificationSettings,
+    NtfyMessage, Subscription,
 };
 use crate::services::TrayManager;
 
@@ -315,6 +315,10 @@ impl ConnectionManager {
             notification.read = true;
         }
 
+        let rules = db.get_ignore_rules().unwrap_or_default();
+        let ignored = is_ignored(&notification.title, &notification.topic_id, &rules);
+        notification.ignored = ignored;
+
         if let Err(e) = db.insert_notification_with_ntfy_id(&notification, &ntfy_id) {
             log::error!("Failed to save notification: {e}");
         }
@@ -327,7 +331,7 @@ impl ConnectionManager {
         let tray_manager: tauri::State<TrayManager> = app_handle.state();
         tray_manager.refresh_from_db(app_handle).await;
 
-        if !is_muted {
+        if !is_muted && !ignored {
             let handle = app_handle.clone();
             let notif = notification.clone();
             tokio::spawn(async move {

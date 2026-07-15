@@ -7,7 +7,7 @@ use crate::db::models::{NewNotification, NotificationRow};
 use crate::db::schema::{notifications, subscriptions};
 use crate::db::types::{JsonActions, JsonAttachments, JsonTags};
 use crate::error::AppError;
-use crate::models::Notification;
+use crate::models::{is_ignored, Notification};
 
 impl Database {
     /// Gets all notifications for a subscription, ordered by timestamp descending.
@@ -15,6 +15,8 @@ impl Database {
         &self,
         subscription_id: &str,
     ) -> Result<Vec<Notification>, AppError> {
+        let rules = self.get_ignore_rules()?;
+
         let mut conn = self.conn()?;
 
         let rows: Vec<NotificationRow> = notifications::table
@@ -25,6 +27,10 @@ impl Database {
         Ok(rows
             .into_iter()
             .map(NotificationRow::into_notification)
+            .map(|mut n| {
+                n.ignored = is_ignored(&n.title, &n.topic_id, &rules);
+                n
+            })
             .collect())
     }
 
@@ -150,6 +156,8 @@ impl Database {
 
     /// Gets all favorite notifications, ordered by timestamp descending.
     pub fn get_favorite_notifications(&self) -> Result<Vec<Notification>, AppError> {
+        let rules = self.get_ignore_rules()?;
+
         let mut conn = self.conn()?;
 
         let rows: Vec<NotificationRow> = notifications::table
@@ -160,6 +168,10 @@ impl Database {
         Ok(rows
             .into_iter()
             .map(NotificationRow::into_notification)
+            .map(|mut n| {
+                n.ignored = is_ignored(&n.title, &n.topic_id, &rules);
+                n
+            })
             .collect())
     }
 

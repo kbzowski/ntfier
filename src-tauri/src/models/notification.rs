@@ -56,6 +56,9 @@ pub struct Notification {
     pub is_expanded: bool,
     /// Whether the notification is marked as favorite.
     pub is_favorite: bool,
+    /// Whether an ignore rule currently hides this notification.
+    /// Computed on read, never stored.
+    pub ignored: bool,
 }
 
 /// An action button attached to a notification.
@@ -181,6 +184,7 @@ impl NtfyMessage {
             read: false,
             is_expanded: false,
             is_favorite: false,
+            ignored: false,
         }
     }
 
