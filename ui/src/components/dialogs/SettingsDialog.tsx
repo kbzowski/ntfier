@@ -141,7 +141,7 @@ export function SettingsDialog({
 						</TabsTrigger>
 						{isTauri() ? (
 							<TabsTrigger value="ignored">
-								<EyeOff className="h-4 w-4" />
+								<EyeOff className="h-4 w-4 mr-1.5" />
 								Ignored
 							</TabsTrigger>
 						) : null}

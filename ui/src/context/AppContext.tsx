@@ -395,9 +395,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const addIgnoreRule = useCallback(
 		async (pattern: string, subscriptionId: string | null) => {
 			if (isTauri()) {
-				await ignoreRulesApi.add(pattern, subscriptionId);
-				await refreshIgnoreRules();
-				await refreshSubscriptions();
+				try {
+					await ignoreRulesApi.add(pattern, subscriptionId);
+					await refreshIgnoreRules();
+					await refreshSubscriptions();
+				} catch (err) {
+					const classified = classifyError(err);
+					toast.error(classified.userMessage, {
+						description: "Failed to add ignore rule",
+					});
+					console.error("[Add ignore rule error]", err);
+				}
 			}
 		},
 		[refreshIgnoreRules, refreshSubscriptions],
@@ -406,9 +414,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const deleteIgnoreRule = useCallback(
 		async (id: string) => {
 			if (isTauri()) {
-				await ignoreRulesApi.delete(id);
-				await refreshIgnoreRules();
-				await refreshSubscriptions();
+				try {
+					await ignoreRulesApi.delete(id);
+					await refreshIgnoreRules();
+					await refreshSubscriptions();
+				} catch (err) {
+					const classified = classifyError(err);
+					toast.error(classified.userMessage, {
+						description: "Failed to delete ignore rule",
+					});
+					console.error("[Delete ignore rule error]", err);
+				}
 			}
 		},
 		[refreshIgnoreRules, refreshSubscriptions],
