@@ -43,4 +43,4 @@ export interface ThemeDefinition {
 }
 
 // All themes array
-export { getDarkThemes, getLightThemes, getThemeById, themes } from "./presets";
+export { getThemeById, themes } from "./presets";

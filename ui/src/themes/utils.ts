@@ -10,7 +10,4 @@ export {
 	saveThemePreferences,
 	THEME_STORAGE_KEY,
 } from "./storage";
-export {
-	getSystemPreference,
-	onSystemPreferenceChange,
-} from "./systemPreference";
+export { getSystemPreference } from "./systemPreference";

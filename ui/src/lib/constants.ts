@@ -35,5 +35,3 @@ export const PRIORITY_CONFIG: Record<
 			"bg-red-500/20 text-red-500 border-red-500/30 hover:bg-red-500/30",
 	},
 } as const;
-
-export const DEFAULT_SERVER_URL = "https://ntfy.sh";

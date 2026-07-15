@@ -53,17 +53,3 @@ const themeMap = new Map<string, ThemeDefinition>(
 export function getThemeById(id: string): ThemeDefinition | undefined {
 	return themeMap.get(id);
 }
-
-/**
- * Get all light themes (for system preference matching)
- */
-export function getLightThemes(): ThemeDefinition[] {
-	return themes.filter((theme) => !theme.isDark);
-}
-
-/**
- * Get all dark themes (for system preference matching)
- */
-export function getDarkThemes(): ThemeDefinition[] {
-	return themes.filter((theme) => theme.isDark);
-}

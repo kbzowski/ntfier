@@ -2,35 +2,6 @@ import { type RefObject, useState } from "react";
 import { useLazyImage } from "@/hooks/useLazyImage";
 import { cn } from "@/lib/utils";
 
-interface LazyImageProps {
-	src: string;
-	alt: string;
-	className?: string;
-	placeholderClassName?: string;
-}
-
-/**
- * Basic lazy-loaded image that shows a placeholder until in view.
- */
-export function LazyImage({
-	src,
-	alt,
-	className,
-	placeholderClassName = "h-32 bg-muted animate-pulse",
-}: LazyImageProps) {
-	const { ref, isInView } = useLazyImage();
-
-	return (
-		<div ref={ref as RefObject<HTMLDivElement>}>
-			{isInView ? (
-				<img src={src} alt={alt} className={className} />
-			) : (
-				<div className={placeholderClassName} />
-			)}
-		</div>
-	);
-}
-
 interface LazyImageWithFallbackProps {
 	src: string;
 	alt?: string;

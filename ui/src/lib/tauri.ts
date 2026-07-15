@@ -9,7 +9,6 @@
  */
 
 import { isTauri as isTauriCore } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
 	disable as autostartDisable,
 	enable as autostartEnable,
@@ -240,25 +239,6 @@ export const syncApi = {
 	/** Sync subscriptions from a server with credentials */
 	syncSubscriptions: async (serverUrl: string) =>
 		unwrap(await commands.syncSubscriptions(serverUrl)),
-};
-
-// ===== Event Listeners =====
-
-export const events = {
-	onNewNotification: (
-		callback: (notification: Notification) => void,
-	): Promise<UnlistenFn> =>
-		listen<Notification>("notification:new", (event) =>
-			callback(event.payload),
-		),
-
-	onSubscriptionsSynced: (callback: () => void): Promise<UnlistenFn> =>
-		listen<void>("subscriptions:synced", () => callback()),
-
-	onNavigateSubscription: (
-		callback: (subscriptionId: string) => void,
-	): Promise<UnlistenFn> =>
-		listen<string>("navigate:subscription", (event) => callback(event.payload)),
 };
 
 // ===== Autostart API =====
