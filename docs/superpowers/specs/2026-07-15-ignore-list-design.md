@@ -136,6 +136,17 @@ intended — the badge reflects what the user needs to act on.
 
 ## UI
 
+**Requires the Tauri backend.** The matching predicate lives only in Rust, and
+`ignored` is computed there. Outside Tauri — the mock-data mode behind
+`pnpm ui:dev` — no rule could ever hide anything, because `mock-data.ts`
+literals carry `ignored: false` and nothing recomputes it.
+
+So the whole surface is hidden when `isTauri()` is false: no "Ignored" tab, no
+"Ignore similar" menu item. The alternative — showing the UI and letting a rule
+appear in a list while hiding nothing — would lie about working. Making mock
+mode genuinely work would mean a second copy of the predicate in TypeScript,
+which is exactly what this design refuses.
+
 **Settings tab "Ignored"** — a fifth tab in `SettingsDialog.tsx`, alongside
 appearance / behavior / notifications / servers. Kept separate rather than
 folded into `NotificationsTab` because it is a standalone management surface,

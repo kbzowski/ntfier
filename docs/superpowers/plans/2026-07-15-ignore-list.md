@@ -991,26 +991,32 @@ export function IgnoredTab() {
 
 Export it from `ui/src/components/dialogs/settings/index.ts` following the existing lines.
 
-- [ ] **Step 2: Add the tab to the dialog**
+- [ ] **Step 2: Add the tab to the dialog, gated on `isTauri()`**
 
-In `ui/src/components/dialogs/SettingsDialog.tsx`, import `EyeOff` from `lucide-react` and add a trigger after the `notifications` one:
+The ignore list requires the Rust backend: the predicate lives only there, so outside Tauri no rule could hide anything. Render the trigger and its content only when `isTauri()` is true — showing a tab that silently does nothing would lie about working.
+
+In `ui/src/components/dialogs/SettingsDialog.tsx`, import `EyeOff` from `lucide-react` and `isTauri` from `@/lib/tauri`, then add a trigger after the `notifications` one:
 
 ```tsx
-						<TabsTrigger value="ignored">
-							<EyeOff className="h-4 w-4" />
-							Ignored
-						</TabsTrigger>
+						{isTauri() ? (
+							<TabsTrigger value="ignored">
+								<EyeOff className="h-4 w-4" />
+								Ignored
+							</TabsTrigger>
+						) : null}
 ```
 
 And the content after the `notifications` content:
 
 ```tsx
-					<TabsContent value="ignored" className="mt-4">
-						<IgnoredTab />
-					</TabsContent>
+					{isTauri() ? (
+						<TabsContent value="ignored" className="mt-4">
+							<IgnoredTab />
+						</TabsContent>
+					) : null}
 ```
 
-Check the `TabsList` layout: if it uses a fixed `grid-cols-4`, change it to `grid-cols-5`.
+Check the `TabsList` layout: if it uses a fixed `grid-cols-4`, it must become `grid-cols-5` only when the tab is shown, otherwise the four remaining tabs stretch wrong outside Tauri. Derive the class from `isTauri()` rather than hardcoding either value.
 
 - [ ] **Step 3: Verify**
 
@@ -1157,17 +1163,21 @@ In `ui/src/components/notifications/NotificationCard.tsx`, add state near the ot
 	const [ignoreDialogOpen, setIgnoreDialogOpen] = useState(false);
 ```
 
-Add an item to `contextMenuContent` after the copy items:
+Add an item to `contextMenuContent` after the copy items, gated on `isTauri()` for the same reason as the settings tab — the predicate lives only in Rust, so outside Tauri the action could not hide anything:
 
 ```tsx
-			<ContextMenuItem
-				disabled={!notification.title}
-				onClick={() => setIgnoreDialogOpen(true)}
-			>
-				<EyeOff />
-				Ignore similar
-			</ContextMenuItem>
+			{isTauri() ? (
+				<ContextMenuItem
+					disabled={!notification.title}
+					onClick={() => setIgnoreDialogOpen(true)}
+				>
+					<EyeOff />
+					Ignore similar
+				</ContextMenuItem>
+			) : null}
 ```
+
+Import `isTauri` from `@/lib/tauri`. Render `<IgnoreRuleDialog>` only when `isTauri()` too — an unreachable dialog should not mount.
 
 Render the dialog alongside the card in both return branches (the collapsible one and the plain one), as a sibling of `<ContextMenu>`:
 
