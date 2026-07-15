@@ -95,11 +95,40 @@ The filter applies in four places.
    free: no query parameter, no refetch, just a `filter` over data already in
    memory. Safe because the list is not paginated.
 
-4. **Unread counts** — `get_unread_count` and `get_total_unread_count` must
-   exclude ignored messages **regardless of the toggle**. Otherwise the tray
-   icon lights up for a message the user cannot find. This is the only place
-   where `count_star()` gives way to counting in Rust; with rules numbering in
-   the tens, the cost is irrelevant.
+4. **Unread counts** — must exclude ignored messages **regardless of the
+   toggle**. Otherwise the tray icon lights up for a message the user cannot
+   find.
+
+   Unread counts are not computed in one place. They are computed in five, and
+   each must be handled:
+
+   | Consumer | Source | Site |
+   | --- | --- | --- |
+   | Sidebar per-topic badge | in-memory count when the topic is loaded, else `sub.unreadCount` | `AppContext.tsx:617-624` |
+   | Header total | sums `s.unreadCount` over non-muted subs | `AppLayout.tsx:63-69` |
+   | "(N unread)" above the list | in-memory count over the list | `NotificationList.tsx:156-162` |
+   | Tray icon | `get_total_unread_count()` | `tray_manager.rs:167` |
+   | `get_unread_count` | registered command, **not called by the UI** | `lib.rs:50` |
+
+   The UI-side counts (`AppContext`, `AppLayout`, `NotificationList`) filter on
+   the `ignored` flag they already receive — no new data needed.
+
+   The Rust-side counts are the awkward ones. `sub.unreadCount` comes from the
+   `unread` subquery inside `SUBSCRIPTION_BASE_QUERY` (`subscriptions.rs:17`),
+   raw SQL. Adding rule matching there in SQL is not viable: Diesel's
+   `sql_query().bind()` returns a new type per call, so a variable number of
+   patterns cannot be bound in a loop, and interpolating them as literals would
+   be an injection hole.
+
+   Therefore both Rust-side counts are computed in Rust, not SQL: load
+   `(subscription_id, title)` for unread rows, apply `is_ignored`, count into a
+   `HashMap`. **When the rules list is empty — the default case — the whole step
+   is skipped and behaviour is byte-identical to today.** With rules numbering in
+   the tens and no pagination, the cost is irrelevant.
+
+   `get_unread_count` is updated for consistency even though nothing calls it;
+   leaving one count function with different semantics than its siblings is how
+   a future caller acquires a bug.
 
 Point 4 has a visible consequence worth stating explicitly: with "show ignored"
 on, a dimmed message may appear unread yet not be counted in the badge. This is
@@ -160,7 +189,10 @@ Rust:
 - `src/db/schema.rs` — `ignore_rules` table, joinable to `subscriptions`
 - `src/db/models.rs` — `IgnoreRuleRow`, `NewIgnoreRule`
 - `src/db/queries/ignore_rules.rs` (new) + `src/db/queries/mod.rs`
-- `src/db/queries/notifications.rs` — `ignored` on list, counts exclude ignored
+- `src/db/queries/notifications.rs` — `ignored` on list, `get_unread_count` and
+  `get_total_unread_count` exclude ignored
+- `src/db/queries/subscriptions.rs` — override the `unread` subquery result of
+  `SUBSCRIPTION_BASE_QUERY` when rules exist
 - `src/models/notification.rs` — computed `ignored` field
 - `src/commands/ignore_rules.rs` (new) + `src/commands/mod.rs` + specta registration
 - `src/services/connection_manager.rs` — suppress toast
@@ -173,7 +205,8 @@ UI:
 - `ui/src/components/dialogs/settings/IgnoredTab.tsx` (new)
 - `ui/src/components/notifications/NotificationCard.tsx` — menu item + dialog
 - `ui/src/components/notifications/NotificationList.tsx` — toggle in the inline
-  `NotificationListHeader`, plus the `filter` it drives
+  `NotificationListHeader`, the `filter` it drives, and the unread count
+- `ui/src/hooks/useNotifications.ts` — `getUnreadCount` excludes ignored
 
 ## Out of scope
 
