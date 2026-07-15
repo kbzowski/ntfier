@@ -33,6 +33,9 @@ jobs:
       - name: Lint
         run: pnpm --filter ui check
 
+      - name: Typecheck
+        run: pnpm --filter ui typecheck
+
   lint-rust:
     name: Lint Rust
     runs-on: windows-latest

@@ -14,3 +14,8 @@ pre-commit:
       glob: "ui/src/**/*.{js,jsx,ts,tsx,json,css}"
       run: pnpm biome check --write --unsafe --staged --no-errors-on-unmatched
       stage_fixed: true
+
+    ui-typecheck:
+      root: "ui"
+      glob: "ui/**/*.{ts,tsx}"
+      run: pnpm typecheck
