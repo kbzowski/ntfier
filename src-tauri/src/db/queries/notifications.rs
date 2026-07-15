@@ -212,33 +212,69 @@ impl Database {
         Ok(())
     }
 
-    /// Gets the unread count for a subscription.
+    /// Gets the unread count for a subscription, excluding ignored notifications.
     pub fn get_unread_count(&self, subscription_id: &str) -> Result<i32, AppError> {
         use diesel::dsl::count_star;
 
+        let rules = self.get_ignore_rules()?;
+
         let mut conn = self.conn()?;
 
-        let count: i64 = notifications::table
+        if rules.is_empty() {
+            let count: i64 = notifications::table
+                .filter(notifications::subscription_id.eq(subscription_id))
+                .filter(notifications::read.eq(0))
+                .select(count_star())
+                .first(&mut *conn)?;
+
+            return Ok(count as i32);
+        }
+
+        let titles: Vec<Option<String>> = notifications::table
             .filter(notifications::subscription_id.eq(subscription_id))
             .filter(notifications::read.eq(0))
-            .select(count_star())
-            .first(&mut *conn)?;
+            .select(notifications::title)
+            .load(&mut *conn)?;
+
+        let count = titles
+            .into_iter()
+            .filter(|t| !is_ignored(t.as_deref().unwrap_or(""), subscription_id, &rules))
+            .count();
 
         Ok(count as i32)
     }
 
-    /// Gets the total unread count across all non-muted subscriptions.
+    /// Gets the total unread count across all non-muted subscriptions,
+    /// excluding ignored notifications.
     pub fn get_total_unread_count(&self) -> Result<i32, AppError> {
         use diesel::dsl::count_star;
 
+        let rules = self.get_ignore_rules()?;
+
         let mut conn = self.conn()?;
 
-        let count: i64 = notifications::table
+        if rules.is_empty() {
+            let count: i64 = notifications::table
+                .inner_join(subscriptions::table)
+                .filter(notifications::read.eq(0))
+                .filter(subscriptions::muted.eq(0))
+                .select(count_star())
+                .first(&mut *conn)?;
+
+            return Ok(count as i32);
+        }
+
+        let rows: Vec<(String, Option<String>)> = notifications::table
             .inner_join(subscriptions::table)
             .filter(notifications::read.eq(0))
             .filter(subscriptions::muted.eq(0))
-            .select(count_star())
-            .first(&mut *conn)?;
+            .select((notifications::subscription_id, notifications::title))
+            .load(&mut *conn)?;
+
+        let count = rows
+            .into_iter()
+            .filter(|(sub_id, title)| !is_ignored(title.as_deref().unwrap_or(""), sub_id, &rules))
+            .count();
 
         Ok(count as i32)
     }

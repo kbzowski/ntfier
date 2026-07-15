@@ -3,12 +3,13 @@
 use diesel::prelude::*;
 use diesel::sql_query;
 use diesel::Connection;
+use std::collections::HashMap;
 
 use crate::db::connection::Database;
 use crate::db::models::{NewServer, NewSubscription, SubscriptionQueryRow};
-use crate::db::schema::{servers, subscriptions};
+use crate::db::schema::{notifications, servers, subscriptions};
 use crate::error::AppError;
-use crate::models::{CreateSubscription, Subscription};
+use crate::models::{is_ignored, CreateSubscription, Subscription};
 
 /// Base SELECT/FROM/JOIN shared by all subscription queries.
 const SUBSCRIPTION_BASE_QUERY: &str = "\
@@ -21,12 +22,35 @@ const SUBSCRIPTION_BASE_QUERY: &str = "\
 impl Database {
     /// Returns all subscriptions ordered by most recent notification.
     pub fn get_all_subscriptions(&self) -> Result<Vec<Subscription>, AppError> {
+        let rules = self.get_ignore_rules()?;
+
         let mut conn = self.conn()?;
 
         let query = format!("{SUBSCRIPTION_BASE_QUERY} ORDER BY last_notif DESC NULLS LAST");
         let rows: Vec<SubscriptionQueryRow> = sql_query(query).load(&mut *conn)?;
+        let mut subs: Vec<Subscription> = rows.into_iter().map(Subscription::from).collect();
 
-        Ok(rows.into_iter().map(Subscription::from).collect())
+        if rules.is_empty() {
+            return Ok(subs);
+        }
+
+        let unread_rows: Vec<(String, Option<String>)> = notifications::table
+            .filter(notifications::read.eq(0))
+            .select((notifications::subscription_id, notifications::title))
+            .load(&mut *conn)?;
+
+        let mut counts: HashMap<String, i32> = HashMap::new();
+        for (sub_id, title) in unread_rows {
+            if !is_ignored(title.as_deref().unwrap_or(""), &sub_id, &rules) {
+                *counts.entry(sub_id).or_default() += 1;
+            }
+        }
+
+        for sub in &mut subs {
+            sub.unread_count = counts.get(&sub.id).copied().unwrap_or(0);
+        }
+
+        Ok(subs)
     }
 
     /// Gets a subscription with its last sync timestamp.
