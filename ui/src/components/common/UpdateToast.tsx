@@ -1,5 +1,4 @@
-import Download from "lucide-react/dist/esm/icons/download";
-import X from "lucide-react/dist/esm/icons/x";
+import { Download, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { UpdateInfo } from "@/types/ntfy";

@@ -16,10 +16,9 @@
     "prepare": "lefthook install"
   },
   "devDependencies": {
-    "@evilmartians/lefthook": "^2.1.0",
-    "@tauri-apps/cli": "^2.10.0",
+    "@evilmartians/lefthook": "^2.1.10",
+    "@tauri-apps/cli": "^2.11.4",
     "dotenv-cli": "^11.0.0",
-    "rimraf": "^6"
-  },
-  "dependencies": {}
+    "rimraf": "^6.1.3"
+  }
 }

@@ -1,7 +1,4 @@
-import CheckCheck from "lucide-react/dist/esm/icons/check-check";
-import Hash from "lucide-react/dist/esm/icons/hash";
-import Inbox from "lucide-react/dist/esm/icons/inbox";
-import Star from "lucide-react/dist/esm/icons/star";
+import { CheckCheck, Hash, Inbox, Star } from "lucide-react";
 import {
 	memo,
 	type ReactNode,
@@ -171,9 +168,9 @@ export const NotificationList = memo(function NotificationList({
 	const showTopicName = isAllView || isFavoritesView;
 	const headerTitle = isFavoritesView
 		? "Favorites"
-		: isAllView
-			? "All Notifications"
-			: subscription?.displayName || subscription?.topic;
+		: subscription
+			? subscription.displayName || subscription.topic
+			: "All Notifications";
 
 	return (
 		<div className="flex-1 flex flex-col min-h-0 overflow-hidden">

@@ -1,6 +1,4 @@
-import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
-import Star from "lucide-react/dist/esm/icons/star";
-import Trash2 from "lucide-react/dist/esm/icons/trash-2";
+import { ChevronRight, Star, Trash2 } from "lucide-react";
 import { type MouseEvent, memo } from "react";
 import { cn } from "@/lib/utils";
 import { PriorityBadge } from "./PriorityBadge";

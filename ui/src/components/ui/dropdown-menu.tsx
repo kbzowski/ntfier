@@ -1,7 +1,9 @@
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
-import CheckIcon from "lucide-react/dist/esm/icons/check";
-import ChevronRightIcon from "lucide-react/dist/esm/icons/chevron-right";
-import CircleIcon from "lucide-react/dist/esm/icons/circle";
+import {
+	Check as CheckIcon,
+	ChevronRight as ChevronRightIcon,
+	Circle as CircleIcon,
+} from "lucide-react";
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -240,18 +242,18 @@ function DropdownMenuSubContent({
 
 export {
 	DropdownMenu,
-	DropdownMenuPortal,
-	DropdownMenuTrigger,
+	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
 	DropdownMenuGroup,
-	DropdownMenuLabel,
 	DropdownMenuItem,
-	DropdownMenuCheckboxItem,
+	DropdownMenuLabel,
+	DropdownMenuPortal,
 	DropdownMenuRadioGroup,
 	DropdownMenuRadioItem,
 	DropdownMenuSeparator,
 	DropdownMenuShortcut,
 	DropdownMenuSub,
-	DropdownMenuSubTrigger,
 	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
+	DropdownMenuTrigger,
 };

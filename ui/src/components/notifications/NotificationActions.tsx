@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-shell";
-import ExternalLink from "lucide-react/dist/esm/icons/external-link";
+import { ExternalLink } from "lucide-react";
 import { memo, useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";

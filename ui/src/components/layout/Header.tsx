@@ -1,5 +1,4 @@
-import Bell from "lucide-react/dist/esm/icons/bell";
-import Menu from "lucide-react/dist/esm/icons/menu";
+import { Bell, Menu } from "lucide-react";
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import {

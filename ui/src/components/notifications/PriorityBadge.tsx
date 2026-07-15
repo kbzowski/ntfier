@@ -1,9 +1,11 @@
 import type { LucideIcon } from "lucide-react";
-import AlertTriangle from "lucide-react/dist/esm/icons/alert-triangle";
-import ArrowDown from "lucide-react/dist/esm/icons/arrow-down";
-import ArrowDownRight from "lucide-react/dist/esm/icons/arrow-down-right";
-import ArrowUpRight from "lucide-react/dist/esm/icons/arrow-up-right";
-import Minus from "lucide-react/dist/esm/icons/minus";
+import {
+	AlertTriangle,
+	ArrowDown,
+	ArrowDownRight,
+	ArrowUpRight,
+	Minus,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PRIORITY_CONFIG } from "@/lib/constants";
 import { cn } from "@/lib/utils";

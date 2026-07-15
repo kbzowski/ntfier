@@ -1,5 +1,4 @@
-import Inbox from "lucide-react/dist/esm/icons/inbox";
-import Star from "lucide-react/dist/esm/icons/star";
+import { Inbox, Star } from "lucide-react";
 import { memo, type ReactNode, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";

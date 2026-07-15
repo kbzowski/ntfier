@@ -1,7 +1,4 @@
-import Check from "lucide-react/dist/esm/icons/check";
-import LayoutList from "lucide-react/dist/esm/icons/layout-list";
-import Monitor from "lucide-react/dist/esm/icons/monitor";
-import Star from "lucide-react/dist/esm/icons/star";
+import { Check, LayoutList, Monitor, Star } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { SettingCheckbox } from "@/components/ui/setting-checkbox";
