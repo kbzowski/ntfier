@@ -17,12 +17,14 @@ import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { classifyError } from "@/lib/error-classification";
 import {
 	autostartApi,
+	ignoreRulesApi,
 	isTauri,
 	notificationsApi,
 	settingsApi,
 	subscriptionsApi,
 	syncApi,
 } from "@/lib/tauri";
+import type { IgnoreRule } from "@/types/bindings";
 import type {
 	AppSettings,
 	Notification,
@@ -37,6 +39,9 @@ interface AppState {
 	// Subscriptions
 	subscriptions: Subscription[];
 	subscriptionsLoading: boolean;
+
+	// Ignore rules
+	ignoreRules: IgnoreRule[];
 
 	// Notifications (keyed by subscription ID)
 	notificationsByTopic: Map<string, Notification[]>;
@@ -62,6 +67,13 @@ interface AppActions {
 	removeSubscription: (id: string) => Promise<void>;
 	toggleMute: (id: string) => Promise<void>;
 	refreshSubscriptions: () => Promise<void>;
+
+	// Ignore rules
+	addIgnoreRule: (
+		pattern: string,
+		subscriptionId: string | null,
+	) => Promise<void>;
+	deleteIgnoreRule: (id: string) => Promise<void>;
 
 	// Topic selection
 	setCurrentTopicId: (id: string | null) => void;
@@ -152,12 +164,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	// State
 	const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
 	const [subscriptionsLoading, setSubscriptionsLoading] = useState(true);
+	const [ignoreRules, setIgnoreRules] = useState<IgnoreRule[]>([]);
 	const [currentTopicId, setCurrentTopicId] = useState<string | null>(null);
 	const [currentView, setCurrentView] = useState<"all" | "favorites">("all");
 	const [settings, setSettings] = useState<AppSettings>(mockSettings);
 	const [settingsLoading, setSettingsLoading] = useState(true);
 	const [autostart, setAutostartState] = useState(false);
 	const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+
+	const refreshIgnoreRules = useCallback(async () => {
+		try {
+			if (isTauri()) {
+				setIgnoreRules(await ignoreRulesApi.getAll());
+			}
+		} catch (err) {
+			console.error("Failed to refresh ignore rules:", err);
+		}
+	}, []);
 
 	// Notification management via custom hook
 	const notifications = useNotifications(subscriptions);
@@ -192,7 +215,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			}
 		};
 		loadData();
-	}, []);
+		refreshIgnoreRules();
+	}, [refreshIgnoreRules]);
 
 	// Stable key that only changes when subscription IDs change
 	const subscriptionIds = useMemo(
@@ -367,6 +391,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			console.error("Failed to refresh subscriptions:", err);
 		}
 	}, []);
+
+	const addIgnoreRule = useCallback(
+		async (pattern: string, subscriptionId: string | null) => {
+			await ignoreRulesApi.add(pattern, subscriptionId);
+			await refreshIgnoreRules();
+			await refreshSubscriptions();
+		},
+		[refreshIgnoreRules, refreshSubscriptions],
+	);
+
+	const deleteIgnoreRule = useCallback(
+		async (id: string) => {
+			await ignoreRulesApi.delete(id);
+			await refreshIgnoreRules();
+			await refreshSubscriptions();
+		},
+		[refreshIgnoreRules, refreshSubscriptions],
+	);
 
 	// Settings actions
 	const setTheme = useCallback(async (theme: ThemeMode) => {
@@ -628,6 +670,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			// State
 			subscriptions,
 			subscriptionsLoading,
+			ignoreRules,
 			notificationsByTopic: notifications.byTopic,
 			currentTopicId,
 			currentView,
@@ -641,6 +684,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			removeSubscription,
 			toggleMute,
 			refreshSubscriptions,
+			addIgnoreRule,
+			deleteIgnoreRule,
 			setCurrentTopicId,
 			setCurrentView,
 			markAsRead: notifications.markAsRead,
@@ -677,6 +722,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		[
 			subscriptions,
 			subscriptionsLoading,
+			ignoreRules,
 			notifications.byTopic,
 			currentTopicId,
 			currentView,
@@ -688,6 +734,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			removeSubscription,
 			toggleMute,
 			refreshSubscriptions,
+			addIgnoreRule,
+			deleteIgnoreRule,
 			notifications.markAsRead,
 			notifications.markAllAsRead,
 			notifications.markAllAsReadGlobally,

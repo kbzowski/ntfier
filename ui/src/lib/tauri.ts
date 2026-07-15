@@ -21,6 +21,7 @@ import {
 	type AppSettings,
 	type CreateSubscription,
 	commands,
+	type IgnoreRule,
 	type Notification,
 	type NotificationDisplayMethod,
 	type ServerConfig,
@@ -34,6 +35,7 @@ export type {
 	AppError,
 	AppSettings,
 	CreateSubscription,
+	IgnoreRule,
 	Notification,
 	NotificationDisplayMethod,
 	ServerConfig,
@@ -114,6 +116,19 @@ export const subscriptionsApi = {
 	},
 
 	toggleMute: async (id: string) => unwrap(await commands.toggleMute(id)),
+};
+
+// ===== Ignore Rules API =====
+
+export const ignoreRulesApi = {
+	getAll: async () => unwrap(await commands.getIgnoreRules()),
+
+	add: async (pattern: string, subscriptionId: string | null) =>
+		unwrap(await commands.addIgnoreRule(pattern, subscriptionId)),
+
+	delete: async (id: string) => {
+		unwrap(await commands.deleteIgnoreRule(id));
+	},
 };
 
 // ===== Notifications API =====
