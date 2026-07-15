@@ -307,7 +307,7 @@ export function useNotifications(subscriptions: Subscription[]) {
 			if (!notifs) return 0;
 			let count = 0;
 			for (const n of notifs) {
-				if (!n.read) count++;
+				if (!n.read && !n.ignored) count++;
 			}
 			return count;
 		},
@@ -324,7 +324,7 @@ export function useNotifications(subscriptions: Subscription[]) {
 				const notifs = byTopic.get(sub.id);
 				if (notifs) {
 					for (const n of notifs) {
-						if (!n.read) total++;
+						if (!n.read && !n.ignored) total++;
 					}
 				}
 			}

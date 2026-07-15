@@ -1,4 +1,4 @@
-import { CheckCheck, Hash, Inbox, Star } from "lucide-react";
+import { CheckCheck, Eye, EyeOff, Hash, Inbox, Star } from "lucide-react";
 import {
 	memo,
 	type ReactNode,
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { notificationsApi } from "@/lib/tauri";
+import { cn } from "@/lib/utils";
 import type {
 	Notification as NotificationType,
 	Subscription,
@@ -28,6 +29,9 @@ interface NotificationListHeaderProps {
 	title: string;
 	unreadCount: number;
 	onMarkAllAsRead: () => void;
+	showIgnored: boolean;
+	onShowIgnoredChange: (show: boolean) => void;
+	hasIgnored: boolean;
 }
 
 const NotificationListHeader = memo(function NotificationListHeader({
@@ -35,6 +39,9 @@ const NotificationListHeader = memo(function NotificationListHeader({
 	title,
 	unreadCount,
 	onMarkAllAsRead,
+	showIgnored,
+	onShowIgnoredChange,
+	hasIgnored,
 }: NotificationListHeaderProps) {
 	return (
 		<div className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -47,26 +54,42 @@ const NotificationListHeader = memo(function NotificationListHeader({
 					</span>
 				) : null}
 			</div>
-			{unreadCount > 0 ? (
-				<TooltipProvider>
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button
-								variant="ghost"
-								size="sm"
-								className="gap-2"
-								onClick={onMarkAllAsRead}
-							>
-								<CheckCheck className="h-4 w-4" />
-								Mark all read
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent>
-							<p>Mark all notifications as read</p>
-						</TooltipContent>
-					</Tooltip>
-				</TooltipProvider>
-			) : null}
+			<div className="flex items-center gap-2">
+				{hasIgnored ? (
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => onShowIgnoredChange(!showIgnored)}
+					>
+						{showIgnored ? (
+							<EyeOff className="h-4 w-4" />
+						) : (
+							<Eye className="h-4 w-4" />
+						)}
+						{showIgnored ? "Hide ignored" : "Show ignored"}
+					</Button>
+				) : null}
+				{unreadCount > 0 ? (
+					<TooltipProvider>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<Button
+									variant="ghost"
+									size="sm"
+									className="gap-2"
+									onClick={onMarkAllAsRead}
+								>
+									<CheckCheck className="h-4 w-4" />
+									Mark all read
+								</Button>
+							</TooltipTrigger>
+							<TooltipContent>
+								<p>Mark all notifications as read</p>
+							</TooltipContent>
+						</Tooltip>
+					</TooltipProvider>
+				) : null}
+			</div>
 		</div>
 	);
 });
@@ -108,6 +131,7 @@ export const NotificationList = memo(function NotificationList({
 	const isAllView = !subscription && !isFavoritesView;
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+	const [showIgnored, setShowIgnored] = useState(false);
 
 	// Scroll to top when window is shown (tray icon click)
 	useTauriEvent("window:shown", () => {
@@ -156,10 +180,21 @@ export const NotificationList = memo(function NotificationList({
 	const unreadCount = useMemo(() => {
 		let count = 0;
 		for (const n of notifications) {
-			if (!n.read) count++;
+			if (!n.read && !n.ignored) count++;
 		}
 		return count;
 	}, [notifications]);
+
+	const hasIgnored = useMemo(
+		() => notifications.some((n) => n.ignored),
+		[notifications],
+	);
+
+	const visibleNotifications = useMemo(
+		() =>
+			showIgnored ? notifications : notifications.filter((n) => !n.ignored),
+		[notifications, showIgnored],
+	);
 
 	if (isAllView && subscriptions.length === 0) {
 		return <EmptyState type="no-topic" />;
@@ -179,9 +214,12 @@ export const NotificationList = memo(function NotificationList({
 				title={headerTitle}
 				unreadCount={unreadCount}
 				onMarkAllAsRead={onMarkAllAsRead}
+				showIgnored={showIgnored}
+				onShowIgnoredChange={setShowIgnored}
+				hasIgnored={hasIgnored}
 			/>
 
-			{notifications.length === 0 ? (
+			{visibleNotifications.length === 0 ? (
 				<EmptyState type="no-notifications" />
 			) : (
 				<div
@@ -189,14 +227,13 @@ export const NotificationList = memo(function NotificationList({
 					className="flex-1 overflow-y-auto min-h-0"
 				>
 					<div className="p-3 space-y-1.5">
-						{notifications.map((notification) => (
+						{visibleNotifications.map((notification) => (
 							<div
 								key={notification.id}
-								className={
-									deletingIds.has(notification.id)
-										? "notification-deleting"
-										: undefined
-								}
+								className={cn(
+									deletingIds.has(notification.id) && "notification-deleting",
+									notification.ignored && "opacity-50",
+								)}
 								style={{
 									contentVisibility: "auto",
 									containIntrinsicSize: "auto 80px",

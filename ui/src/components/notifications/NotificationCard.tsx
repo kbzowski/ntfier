@@ -1,5 +1,12 @@
-import { Copy, Hash } from "lucide-react";
-import { lazy, memo, type ReactNode, Suspense, useCallback } from "react";
+import { Copy, EyeOff, Hash } from "lucide-react";
+import {
+	lazy,
+	memo,
+	type ReactNode,
+	Suspense,
+	useCallback,
+	useState,
+} from "react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -14,8 +21,10 @@ import {
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { PRIORITY_CONFIG } from "@/lib/constants";
+import { isTauri } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { Notification as NotificationType } from "@/types/ntfy";
+import { IgnoreRuleDialog } from "./IgnoreRuleDialog";
 import { NotificationActions } from "./NotificationActions";
 
 const MarkdownContent = lazy(() =>
@@ -76,6 +85,7 @@ export const NotificationCard = memo(function NotificationCard({
 	onExpandedChange,
 }: NotificationCardProps) {
 	const borderColor = PRIORITY_CONFIG[notification.priority].borderClass;
+	const [ignoreDialogOpen, setIgnoreDialogOpen] = useState(false);
 
 	const handleClick = useCallback(() => {
 		onMarkAsRead?.(notification.id);
@@ -160,52 +170,75 @@ export const NotificationCard = memo(function NotificationCard({
 				<Copy />
 				Copy content
 			</ContextMenuItem>
+			{isTauri() ? (
+				<ContextMenuItem
+					disabled={!notification.title}
+					onClick={() => setIgnoreDialogOpen(true)}
+				>
+					<EyeOff />
+					Ignore similar
+				</ContextMenuItem>
+			) : null}
 		</ContextMenuContent>
 	);
 
+	const ignoreDialog = isTauri() ? (
+		<IgnoreRuleDialog
+			notification={notification}
+			open={ignoreDialogOpen}
+			onOpenChange={setIgnoreDialogOpen}
+		/>
+	) : null;
+
 	if (isCollapsible) {
 		return (
-			<ContextMenu>
-				<ContextMenuTrigger asChild>
-					<Collapsible open={isExpanded} onOpenChange={handleExpandedChange}>
-						<Card
-							className={cn(
-								"group transition-colors hover:bg-accent/50 border-l-4 py-0",
-								borderColor,
-								!notification.read && "bg-accent/20",
-							)}
-						>
-							<CollapsibleTrigger className="w-full text-left cursor-pointer block px-6 py-4">
-								{topicBadge}
-								{header}
-							</CollapsibleTrigger>
-							<CollapsibleContent className="collapsible-content overflow-hidden">
-								<div className="px-6 pb-4">{details}</div>
-							</CollapsibleContent>
-						</Card>
-					</Collapsible>
-				</ContextMenuTrigger>
-				{contextMenuContent}
-			</ContextMenu>
+			<>
+				<ContextMenu>
+					<ContextMenuTrigger asChild>
+						<Collapsible open={isExpanded} onOpenChange={handleExpandedChange}>
+							<Card
+								className={cn(
+									"group transition-colors hover:bg-accent/50 border-l-4 py-0",
+									borderColor,
+									!notification.read && "bg-accent/20",
+								)}
+							>
+								<CollapsibleTrigger className="w-full text-left cursor-pointer block px-6 py-4">
+									{topicBadge}
+									{header}
+								</CollapsibleTrigger>
+								<CollapsibleContent className="collapsible-content overflow-hidden">
+									<div className="px-6 pb-4">{details}</div>
+								</CollapsibleContent>
+							</Card>
+						</Collapsible>
+					</ContextMenuTrigger>
+					{contextMenuContent}
+				</ContextMenu>
+				{ignoreDialog}
+			</>
 		);
 	}
 
 	return (
-		<ContextMenu>
-			<ContextMenuTrigger asChild>
-				<div>
-					<CardFrame
-						borderColor={borderColor}
-						isUnread={!notification.read}
-						onClick={handleClick}
-					>
-						{topicBadge}
-						{header}
-						{details}
-					</CardFrame>
-				</div>
-			</ContextMenuTrigger>
-			{contextMenuContent}
-		</ContextMenu>
+		<>
+			<ContextMenu>
+				<ContextMenuTrigger asChild>
+					<div>
+						<CardFrame
+							borderColor={borderColor}
+							isUnread={!notification.read}
+							onClick={handleClick}
+						>
+							{topicBadge}
+							{header}
+							{details}
+						</CardFrame>
+					</div>
+				</ContextMenuTrigger>
+				{contextMenuContent}
+			</ContextMenu>
+			{ignoreDialog}
+		</>
 	);
 });
