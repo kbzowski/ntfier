@@ -78,14 +78,14 @@ interface AppErrorBoundaryProps {
 	children: ReactNode;
 }
 
-export function AppErrorBoundary({ children }: AppErrorBoundaryProps) {
-	const handleCopyError = () => {
-		const errorText =
-			"Application crashed. Please check the console for details.";
-		navigator.clipboard.writeText(errorText);
-		toast.success("Error details copied to clipboard");
-	};
+function handleCopyError() {
+	const errorText =
+		"Application crashed. Please check the console for details.";
+	navigator.clipboard.writeText(errorText);
+	toast.success("Error details copied to clipboard");
+}
 
+export function AppErrorBoundary({ children }: AppErrorBoundaryProps) {
 	return (
 		<ErrorBoundary
 			fallback={

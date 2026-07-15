@@ -77,6 +77,9 @@ export const NotificationHeader = memo(function NotificationHeader({
 				{onToggleFavorite && (
 					<button
 						type="button"
+						aria-label={
+							isFavorite ? "Remove from favorites" : "Add to favorites"
+						}
 						onClick={handleToggleFavorite}
 						className={cn(
 							"p-1 rounded-sm transition-opacity",
@@ -91,6 +94,7 @@ export const NotificationHeader = memo(function NotificationHeader({
 				{onDelete && (
 					<button
 						type="button"
+						aria-label="Delete notification"
 						onClick={handleDelete}
 						className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-sm hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
 					>

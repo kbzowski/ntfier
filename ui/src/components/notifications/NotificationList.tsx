@@ -103,6 +103,8 @@ function getHeaderIcon(
 	return <Hash className="h-5 w-5 text-muted-foreground" />;
 }
 
+const EMPTY_SUBSCRIPTIONS: Subscription[] = [];
+
 interface NotificationListProps {
 	subscription: Subscription | null;
 	subscriptions?: Subscription[];
@@ -118,7 +120,7 @@ interface NotificationListProps {
 
 export const NotificationList = memo(function NotificationList({
 	subscription,
-	subscriptions = [],
+	subscriptions = EMPTY_SUBSCRIPTIONS,
 	notifications,
 	onMarkAsRead,
 	onMarkAllAsRead,

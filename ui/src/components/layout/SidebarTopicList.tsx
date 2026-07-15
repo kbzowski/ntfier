@@ -13,6 +13,9 @@ const EMPTY_STATE = (
 	</div>
 );
 
+const INBOX_ICON = <Inbox className="h-4 w-4 text-muted-foreground shrink-0" />;
+const FAVORITES_ICON = <Star className="h-4 w-4 text-yellow-500 shrink-0" />;
+
 interface SidebarNavItemProps {
 	icon: ReactNode;
 	label: string;
@@ -96,7 +99,7 @@ export const SidebarTopicList = memo(function SidebarTopicList({
 		<ScrollArea className="flex-1">
 			<div className="py-2">
 				<SidebarNavItem
-					icon={<Inbox className="h-4 w-4 text-muted-foreground shrink-0" />}
+					icon={INBOX_ICON}
 					label="All Notifications"
 					isActive={currentView === "all" && selectedTopicId === null}
 					badge={totalUnread}
@@ -105,7 +108,7 @@ export const SidebarTopicList = memo(function SidebarTopicList({
 
 				{favoritesEnabled ? (
 					<SidebarNavItem
-						icon={<Star className="h-4 w-4 text-yellow-500 shrink-0" />}
+						icon={FAVORITES_ICON}
 						label="Favorites"
 						isActive={currentView === "favorites"}
 						badge={favoritesCount}
