@@ -347,15 +347,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 	const toggleMute = useCallback(async (id: string) => {
 		if (isTauri()) {
-			// Store previous state for rollback
-			let previousSubscriptions: Subscription[] = [];
-			setSubscriptions((prev) => {
-				previousSubscriptions = [...prev];
-				// Optimistic update
-				return prev.map((sub) =>
+			const previousSubscriptions = subscriptionsRef.current;
+			// Optimistic update
+			setSubscriptions((prev) =>
+				prev.map((sub) =>
 					sub.id === id ? { ...sub, muted: !sub.muted } : sub,
-				);
-			});
+				),
+			);
 
 			try {
 				const updated = await subscriptionsApi.toggleMute(id);

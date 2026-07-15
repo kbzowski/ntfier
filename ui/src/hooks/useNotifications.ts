@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { mockNotifications } from "@/data/mock-data";
 import { classifyError } from "@/lib/error-classification";
@@ -18,6 +18,10 @@ export function useNotifications(subscriptions: Subscription[]) {
 	const loadedTopicsRef = useRef<Set<string>>(new Set());
 	// Reverse index: notificationId → topicId for O(1) lookup
 	const notificationIndexRef = useRef<Map<string, string>>(new Map());
+	const byTopicRef = useRef(byTopic);
+	useEffect(() => {
+		byTopicRef.current = byTopic;
+	}, [byTopic]);
 
 	/**
 	 * Loads notifications for a topic if not already loaded.
@@ -68,13 +72,11 @@ export function useNotifications(subscriptions: Subscription[]) {
 	 * Uses optimistic UI update for instant feedback with rollback on error.
 	 */
 	const markAsRead = useCallback((id: string) => {
-		// Store previous state for rollback
-		let previousState: Map<string, Notification[]> | null = null;
+		const previousState = byTopicRef.current;
 		const topicId = notificationIndexRef.current.get(id);
 
 		// Optimistic update - instant UI feedback
 		setByTopic((prev) => {
-			previousState = new Map(prev);
 			if (!topicId) return prev;
 
 			const notifs = prev.get(topicId);
@@ -90,9 +92,7 @@ export function useNotifications(subscriptions: Subscription[]) {
 		if (isTauri()) {
 			notificationsApi.markAsRead(id).catch((err) => {
 				// Rollback on error
-				if (previousState) {
-					setByTopic(previousState);
-				}
+				setByTopic(previousState);
 				const classified = classifyError(err);
 				toast.error(classified.userMessage, {
 					description: "Failed to mark notification as read",
@@ -107,12 +107,10 @@ export function useNotifications(subscriptions: Subscription[]) {
 	 * Uses optimistic UI update for instant feedback with rollback on error.
 	 */
 	const markAllAsRead = useCallback((subscriptionId: string) => {
-		// Store previous state for rollback
-		let previousState: Map<string, Notification[]> | null = null;
+		const previousState = byTopicRef.current;
 
 		// Optimistic update - instant UI feedback
 		setByTopic((prev) => {
-			previousState = new Map(prev);
 			const notifs = prev.get(subscriptionId);
 			if (!notifs) return prev;
 			const updated = notifs.map((n) => ({ ...n, read: true }));
@@ -123,9 +121,7 @@ export function useNotifications(subscriptions: Subscription[]) {
 		if (isTauri()) {
 			notificationsApi.markAllAsRead(subscriptionId).catch((err) => {
 				// Rollback on error
-				if (previousState) {
-					setByTopic(previousState);
-				}
+				setByTopic(previousState);
 				const classified = classifyError(err);
 				toast.error(classified.userMessage, {
 					description: "Failed to mark all notifications as read",
@@ -140,12 +136,10 @@ export function useNotifications(subscriptions: Subscription[]) {
 	 * Uses optimistic UI update for instant feedback with rollback on error.
 	 */
 	const markAllAsReadGlobally = useCallback(() => {
-		// Store previous state for rollback
-		let previousState: Map<string, Notification[]> | null = null;
+		const previousState = byTopicRef.current;
 
 		// Optimistic update - mark all as read in UI
 		setByTopic((prev) => {
-			previousState = new Map(prev);
 			const updated = new Map<string, Notification[]>();
 			for (const [topicId, notifs] of prev) {
 				updated.set(
@@ -170,7 +164,7 @@ export function useNotifications(subscriptions: Subscription[]) {
 					}),
 				),
 			).then(() => {
-				if (hasError && previousState) {
+				if (hasError) {
 					// Rollback on error
 					setByTopic(previousState);
 					toast.error("Failed to mark all notifications as read", {
@@ -186,13 +180,11 @@ export function useNotifications(subscriptions: Subscription[]) {
 	 * Uses optimistic UI update for instant feedback with rollback on error.
 	 */
 	const deleteNotification = useCallback((id: string) => {
-		// Store previous state for rollback
-		let previousState: Map<string, Notification[]> | null = null;
+		const previousState = byTopicRef.current;
 		const topicId = notificationIndexRef.current.get(id);
 
 		// Optimistic update - instant UI feedback
 		setByTopic((prev) => {
-			previousState = new Map(prev);
 			if (!topicId) return prev;
 
 			const notifs = prev.get(topicId);
@@ -208,9 +200,7 @@ export function useNotifications(subscriptions: Subscription[]) {
 		if (isTauri()) {
 			notificationsApi.delete(id).catch((err) => {
 				// Rollback on error
-				if (previousState) {
-					setByTopic(previousState);
-				}
+				setByTopic(previousState);
 				const classified = classifyError(err);
 				toast.error(classified.userMessage, {
 					description: "Failed to delete notification",
@@ -225,32 +215,27 @@ export function useNotifications(subscriptions: Subscription[]) {
 	 * Uses optimistic UI update for instant feedback with rollback on error.
 	 */
 	const toggleFavorite = useCallback((id: string) => {
-		let previousState: Map<string, Notification[]> | null = null;
+		const previousState = byTopicRef.current;
 		const topicId = notificationIndexRef.current.get(id);
-		let newFavorite = false;
+		if (!topicId) return;
+
+		const current = previousState.get(topicId)?.find((n) => n.id === id);
+		if (!current) return;
+		const newFavorite = !current.isFavorite;
 
 		setByTopic((prev) => {
-			previousState = new Map(prev);
-			if (!topicId) return prev;
-
 			const notifs = prev.get(topicId);
 			if (!notifs) return prev;
 
-			const updated = notifs.map((n) => {
-				if (n.id === id) {
-					newFavorite = !n.isFavorite;
-					return { ...n, isFavorite: newFavorite };
-				}
-				return n;
-			});
+			const updated = notifs.map((n) =>
+				n.id === id ? { ...n, isFavorite: newFavorite } : n,
+			);
 			return new Map(prev).set(topicId, updated);
 		});
 
 		if (isTauri()) {
 			notificationsApi.setFavorite(id, newFavorite).catch((err) => {
-				if (previousState) {
-					setByTopic(previousState);
-				}
+				setByTopic(previousState);
 				const classified = classifyError(err);
 				toast.error(classified.userMessage, {
 					description: "Failed to update favorite",
