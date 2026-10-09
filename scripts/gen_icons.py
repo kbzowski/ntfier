@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Generate app icons with rounded rectangle background from logo.png."""
 
+import io
+import struct
 from pathlib import Path
 from PIL import Image, ImageDraw
 
@@ -45,6 +47,25 @@ def generate_icon(size):
     return bg
 
 
+def write_ico(path, images):
+    """Write PNG-compressed ICO frames in the given order."""
+    frames = []
+    for img in images:
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        frames.append((img.size[0], buf.getvalue()))
+
+    header = struct.pack("<HHH", 0, 1, len(frames))
+    offset = len(header) + 16 * len(frames)
+    entries, data = b"", b""
+    for size, png in frames:
+        dim = 0 if size >= 256 else size
+        entries += struct.pack("<BBBBHHII", dim, dim, 0, 0, 1, 32, len(png), offset)
+        offset += len(png)
+        data += png
+    path.write_bytes(header + entries + data)
+
+
 def main():
     ICONS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -63,17 +84,10 @@ def main():
         icon.save(ICONS_DIR / filename, "PNG")
         print(f"Generated {filename} ({size}x{size})")
 
-    # Generate ICO with multiple sizes
+    # Generate ICO with multiple sizes, largest first: Tauri builds the window
+    # (taskbar) icon from the first frame only, and Pillow writes smallest-first.
     ico_sizes = [256, 64, 48, 32, 24, 16]
-    ico_images = [generate_icon(s) for s in ico_sizes]
-
-    # ICO needs the largest image as base, with others as additional sizes
-    ico_images[0].save(
-        ICONS_DIR / "icon.ico",
-        format="ICO",
-        sizes=[(s, s) for s in ico_sizes],
-        append_images=ico_images[1:],
-    )
+    write_ico(ICONS_DIR / "icon.ico", [generate_icon(s) for s in ico_sizes])
     print(f"Generated icon.ico ({', '.join(f'{s}x{s}' for s in ico_sizes)})")
 
     # Generate ICNS for macOS
