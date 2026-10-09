@@ -37,6 +37,16 @@ impl Database {
             .collect())
     }
 
+    /// One stored message by id.
+    pub fn get_notification(&self, id: &str) -> Result<Option<Notification>, AppError> {
+        let mut conn = self.conn()?;
+        let row: Option<NotificationRow> = notifications::table
+            .filter(notifications::id.eq(id))
+            .first(&mut *conn)
+            .optional()?;
+        Ok(row.map(NotificationRow::into_notification))
+    }
+
     /// Whether a message with this `ntfy_id` is stored (tombstones included).
     pub fn notification_exists(&self, ntfy_id: &str) -> Result<bool, AppError> {
         let mut conn = self.conn()?;

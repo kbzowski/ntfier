@@ -24,11 +24,11 @@ use crate::config::connection::{
 use crate::db::Database;
 use crate::error::AppError;
 use crate::models::{
-    is_ignored, Notification, NotificationDisplayMethod, NotificationSettings, NtfyMessage,
-    ServerStatus, ServerStatusEntry, Subscription, SubscriptionError,
+    is_ignored, ActionType, Notification, NotificationDisplayMethod, NotificationSettings,
+    NtfyMessage, ServerStatus, ServerStatusEntry, Subscription, SubscriptionError,
 };
 use crate::services::ntfy_client::{VersionCheck, NO_TOPIC_ACCESS, RATE_LIMITED};
-use crate::services::{text_attachment, url_opener, NtfyClient, SyncService, TrayManager};
+use crate::services::{actions, text_attachment, url_opener, NtfyClient, SyncService, TrayManager};
 
 /// Connection entry storing both the shutdown sender and a unique connection ID.
 /// The ID is used to detect stale connections after a race condition.
@@ -919,16 +919,16 @@ impl ConnectionManager {
             None => (None, None),
         };
 
+        // Every supported action, run in the app through `run_action`
         let buttons = if settings.notification_show_actions {
             notification
                 .actions
                 .iter()
-                .filter_map(|a| {
-                    a.url.as_ref().map(|url| ToastButton {
-                        label: a.label.clone(),
-                        arguments: url.clone(),
-                        protocol: true,
-                    })
+                .filter(|a| a.action != ActionType::Unknown)
+                .map(|a| ToastButton {
+                    label: a.label.clone(),
+                    arguments: format!("action:{}:{}", notification.id, a.id),
+                    protocol: false,
                 })
                 .collect()
         } else {
@@ -958,6 +958,7 @@ impl ConnectionManager {
         };
 
         let click = notification.click.clone();
+        let app = app_handle.clone();
         let on_activated = move |arguments: String| {
             if arguments == toast::CLICK_ARGUMENT {
                 if let Some(url) = &click {
@@ -965,7 +966,25 @@ impl ConnectionManager {
                         log::error!("Toast click: {e}");
                     }
                 }
+                return;
             }
+            let Some((notification_id, action_id)) = arguments
+                .strip_prefix("action:")
+                .and_then(|rest| rest.split_once(':'))
+            else {
+                return;
+            };
+            let (app, notification_id, action_id) = (
+                app.clone(),
+                notification_id.to_string(),
+                action_id.to_string(),
+            );
+            // The window stays hidden; only a failure shows up, as a new toast
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = actions::run_action(&app, &notification_id, &action_id).await {
+                    Self::show_error_toast(&app, &e.to_string());
+                }
+            });
         };
 
         let aumid = app_handle.config().identifier.as_str();
@@ -975,8 +994,34 @@ impl ConnectionManager {
         }
     }
 
+    /// A one-line toast for a failed toast action.
+    #[cfg(windows)]
+    fn show_error_toast(app_handle: &AppHandle, message: &str) {
+        use crate::services::toast::{self, ToastContent};
+
+        let tag = uuid::Uuid::new_v4().simple().to_string();
+        let content = ToastContent {
+            tag: &tag,
+            group: "ntfier-errors",
+            title: message,
+            body: "",
+            hero_image: None,
+            inline_image: None,
+            app_logo: None,
+            buttons: Vec::new(),
+            clickable: false,
+            alarm: false,
+            long: false,
+            sound: None,
+        };
+        let aumid = app_handle.config().identifier.as_str();
+        if let Err(e) = toast::show(aumid, &content, |_| {}) {
+            log::error!("Failed to show error toast: {e}");
+        }
+    }
+
     /// Removes the toast of a message's sequence, if one is shown.
-    fn remove_toast(app_handle: &AppHandle, subscription_id: &str, sequence_id: &str) {
+    pub fn remove_toast(app_handle: &AppHandle, subscription_id: &str, sequence_id: &str) {
         #[cfg(windows)]
         if let Err(e) = crate::services::toast::remove(
             app_handle.config().identifier.as_str(),

@@ -153,6 +153,10 @@ export const notificationsApi = {
 		unwrap(await commands.deleteNotification(id));
 	},
 
+	runAction: async (notificationId: string, actionId: string) => {
+		unwrap(await commands.runAction(notificationId, actionId));
+	},
+
 	setExpanded: async (id: string, expanded: boolean) => {
 		unwrap(await commands.setNotificationExpanded(id, expanded));
 	},

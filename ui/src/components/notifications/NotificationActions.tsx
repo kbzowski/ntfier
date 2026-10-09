@@ -1,66 +1,74 @@
-import { open } from "@tauri-apps/plugin-shell";
-import { ExternalLink } from "lucide-react";
-import { memo, useCallback } from "react";
+import { Copy, ExternalLink, Loader2, Send } from "lucide-react";
+import { memo, useCallback, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { classifyError } from "@/lib/error-classification";
-import { isTauri } from "@/lib/tauri";
+import { isTauri, notificationsApi } from "@/lib/tauri";
 import type { NotificationAction } from "@/types/ntfy";
 
+const ICONS = { view: ExternalLink, http: Send, copy: Copy } as const;
+
 interface NotificationActionsProps {
+	notificationId: string;
 	actions: NotificationAction[];
 }
 
 export const NotificationActions = memo(function NotificationActions({
+	notificationId,
 	actions,
 }: NotificationActionsProps) {
+	const [running, setRunning] = useState<string | null>(null);
+
 	const handleClick = useCallback(
 		async (e: React.MouseEvent, action: NotificationAction) => {
 			e.stopPropagation();
-			if (!action.url) return;
-
-			try {
-				if (isTauri()) {
-					await open(action.url);
-				} else {
+			if (!isTauri()) {
+				if (action.action === "view" && action.url) {
 					window.open(action.url, "_blank", "noopener,noreferrer");
 				}
+				return;
+			}
+
+			setRunning(action.id);
+			try {
+				await notificationsApi.runAction(notificationId, action.id);
+				if (action.action === "copy") toast.success("Copied");
 			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage, {
-					description: "Failed to open URL",
-					action: {
-						label: "Copy URL",
-						onClick: () => {
-							if (action.url) {
-								navigator.clipboard.writeText(action.url);
-								toast.success("URL copied to clipboard");
-							}
-						},
-					},
-				});
-				console.error("[Open URL error]", err);
+				toast.error(classifyError(err).userMessage);
+				console.error("[Action error]", err);
+			} finally {
+				setRunning(null);
 			}
 		},
-		[],
+		[notificationId],
 	);
 
-	if (actions.length === 0) return null;
+	// broadcast and other types this app can't run are hidden
+	const supported = actions.filter((a) => a.action !== "unknown");
+	if (supported.length === 0) return null;
 
 	return (
 		<div className="flex flex-wrap gap-2 mt-4">
-			{actions.map((action) => (
-				<Button
-					key={action.id}
-					variant={action.clear ? "ghost" : "outline"}
-					size="sm"
-					className="h-8 text-xs gap-1.5 transition-all duration-150 hover:bg-accent hover:shadow-sm active:scale-95"
-					onClick={(e) => handleClick(e, action)}
-				>
-					{action.url && <ExternalLink className="h-3 w-3" />}
-					{action.label}
-				</Button>
-			))}
+			{supported.map((action) => {
+				const Icon = ICONS[(action.action ?? "view") as keyof typeof ICONS];
+				return (
+					<Button
+						key={action.id}
+						variant={action.clear ? "ghost" : "outline"}
+						size="sm"
+						className="h-8 text-xs gap-1.5 transition-all duration-150 hover:bg-accent hover:shadow-sm active:scale-95"
+						disabled={running === action.id}
+						onClick={(e) => handleClick(e, action)}
+					>
+						{running === action.id ? (
+							<Loader2 className="h-3 w-3 animate-spin" />
+						) : (
+							<Icon className="h-3 w-3" />
+						)}
+						{action.label}
+					</Button>
+				);
+			})}
 		</div>
 	);
 });

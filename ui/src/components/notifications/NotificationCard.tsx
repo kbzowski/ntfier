@@ -162,7 +162,10 @@ export const NotificationCard = memo(function NotificationCard({
 			)}
 			<NotificationTags tags={notification.tags} />
 			<NotificationAttachments attachments={notification.attachments} />
-			<NotificationActions actions={notification.actions} />
+			<NotificationActions
+				notificationId={notification.id}
+				actions={notification.actions}
+			/>
 		</>
 	);
 

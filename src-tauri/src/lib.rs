@@ -46,6 +46,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::mark_all_as_read,
         commands::delete_notification,
         commands::set_notification_expanded,
+        commands::run_action,
         commands::get_unread_count,
         commands::get_total_unread_count,
         // Ignore rules
@@ -114,6 +115,8 @@ pub fn export_bindings() {
 /// Tauri applications - if the app can't start, there's nothing to recover.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 #[allow(clippy::expect_used)]
+// The frame is tauri's generated context (embedded assets), built once at startup
+#[allow(clippy::large_stack_frames)]
 pub fn run() {
     // reqwest's `rustls-no-provider` panics on Client build unless a provider is already
     // installed, and tauri-plugin-updater's reqwest makes the same demand. Err only means
@@ -129,6 +132,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();

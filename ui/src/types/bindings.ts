@@ -14,6 +14,8 @@ export const commands = {
 	markAllAsRead: (subscriptionId: string) => typedError<null, AppError>(__TAURI_INVOKE("mark_all_as_read", { subscriptionId })),
 	deleteNotification: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_notification", { id })),
 	setNotificationExpanded: (id: string, expanded: boolean) => typedError<null, AppError>(__TAURI_INVOKE("set_notification_expanded", { id, expanded })),
+	/**  Runs an action button of a message (view, http or copy). */
+	runAction: (notificationId: string, actionId: string) => typedError<null, AppError>(__TAURI_INVOKE("run_action", { notificationId, actionId })),
 	getUnreadCount: (subscriptionId: string) => typedError<number, AppError>(__TAURI_INVOKE("get_unread_count", { subscriptionId })),
 	getTotalUnreadCount: () => typedError<number, AppError>(__TAURI_INVOKE("get_total_unread_count")),
 	getIgnoreRules: () => typedError<IgnoreRule[], AppError>(__TAURI_INVOKE("get_ignore_rules")),
@@ -78,6 +80,9 @@ export const commands = {
 };
 
 /* Types */
+/**  What an action button does. Anything else ntfy sends (like `broadcast`) is hidden. */
+export type ActionType = "view" | "http" | "copy" | "unknown";
+
 /**
  *  Application error type that serializes to a discriminated union in TypeScript.
  * 
@@ -208,9 +213,17 @@ export type Notification = {
 /**  An action button attached to a notification. */
 export type NotificationAction = {
 	id: string,
+	/**  Rows stored before the type was kept are treated as `view`. */
+	action?: ActionType,
 	label: string,
 	url: string | null,
+	/**  HTTP method for `http` actions (POST when missing). */
 	method: string | null,
+	headers?: { [key in string]: string },
+	body?: string | null,
+	/**  Text a `copy` action puts on the clipboard. */
+	value?: string | null,
+	/**  After the action succeeds, mark the message read and remove its toast. */
 	clear: boolean,
 };
 

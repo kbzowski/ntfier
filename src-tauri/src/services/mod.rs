@@ -1,3 +1,4 @@
+pub mod actions;
 mod connection_manager;
 pub mod credential_manager;
 pub mod image_cache;

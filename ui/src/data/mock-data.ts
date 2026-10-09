@@ -52,6 +52,7 @@ export const mockNotifications: Notification[] = [
 		actions: [
 			{
 				id: "act-1",
+				action: "view",
 				label: "Open Dashboard",
 				url: "https://dashboard.example.com",
 				method: null,
@@ -82,6 +83,7 @@ export const mockNotifications: Notification[] = [
 		actions: [
 			{
 				id: "act-3",
+				action: "view",
 				label: "View Logs",
 				url: "https://logs.example.com/nginx",
 				method: null,
@@ -132,6 +134,7 @@ export const mockNotifications: Notification[] = [
 		actions: [
 			{
 				id: "act-4",
+				action: "view",
 				label: "View Security Log",
 				url: "https://security.example.com/logs",
 				method: null,
@@ -139,6 +142,7 @@ export const mockNotifications: Notification[] = [
 			},
 			{
 				id: "act-5",
+				action: "view",
 				label: "Unblock IP",
 				url: null,
 				method: "POST",
@@ -178,6 +182,7 @@ export const mockNotifications: Notification[] = [
 		actions: [
 			{
 				id: "act-6",
+				action: "view",
 				label: "Review Rules",
 				url: "https://firewall.example.com",
 				method: null,
@@ -207,6 +212,7 @@ export const mockNotifications: Notification[] = [
 		actions: [
 			{
 				id: "act-7",
+				action: "view",
 				label: "Renew Now",
 				url: "https://certs.example.com/renew",
 				method: null,
@@ -236,6 +242,7 @@ export const mockNotifications: Notification[] = [
 		actions: [
 			{
 				id: "act-8",
+				action: "view",
 				label: "View Devices",
 				url: "https://network.example.com/devices",
 				method: null,
@@ -286,6 +293,7 @@ export const mockNotifications: Notification[] = [
 		actions: [
 			{
 				id: "act-9",
+				action: "view",
 				label: "View Run",
 				url: "https://github.com/user/repo/actions/runs/123",
 				method: null,
@@ -367,6 +375,7 @@ export const mockNotifications: Notification[] = [
 		actions: [
 			{
 				id: "act-10",
+				action: "view",
 				label: "Open Grafana",
 				url: "https://grafana.example.com",
 				method: null,
@@ -406,6 +415,7 @@ export const mockNotifications: Notification[] = [
 		actions: [
 			{
 				id: "act-11",
+				action: "view",
 				label: "View Preview",
 				url: "https://preview-127.example.com",
 				method: null,
@@ -413,6 +423,7 @@ export const mockNotifications: Notification[] = [
 			},
 			{
 				id: "act-12",
+				action: "view",
 				label: "View PR",
 				url: "https://github.com/user/repo/pull/127",
 				method: null,

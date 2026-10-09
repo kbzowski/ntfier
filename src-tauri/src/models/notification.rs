@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use specta::Type;
+use std::collections::HashMap;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 
@@ -110,10 +111,47 @@ impl Notification {
 #[serde(rename_all = "camelCase")]
 pub struct NotificationAction {
     pub id: String,
+    /// Rows stored before the type was kept are treated as `view`.
+    #[serde(default = "ActionType::legacy")]
+    pub action: ActionType,
     pub label: String,
     pub url: Option<String>,
+    /// HTTP method for `http` actions (POST when missing).
     pub method: Option<String>,
+    #[serde(default)]
+    pub headers: HashMap<String, String>,
+    #[serde(default)]
+    pub body: Option<String>,
+    /// Text a `copy` action puts on the clipboard.
+    #[serde(default)]
+    pub value: Option<String>,
+    /// After the action succeeds, mark the message read and remove its toast.
     pub clear: bool,
+}
+
+/// What an action button does. Anything else ntfy sends (like `broadcast`) is hidden.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum ActionType {
+    View,
+    Http,
+    Copy,
+    Unknown,
+}
+
+impl ActionType {
+    const fn legacy() -> Self {
+        Self::View
+    }
+
+    fn from_ntfy(action: &str) -> Self {
+        match action {
+            "view" => Self::View,
+            "http" => Self::Http,
+            "copy" => Self::Copy,
+            _ => Self::Unknown,
+        }
+    }
 }
 
 /// A file attachment on a notification.
@@ -170,6 +208,9 @@ pub struct NtfyAction {
     pub label: String,
     pub url: Option<String>,
     pub method: Option<String>,
+    pub headers: Option<HashMap<String, String>>,
+    pub body: Option<String>,
+    pub value: Option<String>,
     pub clear: Option<bool>,
 }
 
@@ -189,9 +230,13 @@ impl From<NtfyAction> for NotificationAction {
     fn from(action: NtfyAction) -> Self {
         Self {
             id: action.id,
+            action: ActionType::from_ntfy(&action.action),
             label: action.label,
             url: action.url,
             method: action.method,
+            headers: action.headers.unwrap_or_default(),
+            body: action.body,
+            value: action.value,
             clear: action.clear.unwrap_or(false),
         }
     }

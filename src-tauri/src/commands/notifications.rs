@@ -13,6 +13,17 @@ pub fn refresh_tray(app_handle: AppHandle) {
     });
 }
 
+/// Runs an action button of a message (view, http or copy).
+#[tauri::command]
+#[specta::specta]
+pub async fn run_action(
+    app_handle: AppHandle,
+    notification_id: String,
+    action_id: String,
+) -> Result<(), AppError> {
+    crate::services::actions::run_action(&app_handle, &notification_id, &action_id).await
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_notifications(
