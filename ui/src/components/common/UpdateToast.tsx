@@ -62,6 +62,7 @@ export function UpdateToast({
 						size="icon"
 						variant="ghost"
 						className="h-8 w-8"
+						aria-label="Dismiss"
 						onClick={handleDismiss}
 					>
 						<X className="h-4 w-4" />

@@ -165,6 +165,7 @@ function ImageCard({
 					variant="ghost"
 					size="icon"
 					className="h-6 w-6 shrink-0"
+					aria-label="Download attachment"
 					onClick={(e) => {
 						e.stopPropagation();
 						onDownload(attachment.url);
@@ -199,6 +200,7 @@ function FileCard({
 				variant="ghost"
 				size="icon"
 				className="h-8 w-8 shrink-0"
+				aria-label="Download attachment"
 				onClick={() => onDownload(attachment.url)}
 			>
 				<Download className="h-4 w-4" />

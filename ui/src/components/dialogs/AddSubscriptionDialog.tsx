@@ -41,7 +41,9 @@ export function AddSubscriptionDialog({
 }: AddSubscriptionDialogProps) {
 	const [topic, setTopic] = useState("");
 	const [displayName, setDisplayName] = useState("");
-	const [selectedServer, setSelectedServer] = useState(defaultServer);
+	// null = follow the default, which may load after the dialog mounts
+	const [selectedServer, setSelectedServer] = useState<string | null>(null);
+	const serverUrl = selectedServer ?? defaultServer;
 	const [error, setError] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -53,16 +55,12 @@ export function AddSubscriptionDialog({
 		setIsSubmitting(true);
 
 		try {
-			await onAdd(
-				topic.trim(),
-				selectedServer,
-				displayName.trim() || undefined,
-			);
+			await onAdd(topic.trim(), serverUrl, displayName.trim() || undefined);
 
 			// Reset form on success
 			setTopic("");
 			setDisplayName("");
-			setSelectedServer(defaultServer);
+			setSelectedServer(null);
 			toast.success("Subscribed to topic");
 			onOpenChange(false);
 		} catch (err) {
@@ -79,7 +77,7 @@ export function AddSubscriptionDialog({
 		if (!newOpen) {
 			setTopic("");
 			setDisplayName("");
-			setSelectedServer(defaultServer);
+			setSelectedServer(null);
 			setError(null);
 		}
 		onOpenChange(newOpen);
@@ -103,7 +101,7 @@ export function AddSubscriptionDialog({
 								>
 									<span className="flex items-center gap-2">
 										<Server className="h-4 w-4 text-muted-foreground" />
-										{selectedServer}
+										{serverUrl}
 									</span>
 									<ChevronDown className="h-4 w-4 text-muted-foreground" />
 								</Button>

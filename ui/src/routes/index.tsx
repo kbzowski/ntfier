@@ -12,6 +12,7 @@ import { UpdateToast } from "@/components/common/UpdateToast";
 import { AddSubscriptionDialog } from "@/components/dialogs/AddSubscriptionDialog";
 import { ConfirmDialog } from "@/components/dialogs/ConfirmDialog";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ErrorCard } from "@/components/ui/error-card";
 
 const SettingsDialog = lazy(() =>
 	import("@/components/dialogs/SettingsDialog").then((m) => ({
@@ -73,6 +74,8 @@ function App() {
 		setDeleteLocalOnly,
 		updateInfo,
 		setUpdateInfo,
+		loadError,
+		retryLoad,
 	} = useApp();
 
 	const currentTopicIdRef = useRef(currentTopicId);
@@ -152,22 +155,33 @@ function App() {
 				onOpenSettings={handleOpenSettings}
 				onAddSubscription={handleOpenAddSubscription}
 			>
-				<NotificationList
-					subscription={
-						currentView === "favorites" ? null : (selectedSubscription ?? null)
-					}
-					subscriptions={subscriptionsWithUnread}
-					notifications={currentNotifications}
-					onMarkAsRead={markAsRead}
-					onMarkAllAsRead={handleMarkAllAsRead}
-					onDelete={deleteNotification}
-					onToggleFavorite={
-						settings.favoritesEnabled ? toggleFavorite : undefined
-					}
-					onExpandedChange={setNotificationExpanded}
-					compactView={settings.compactView ?? false}
-					isFavoritesView={currentView === "favorites"}
-				/>
+				{loadError ? (
+					<ErrorCard
+						className="m-6"
+						message="Couldn't load your data"
+						details={loadError}
+						onRetry={retryLoad}
+					/>
+				) : (
+					<NotificationList
+						subscription={
+							currentView === "favorites"
+								? null
+								: (selectedSubscription ?? null)
+						}
+						subscriptions={subscriptionsWithUnread}
+						notifications={currentNotifications}
+						onMarkAsRead={markAsRead}
+						onMarkAllAsRead={handleMarkAllAsRead}
+						onDelete={deleteNotification}
+						onToggleFavorite={
+							settings.favoritesEnabled ? toggleFavorite : undefined
+						}
+						onExpandedChange={setNotificationExpanded}
+						compactView={settings.compactView ?? false}
+						isFavoritesView={currentView === "favorites"}
+					/>
+				)}
 			</AppLayout>
 
 			<Suspense fallback={null}>

@@ -55,9 +55,14 @@ interface AppState {
 
 	// Updates
 	updateInfo: UpdateInfo | null;
+
+	// Startup load failure, shown instead of the list
+	loadError: string | null;
 }
 
 interface AppActions {
+	retryLoad: () => Promise<void>;
+
 	// Subscriptions
 	addSubscription: (subscription: {
 		topic: string;
@@ -132,6 +137,8 @@ interface AppContextValue extends AppState, AppActions {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+const emptySettings: AppSettings = { ...mockSettings, servers: [] };
+
 type SetSettings = Dispatch<SetStateAction<AppSettings>>;
 
 /**
@@ -167,10 +174,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [ignoreRules, setIgnoreRules] = useState<IgnoreRule[]>([]);
 	const [currentTopicId, setCurrentTopicId] = useState<string | null>(null);
 	const [currentView, setCurrentView] = useState<"all" | "favorites">("all");
-	const [settings, setSettings] = useState<AppSettings>(mockSettings);
+	const [settings, setSettings] = useState<AppSettings>(() =>
+		isTauri() ? emptySettings : mockSettings,
+	);
 	const [settingsLoading, setSettingsLoading] = useState(true);
 	const [autostart, setAutostartState] = useState(false);
 	const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+	const [loadError, setLoadError] = useState<string | null>(null);
 
 	const refreshIgnoreRules = useCallback(async () => {
 		try {
@@ -186,37 +196,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const notifications = useNotifications(subscriptions);
 
 	// Load initial data
-	useEffect(() => {
-		const loadData = async () => {
-			try {
-				if (isTauri()) {
-					// Load all data in parallel to avoid waterfall
-					const [subs, loadedSettings, autostartEnabled] = await Promise.all([
-						subscriptionsApi.getAll(),
-						settingsApi.get(),
-						autostartApi.isEnabled(),
-					]);
+	const loadData = useCallback(async () => {
+		setLoadError(null);
+		try {
+			if (isTauri()) {
+				// Load all data in parallel to avoid waterfall
+				const [subs, loadedSettings, autostartEnabled] = await Promise.all([
+					subscriptionsApi.getAll(),
+					settingsApi.get(),
+					autostartApi.isEnabled(),
+				]);
 
-					setSubscriptions(subs);
-					setSettings(loadedSettings);
-					setAutostartState(autostartEnabled);
-				} else {
-					// Fallback to mock data
-					setSubscriptions(mockSubscriptions);
-					setSettings(mockSettings);
-				}
-			} catch (err) {
-				console.error("Failed to load initial data:", err);
+				setSubscriptions(subs);
+				setSettings(loadedSettings);
+				setAutostartState(autostartEnabled);
+			} else {
 				setSubscriptions(mockSubscriptions);
 				setSettings(mockSettings);
-			} finally {
-				setSubscriptionsLoading(false);
-				setSettingsLoading(false);
 			}
-		};
+		} catch (err) {
+			console.error("Failed to load initial data:", err);
+			setLoadError(classifyError(err).userMessage);
+		} finally {
+			setSubscriptionsLoading(false);
+			setSettingsLoading(false);
+		}
+	}, []);
+
+	useEffect(() => {
 		loadData();
 		refreshIgnoreRules();
-	}, [refreshIgnoreRules]);
+	}, [loadData, refreshIgnoreRules]);
 
 	// Stable key that only changes when subscription IDs change
 	const subscriptionIds = useMemo(
@@ -700,8 +710,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			settingsLoading,
 			autostart,
 			updateInfo,
+			loadError,
 
 			// Actions
+			retryLoad: loadData,
 			addSubscription,
 			removeSubscription,
 			toggleMute,
@@ -752,6 +764,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			settingsLoading,
 			autostart,
 			updateInfo,
+			loadError,
+			loadData,
 			addSubscription,
 			removeSubscription,
 			toggleMute,

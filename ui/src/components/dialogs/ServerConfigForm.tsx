@@ -118,6 +118,7 @@ export function ServerConfigForm({
 										variant="ghost"
 										size="icon"
 										className="h-8 w-8 text-destructive hover:text-destructive"
+										aria-label={`Remove server ${server.url}`}
 										onClick={() => onRemoveServer(server.url)}
 									>
 										<Trash2 className="h-4 w-4" />
@@ -166,6 +167,7 @@ export function ServerConfigForm({
 									variant="ghost"
 									size="icon"
 									className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+									aria-label={showPassword ? "Hide password" : "Show password"}
 									onClick={toggleShowPassword}
 									disabled={isLoading}
 								>

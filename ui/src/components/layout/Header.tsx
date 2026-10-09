@@ -28,6 +28,7 @@ export const Header = memo(function Header({
 							variant="ghost"
 							size="icon"
 							className="h-9 w-9 relative"
+							aria-label="Open menu"
 							onClick={onMenuClick}
 						>
 							<Menu className="h-5 w-5" />
