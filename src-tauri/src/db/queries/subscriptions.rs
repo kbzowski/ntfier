@@ -9,7 +9,7 @@ use crate::db::connection::Database;
 use crate::db::models::{NewServer, NewSubscription, SubscriptionQueryRow};
 use crate::db::schema::{notifications, servers, subscriptions};
 use crate::error::AppError;
-use crate::models::{is_ignored, CreateSubscription, Subscription};
+use crate::models::{canonical_url, is_ignored, CreateSubscription, Subscription};
 
 /// Base SELECT/FROM/JOIN shared by all subscription queries.
 const SUBSCRIPTION_BASE_QUERY: &str = "\
@@ -83,8 +83,12 @@ impl Database {
     }
 
     /// Creates a new subscription.
-    pub fn create_subscription(&self, sub: CreateSubscription) -> Result<Subscription, AppError> {
+    pub fn create_subscription(
+        &self,
+        mut sub: CreateSubscription,
+    ) -> Result<Subscription, AppError> {
         sub.validate()?;
+        sub.server_url = canonical_url(&sub.server_url)?;
         let mut conn = self.conn()?;
 
         let (id, server_url, topic, display_name) = conn

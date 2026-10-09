@@ -7,7 +7,7 @@ use crate::db::connection::Database;
 use crate::db::models::{NewServer, ServerRow};
 use crate::db::schema::{servers, subscriptions};
 use crate::error::AppError;
-use crate::models::ServerConfig;
+use crate::models::{canonical_url, ServerConfig};
 use crate::services::credential_manager;
 
 impl Database {
@@ -51,8 +51,8 @@ impl Database {
     }
 
     /// Adds a new server.
-    pub fn add_server(&self, server: ServerConfig) -> Result<(), AppError> {
-        server.validate()?;
+    pub fn add_server(&self, mut server: ServerConfig) -> Result<String, AppError> {
+        server.url = canonical_url(&server.url)?;
 
         // Store password in OS keychain if we have both username and password
         if let (Some(ref username), Some(ref password)) = (&server.username, &server.password) {
@@ -74,7 +74,7 @@ impl Database {
             .values(&new_server)
             .execute(&mut *conn)?;
 
-        Ok(())
+        Ok(server.url)
     }
 
     /// Removes a server and all its subscriptions.

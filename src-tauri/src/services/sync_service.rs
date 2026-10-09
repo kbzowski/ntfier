@@ -6,7 +6,7 @@
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::db::Database;
-use crate::models::{is_ignored, normalize_url, CreateSubscription};
+use crate::models::{canonical_url, is_ignored, CreateSubscription};
 use crate::services::{ConnectionManager, NtfyClient, TrayManager};
 
 /// Synchronization service for subscriptions and notifications.
@@ -68,18 +68,15 @@ impl SyncService {
                 }
             };
 
-            let our_base = server.normalized_url();
-
+            let our_url = &server.url;
             for ntfy_sub in account.subscriptions {
-                let ntfy_base = normalize_url(&ntfy_sub.base_url);
-
-                if ntfy_base != our_base {
+                if canonical_url(&ntfy_sub.base_url).ok().as_ref() != Some(our_url) {
                     continue;
                 }
 
                 let already_exists = existing
                     .iter()
-                    .any(|s| s.server_url_matches(our_base) && s.topic == ntfy_sub.topic);
+                    .any(|s| s.topic == ntfy_sub.topic && s.server_url == *our_url);
 
                 if already_exists {
                     continue;
@@ -134,10 +131,7 @@ impl SyncService {
 
         for sub in subscriptions {
             // Find server credentials for this subscription
-            let server = settings
-                .servers
-                .iter()
-                .find(|s| s.url_matches(&sub.server_url));
+            let server = settings.servers.iter().find(|s| s.url == sub.server_url);
             let (username, password) = match server {
                 Some(s) => (s.username.as_deref(), s.password.as_deref()),
                 None => (None, None),

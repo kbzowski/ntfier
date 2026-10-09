@@ -26,7 +26,8 @@ pub fn set_theme(db: State<'_, Database>, theme: ThemeMode) -> Result<(), AppErr
 
 #[tauri::command]
 #[specta::specta]
-pub fn add_server(db: State<'_, Database>, server: ServerConfig) -> Result<(), AppError> {
+/// Returns the server's canonical URL, the form it's stored and compared in.
+pub fn add_server(db: State<'_, Database>, server: ServerConfig) -> Result<String, AppError> {
     db.add_server(server)
 }
 

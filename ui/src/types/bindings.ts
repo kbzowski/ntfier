@@ -21,7 +21,8 @@ export const commands = {
 	deleteIgnoreRule: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_ignore_rule", { id })),
 	getSettings: () => typedError<AppSettings, AppError>(__TAURI_INVOKE("get_settings")),
 	setTheme: (theme: ThemeMode) => typedError<null, AppError>(__TAURI_INVOKE("set_theme", { theme })),
-	addServer: (server: ServerConfig) => typedError<null, AppError>(__TAURI_INVOKE("add_server", { server })),
+	/**  Returns the server's canonical URL, the form it's stored and compared in. */
+	addServer: (server: ServerConfig) => typedError<string, AppError>(__TAURI_INVOKE("add_server", { server })),
 	removeServer: (url: string) => typedError<null, AppError>(__TAURI_INVOKE("remove_server", { url })),
 	setDefaultServer: (url: string) => typedError<null, AppError>(__TAURI_INVOKE("set_default_server", { url })),
 	setMinimizeToTray: (enabled: boolean) => typedError<null, AppError>(__TAURI_INVOKE("set_minimize_to_tray", { enabled })),

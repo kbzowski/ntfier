@@ -465,11 +465,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			server: Omit<ServerConfig, "isDefault">,
 		): Promise<Subscription[]> => {
 			if (isTauri()) {
-				await settingsApi.addServer(server);
+				const url = await settingsApi.addServer(server);
+				server = { ...server, url };
 
 				// If server has credentials, sync subscriptions
 				if (server.username && server.password) {
-					const synced = await syncApi.syncSubscriptions(server.url);
+					const synced = await syncApi.syncSubscriptions(url);
 					const newServer: ServerConfig = { ...server, isDefault: false };
 					setSettings((prev) => ({
 						...prev,

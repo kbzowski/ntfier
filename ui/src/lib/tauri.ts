@@ -171,14 +171,13 @@ export const settingsApi = {
 		unwrap(await commands.setTheme(theme));
 	},
 
-	addServer: async (server: Omit<ServerConfig, "isDefault">) => {
+	addServer: async (server: Omit<ServerConfig, "isDefault">) =>
 		unwrap(
 			await commands.addServer({
 				...server,
 				isDefault: false,
 			}),
-		);
-	},
+		),
 
 	removeServer: async (url: string) => {
 		unwrap(await commands.removeServer(url));

@@ -6,6 +6,6 @@ mod subscription;
 
 pub use ignore_rule::*;
 pub use notification::*;
-pub use server_url::normalize_url;
+pub use server_url::canonical_url;
 pub use settings::*;
 pub use subscription::*;

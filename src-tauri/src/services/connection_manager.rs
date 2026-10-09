@@ -21,8 +21,8 @@ use crate::config::connection::{JITTER_MAX_SECS, RETRY_BACKOFF_SECS};
 use crate::db::Database;
 use crate::error::AppError;
 use crate::models::{
-    is_ignored, normalize_url, Notification, NotificationDisplayMethod, NotificationSettings,
-    NtfyMessage, Subscription,
+    is_ignored, Notification, NotificationDisplayMethod, NotificationSettings, NtfyMessage,
+    Subscription,
 };
 use crate::services::TrayManager;
 
@@ -64,20 +64,8 @@ impl ConnectionManager {
         let db: tauri::State<Database> = self.app_handle.state();
         let settings = db.get_settings().ok()?;
 
-        // Normalize URLs for comparison (remove trailing slash)
-        let normalized_url = normalize_url(server_url);
-        let server = settings
-            .servers
-            .iter()
-            .find(|s| s.url_matches(normalized_url));
-
-        let Some(server) = server else {
-            log::debug!(
-                "No server found for URL '{}' (normalized: '{}'). Available servers: {:?}",
-                server_url,
-                normalized_url,
-                settings.servers.iter().map(|s| &s.url).collect::<Vec<_>>()
-            );
+        let Some(server) = settings.servers.iter().find(|s| s.url == server_url) else {
+            log::debug!("No server found for URL '{server_url}'");
             return None;
         };
 
@@ -241,7 +229,7 @@ impl ConnectionManager {
         let db: tauri::State<Database> = self.app_handle.state();
         if let Ok(subs) = db.get_all_subscriptions() {
             for sub in subs {
-                if sub.server_url_matches(server_url) {
+                if sub.server_url == server_url {
                     self.disconnect(&sub.id).await;
                 }
             }

@@ -2,7 +2,7 @@ use tauri::{AppHandle, State};
 
 use crate::db::Database;
 use crate::error::AppError;
-use crate::models::{normalize_url, Subscription};
+use crate::models::{canonical_url, Subscription};
 use crate::services::{ConnectionManager, NtfyClient, SyncService};
 
 /// Sync subscriptions from a server that has user credentials
@@ -57,7 +57,6 @@ pub async fn sync_subscriptions(
 
     // Load existing subscriptions once (avoid N+1 query)
     let existing = db.get_all_subscriptions()?;
-    let our_base = normalize_url(&server_url);
 
     let mut synced_subscriptions = Vec::new();
 
@@ -68,18 +67,19 @@ pub async fn sync_subscriptions(
             ntfy_sub.base_url
         );
 
-        // Skip if base_url doesn't match (subscription might be for a different server)
-        let ntfy_base = normalize_url(&ntfy_sub.base_url);
-
-        if ntfy_base != our_base {
-            log::info!("Skipping subscription - base_url mismatch: {ntfy_base} vs {our_base}");
+        // Skip entries for other servers
+        if canonical_url(&ntfy_sub.base_url).ok().as_ref() != Some(&server_url) {
+            log::info!(
+                "Skipping subscription - base_url mismatch: {}",
+                ntfy_sub.base_url
+            );
             continue;
         }
 
         // Check if subscription already exists
         if let Some(existing_sub) = existing
             .iter()
-            .find(|s| s.server_url_matches(our_base) && s.topic == ntfy_sub.topic)
+            .find(|s| s.server_url == server_url && s.topic == ntfy_sub.topic)
         {
             log::info!("Subscription already exists: {}", ntfy_sub.topic);
             synced_subscriptions.push(existing_sub.clone());

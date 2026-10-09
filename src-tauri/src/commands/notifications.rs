@@ -61,9 +61,7 @@ pub async fn delete_notification(
             if let Some(subscription) = db.get_subscription_by_id(&subscription_id)? {
                 // Find credentials for this server
                 let servers = db.get_servers_with_credentials()?;
-                let server = servers
-                    .iter()
-                    .find(|s| s.url_matches(&subscription.server_url));
+                let server = servers.iter().find(|s| s.url == subscription.server_url);
 
                 let (username, password) = server
                     .and_then(|s| s.credentials())

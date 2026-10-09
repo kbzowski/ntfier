@@ -3,7 +3,7 @@ use serde::Deserialize;
 use std::error::Error as StdError;
 
 use crate::error::AppError;
-use crate::models::{normalize_url, NtfyMessage};
+use crate::models::NtfyMessage;
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
@@ -41,7 +41,7 @@ impl NtfyClient {
         username: &str,
         password: &str,
     ) -> Result<NtfyAccount, AppError> {
-        let url = format!("{}/v1/account", normalize_url(server_url));
+        let url = format!("{server_url}/v1/account");
         log::info!("Fetching account from: {url}");
 
         let response = self
@@ -101,7 +101,7 @@ impl NtfyClient {
         username: Option<&str>,
         password: Option<&str>,
     ) -> Result<(), AppError> {
-        let base = normalize_url(server_url);
+        let base = server_url;
         let url = format!("{base}/{topic}/{message_id}");
 
         log::info!("Deleting message from: {url}");
@@ -142,7 +142,7 @@ impl NtfyClient {
         username: Option<&str>,
         password: Option<&str>,
     ) -> Result<Vec<NtfyMessage>, AppError> {
-        let base = normalize_url(server_url);
+        let base = server_url;
 
         // Build URL with poll parameter to get historical messages
         // since=<timestamp> gets messages since that Unix timestamp
