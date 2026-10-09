@@ -477,6 +477,9 @@ impl ConnectionManager {
             }
 
             let mut attempt: usize = 0;
+            // Server time of the last frame (keepalives included); a reconnect resumes there
+            // so an announcement sent while disconnected still arrives
+            let mut since = chrono::Utc::now().timestamp();
             loop {
                 let is_current = connections
                     .read()
@@ -487,8 +490,6 @@ impl ConnectionManager {
                     return;
                 }
 
-                // Only announcements from now on matter, not old ones
-                let since = chrono::Utc::now().timestamp();
                 let Ok(ws_url) = Self::build_ws_url(&server_url, &sync_topic, Some(since)) else {
                     return;
                 };
@@ -509,6 +510,9 @@ impl ConnectionManager {
                                 msg = tokio::time::timeout(Duration::from_secs(READ_TIMEOUT_SECS), read.next()) => {
                                     match msg {
                                         Ok(Some(Ok(Message::Text(text)))) => {
+                                            if let Ok(frame) = serde_json::from_str::<NtfyMessage>(&text) {
+                                                since = since.max(frame.time);
+                                            }
                                             if is_sync_announcement(&text) {
                                                 let handle = app_handle.clone();
                                                 let url = server_url.clone();
