@@ -173,8 +173,12 @@ impl SyncService {
             }
         };
 
+        // A poll is all catch-up; no open frame, so our clock is the reference
+        let polled_at = chrono::Utc::now().timestamp();
         for msg in messages {
-            if let Err(e) = ConnectionManager::receive_message(handle, &sub.id, msg).await {
+            if let Err(e) =
+                ConnectionManager::receive_message(handle, &sub.id, msg, polled_at).await
+            {
                 // Stop so the cursor stays before the message that wasn't stored
                 log::error!("Failed to store a message for {}: {e}", sub.id);
                 return;

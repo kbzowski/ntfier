@@ -356,6 +356,8 @@ impl ConnectionManager {
                             // Reset backoff on successful connection
                             reconnect_attempt = 0;
                             let (_write, mut read) = ws_stream.split();
+                            // Server time of the `open` frame: older messages are catch-up
+                            let mut opened_at = chrono::Utc::now().timestamp();
 
                             loop {
                                 tokio::select! {
@@ -367,7 +369,10 @@ impl ConnectionManager {
                                             }
                                             Ok(Some(Ok(Message::Text(text)))) => {
                                                 if let Ok(ntfy_msg) = serde_json::from_str::<NtfyMessage>(&text) {
-                                                    if let Err(e) = Self::receive_message(&app_handle, &sub_id, ntfy_msg).await {
+                                                    if ntfy_msg.event == "open" {
+                                                        opened_at = ntfy_msg.time;
+                                                    }
+                                                    if let Err(e) = Self::receive_message(&app_handle, &sub_id, ntfy_msg, opened_at).await {
                                                     // Reconnect from the cursor, which is still before this message
                                                     log::error!("Failed to store a message for {sub_id}: {e}");
                                                     break;
@@ -622,12 +627,12 @@ impl ConnectionManager {
         Ok(parsed.to_string())
     }
 
-    /// Whether a received message is recent enough to toast. Live messages always are;
-    /// catch-up older than `CATCH_UP_TOAST_MAX_AGE_SECS` goes into the list silently.
-    // shortcut: compares the server's message time with our clock, so a server clock more
-    // than 10 min off also silences live toasts; tell live and replayed apart if that bites.
-    const fn should_toast(msg_time: i64, now: i64) -> bool {
-        now - msg_time < CATCH_UP_TOAST_MAX_AGE_SECS
+    /// Whether a received message is recent enough to toast. `opened_at` is when the stream
+    /// opened, in the server's clock: live messages come after it and always toast; catch-up
+    /// older than `CATCH_UP_TOAST_MAX_AGE_SECS` goes into the list silently. Both times come
+    /// from the server, so a wrong local clock doesn't matter.
+    const fn should_toast(msg_time: i64, opened_at: i64) -> bool {
+        opened_at - msg_time < CATCH_UP_TOAST_MAX_AGE_SECS
     }
 
     /// The one receive path for every message: live, catch-up, backfill and manual sync.
@@ -642,6 +647,7 @@ impl ConnectionManager {
         app_handle: &AppHandle,
         subscription_id: &str,
         msg: NtfyMessage,
+        opened_at: i64,
     ) -> Result<(), AppError> {
         let db: tauri::State<Database> = app_handle.state();
 
@@ -727,7 +733,7 @@ impl ConnectionManager {
             tray_manager.refresh_from_db(app_handle).await;
         }
 
-        if !is_muted && !ignored && Self::should_toast(msg_time, chrono::Utc::now().timestamp()) {
+        if !is_muted && !ignored && Self::should_toast(msg_time, opened_at) {
             let handle = app_handle.clone();
             tokio::spawn(async move {
                 Self::show_notification(&handle, &notification).await;
@@ -1091,6 +1097,8 @@ pub mod tests {
     fn only_fresh_messages_toast() {
         let now = 1_000_000;
         assert!(ConnectionManager::should_toast(now, now));
+        // Live: newer than the stream's open, even by hours of clock skew
+        assert!(ConnectionManager::should_toast(now + 3600, now));
         assert!(ConnectionManager::should_toast(now - 599, now));
         assert!(!ConnectionManager::should_toast(now - 600, now));
     }
