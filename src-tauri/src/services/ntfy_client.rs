@@ -50,6 +50,48 @@ pub fn status_error(status: StatusCode, context: &str) -> AppError {
     }
 }
 
+/// Outcome of the server version check: ntfier needs ntfy 2.17 or newer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VersionCheck {
+    Ok,
+    TooOld,
+    /// The server answered, but not in a way we recognize (HTTP status). Blocked like too old.
+    Unknown(u16),
+}
+
+impl VersionCheck {
+    /// Why the server can't be used, or `None` when it's supported.
+    pub fn problem(self) -> Option<String> {
+        match self {
+            Self::Ok => None,
+            Self::TooOld => Some(
+                "This server runs ntfy older than 2.17. ntfier needs 2.17 or newer, so update the server."
+                    .to_string(),
+            ),
+            Self::Unknown(status) => Some(format!(
+                "Couldn't confirm this server runs ntfy 2.17 or newer (version check got HTTP {status}). ntfier needs 2.17 or newer."
+            )),
+        }
+    }
+}
+
+/// Maps the answer to the `copy` action probe. Only 2.17+ knows the `copy` action,
+/// so both versions reject the empty probe, with different texts.
+/// Network errors and 5xx aren't results: the caller retries like any connection error.
+pub fn classify_probe(status: StatusCode, body: &str) -> Result<VersionCheck, AppError> {
+    match status {
+        StatusCode::BAD_REQUEST if body.contains("parameter 'value' is required") => {
+            Ok(VersionCheck::Ok)
+        }
+        StatusCode::BAD_REQUEST if body.contains("cannot be 'copy'") => Ok(VersionCheck::TooOld),
+        StatusCode::UNAUTHORIZED => Err(AppError::Auth(WRONG_CREDENTIALS.to_string())),
+        s if s.is_server_error() => Err(AppError::Connection(format!(
+            "Version check: server returned {s}"
+        ))),
+        s => Ok(VersionCheck::Unknown(s.as_u16())),
+    }
+}
+
 pub struct NtfyClient {
     client: Client,
 }
@@ -106,6 +148,50 @@ impl NtfyClient {
             .json()
             .await
             .map_err(|e| AppError::Connection(format!("Unexpected account response: {e}")))
+    }
+
+    /// Checks the server runs ntfy 2.17+. `/v1/version` exists since 2.17 but is admin-only,
+    /// so a 401 also means new enough; anything else falls back to the `copy` action probe.
+    pub async fn check_server_version(
+        &self,
+        server_url: &str,
+        auth: Option<&str>,
+    ) -> Result<VersionCheck, AppError> {
+        let url = format!("{server_url}/v1/version");
+        let response = self
+            .request(Method::GET, &url, auth)
+            .send()
+            .await
+            .map_err(|e| AppError::Connection(format!("Failed to reach {server_url}: {e}")))?;
+        match response.status() {
+            StatusCode::OK | StatusCode::UNAUTHORIZED => Ok(VersionCheck::Ok),
+            s if s.is_server_error() => Err(AppError::Connection(format!(
+                "Version check: server returned {s}"
+            ))),
+            _ => self.probe_copy_action(server_url, auth).await,
+        }
+    }
+
+    /// Publishes an empty message with an invalid `copy` action to a random topic. Every
+    /// version rejects it (nothing is published); the error text tells them apart.
+    pub async fn probe_copy_action(
+        &self,
+        server_url: &str,
+        auth: Option<&str>,
+    ) -> Result<VersionCheck, AppError> {
+        let url = format!(
+            "{server_url}/ntfier-probe-{}",
+            uuid::Uuid::new_v4().simple()
+        );
+        let response = self
+            .request(Method::POST, &url, auth)
+            .header("X-Actions", "copy, probe")
+            .send()
+            .await
+            .map_err(|e| AppError::Connection(format!("Failed to reach {server_url}: {e}")))?;
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        classify_probe(status, &body)
     }
 
     /// Deletes a message (all versions of its sequence) on the server.
@@ -213,6 +299,61 @@ mod tests {
 
         let anonymous = client.get_account(&url, None).await.unwrap();
         assert!(!anonymous.is_signed_in());
+    }
+
+    #[test]
+    fn probe_answers_map_to_results() {
+        let new = r#"{"error":"invalid request: actions invalid; parameter 'value' is required for action 'copy'"}"#;
+        let old = r#"{"error":"invalid request: actions invalid; parameter 'action' cannot be 'copy', valid values are 'view', 'broadcast' and 'http'"}"#;
+        assert_eq!(
+            classify_probe(StatusCode::BAD_REQUEST, new).unwrap(),
+            VersionCheck::Ok
+        );
+        assert_eq!(
+            classify_probe(StatusCode::BAD_REQUEST, old).unwrap(),
+            VersionCheck::TooOld
+        );
+        assert_eq!(
+            classify_probe(StatusCode::BAD_REQUEST, "something else").unwrap(),
+            VersionCheck::Unknown(400)
+        );
+        assert_eq!(
+            classify_probe(StatusCode::FORBIDDEN, "").unwrap(),
+            VersionCheck::Unknown(403)
+        );
+        assert!(matches!(
+            classify_probe(StatusCode::UNAUTHORIZED, ""),
+            Err(AppError::Auth(_))
+        ));
+        assert!(matches!(
+            classify_probe(StatusCode::BAD_GATEWAY, ""),
+            Err(AppError::Connection(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn version_check_tells_new_from_old() {
+        let (Some(new), Some(old)) = (test_server::url(), test_server::old_url()) else {
+            return;
+        };
+        let client = NtfyClient::new().unwrap();
+        let auth = server(Some(test_server::USER), Some(test_server::PASS), None).auth_header();
+
+        assert_eq!(
+            client.check_server_version(&new, None).await.unwrap(),
+            VersionCheck::Ok
+        );
+        assert_eq!(
+            client
+                .probe_copy_action(&new, auth.as_deref())
+                .await
+                .unwrap(),
+            VersionCheck::Ok
+        );
+        assert_eq!(
+            client.check_server_version(&old, None).await.unwrap(),
+            VersionCheck::TooOld
+        );
     }
 
     #[tokio::test]

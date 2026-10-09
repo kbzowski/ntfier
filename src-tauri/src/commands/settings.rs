@@ -66,8 +66,13 @@ async fn check_credential(
 #[specta::specta]
 pub async fn add_server(
     db: State<'_, Database>,
-    server: ServerConfig,
+    conn_manager: State<'_, ConnectionManager>,
+    mut server: ServerConfig,
 ) -> Result<SavedServer, AppError> {
+    server.url = canonical_url(&server.url)?;
+    conn_manager
+        .ensure_supported(&server.url, server.auth_header().as_deref())
+        .await?;
     let (server, warning) = check_credential(server).await?;
     let url = db.add_server(server)?;
     Ok(SavedServer { url, warning })

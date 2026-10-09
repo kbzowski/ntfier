@@ -11,6 +11,10 @@ pub enum ServerStatus {
     Ok,
     /// The server rejected the credential (401).
     NeedsCredentials,
+    /// The server runs ntfy older than 2.17, or its version couldn't be confirmed.
+    Unsupported {
+        message: String,
+    },
 }
 
 /// Payload of the `server:status` event and of `get_server_statuses`.

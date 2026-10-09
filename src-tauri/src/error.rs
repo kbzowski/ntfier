@@ -48,6 +48,10 @@ pub enum AppError {
     #[error("{0}")]
     RateLimited(String),
 
+    /// The server runs ntfy older than 2.17 (or its version is unknown).
+    #[error("{0}")]
+    UnsupportedServer(String),
+
     #[error("Updater error: {0}")]
     Updater(String),
 }

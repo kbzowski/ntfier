@@ -27,8 +27,8 @@ use crate::models::{
     is_ignored, Notification, NotificationDisplayMethod, NotificationSettings, NtfyMessage,
     ServerStatus, ServerStatusEntry, Subscription, SubscriptionError,
 };
-use crate::services::ntfy_client::{NO_TOPIC_ACCESS, RATE_LIMITED};
-use crate::services::TrayManager;
+use crate::services::ntfy_client::{VersionCheck, NO_TOPIC_ACCESS, RATE_LIMITED};
+use crate::services::{NtfyClient, TrayManager};
 
 /// Connection entry storing both the shutdown sender and a unique connection ID.
 /// The ID is used to detect stale connections after a race condition.
@@ -40,6 +40,43 @@ struct ConnectionEntry {
 /// Servers that may not be connected to, keyed by canonical URL. Absent means ok.
 type ServerStatuses = Arc<RwLock<HashMap<String, ServerStatus>>>;
 
+/// Remembers each server's version check for this launch. Connection errors aren't
+/// results, so they aren't cached and the caller retries.
+#[derive(Clone, Default)]
+struct VersionGate {
+    results: Arc<RwLock<HashMap<String, VersionCheck>>>,
+    /// One check per server at a time.
+    locks: Arc<tokio::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>,
+}
+
+impl VersionGate {
+    /// `Ok` when the server runs ntfy 2.17+, else `UnsupportedServer` with the reason.
+    async fn ensure(&self, url: &str, auth: Option<&str>) -> Result<(), AppError> {
+        if let Some(result) = self.results.read().await.get(url) {
+            return Self::verdict(*result);
+        }
+        let lock = Arc::clone(self.locks.lock().await.entry(url.to_string()).or_default());
+        let _guard = lock.lock().await;
+        if let Some(result) = self.results.read().await.get(url) {
+            return Self::verdict(*result);
+        }
+
+        let result = NtfyClient::new()?.check_server_version(url, auth).await?;
+        self.results.write().await.insert(url.to_string(), result);
+        Self::verdict(result)
+    }
+
+    fn verdict(result: VersionCheck) -> Result<(), AppError> {
+        result
+            .problem()
+            .map_or(Ok(()), |m| Err(AppError::UnsupportedServer(m)))
+    }
+
+    async fn forget(&self, url: &str) {
+        self.results.write().await.remove(url);
+    }
+}
+
 /// Manages WebSocket connections to ntfy servers.
 ///
 /// Each subscription gets its own WebSocket connection that receives
@@ -49,6 +86,7 @@ pub struct ConnectionManager {
     app_handle: AppHandle,
     connections: Arc<RwLock<HashMap<String, ConnectionEntry>>>,
     server_statuses: ServerStatuses,
+    version_gate: VersionGate,
     next_connection_id: AtomicU64,
 }
 
@@ -59,6 +97,7 @@ impl ConnectionManager {
             app_handle,
             connections: Arc::new(RwLock::new(HashMap::new())),
             server_statuses: Arc::new(RwLock::new(HashMap::new())),
+            version_gate: VersionGate::default(),
             next_connection_id: AtomicU64::new(1),
         }
     }
@@ -120,9 +159,21 @@ impl ConnectionManager {
         Self::set_server_status(&self.app_handle, &self.server_statuses, url, status).await;
     }
 
+    /// Fails with `UnsupportedServer` unless the server runs ntfy 2.17+, or is flagged.
+    /// `auth` is the credential to check with (the server may not be saved yet).
+    pub async fn ensure_supported(&self, url: &str, auth: Option<&str>) -> Result<(), AppError> {
+        if let Some(ServerStatus::Unsupported { message }) =
+            self.server_statuses.read().await.get(url)
+        {
+            return Err(AppError::UnsupportedServer(message.clone()));
+        }
+        self.version_gate.ensure(url, auth).await
+    }
+
     /// Clears the server's status and reconnects all of its subscriptions, which picks up
     /// a changed credential. Each keeps its cursor.
     pub async fn reconnect_server(&self, url: &str) {
+        self.version_gate.forget(url).await;
         Self::set_server_status(
             &self.app_handle,
             &self.server_statuses,
@@ -183,6 +234,7 @@ impl ConnectionManager {
         let app_handle = self.app_handle.clone();
         let connections = Arc::clone(&self.connections);
         let statuses = Arc::clone(&self.server_statuses);
+        let version_gate = self.version_gate.clone();
 
         tokio::spawn(async move {
             let mut reconnect_attempt: usize = 0;
@@ -240,78 +292,112 @@ impl ConnectionManager {
                 log::info!("Connecting to WebSocket: {ws_url}");
 
                 // Read every attempt so an edited credential applies on the next connect
-                let mut request = ClientRequestBuilder::new(ws_uri);
-                if let Some(auth) = Self::auth_header(&app_handle, &server_url) {
-                    request = request.with_header("Authorization", auth);
-                }
-
+                let auth = Self::auth_header(&app_handle, &server_url);
                 let mut delay_secs = None;
-                match connect_async(request).await {
-                    Ok((ws_stream, _)) => {
-                        log::info!("Connected to {ws_url}");
-                        report(None);
-                        // Reset backoff on successful connection
-                        reconnect_attempt = 0;
-                        let (_write, mut read) = ws_stream.split();
+                'attempt: {
+                    // Runs once per server per launch (cached), before its first connect
+                    match version_gate.ensure(&server_url, auth.as_deref()).await {
+                        Ok(()) => {}
+                        Err(AppError::UnsupportedServer(message)) => {
+                            log::error!("{server_url}: {message}");
+                            Self::set_server_status(
+                                &app_handle,
+                                &statuses,
+                                &server_url,
+                                ServerStatus::Unsupported { message },
+                            )
+                            .await;
+                            return;
+                        }
+                        Err(AppError::Auth(_)) => {
+                            Self::set_server_status(
+                                &app_handle,
+                                &statuses,
+                                &server_url,
+                                ServerStatus::NeedsCredentials,
+                            )
+                            .await;
+                            return;
+                        }
+                        Err(e) => {
+                            log::error!("Version check for {server_url} failed: {e}");
+                            report(Some(format!("Can't connect: {e}")));
+                            break 'attempt;
+                        }
+                    }
 
-                        loop {
-                            tokio::select! {
-                                msg = tokio::time::timeout(read_timeout, read.next()) => {
-                                    match msg {
-                                        Err(_) => {
-                                            log::warn!("Nothing from {ws_url} for {READ_TIMEOUT_SECS}s, reconnecting");
-                                            break;
-                                        }
-                                        Ok(Some(Ok(Message::Text(text)))) => {
-                                            if let Ok(ntfy_msg) = serde_json::from_str::<NtfyMessage>(&text) {
-                                                Self::receive_message(&app_handle, &sub_id, ntfy_msg).await;
+                    let mut request = ClientRequestBuilder::new(ws_uri);
+                    if let Some(auth) = auth {
+                        request = request.with_header("Authorization", auth);
+                    }
+
+                    match connect_async(request).await {
+                        Ok((ws_stream, _)) => {
+                            log::info!("Connected to {ws_url}");
+                            report(None);
+                            // Reset backoff on successful connection
+                            reconnect_attempt = 0;
+                            let (_write, mut read) = ws_stream.split();
+
+                            loop {
+                                tokio::select! {
+                                    msg = tokio::time::timeout(read_timeout, read.next()) => {
+                                        match msg {
+                                            Err(_) => {
+                                                log::warn!("Nothing from {ws_url} for {READ_TIMEOUT_SECS}s, reconnecting");
+                                                break;
                                             }
+                                            Ok(Some(Ok(Message::Text(text)))) => {
+                                                if let Ok(ntfy_msg) = serde_json::from_str::<NtfyMessage>(&text) {
+                                                    Self::receive_message(&app_handle, &sub_id, ntfy_msg).await;
+                                                }
+                                            }
+                                            Ok(Some(Err(e))) => {
+                                                log::error!("WebSocket error: {e}");
+                                                break;
+                                            }
+                                            Ok(None) => {
+                                                log::info!("WebSocket closed");
+                                                break;
+                                            }
+                                            // Pings and other frames only prove the socket is alive
+                                            Ok(Some(Ok(_))) => {}
                                         }
-                                        Ok(Some(Err(e))) => {
-                                            log::error!("WebSocket error: {e}");
-                                            break;
-                                        }
-                                        Ok(None) => {
-                                            log::info!("WebSocket closed");
-                                            break;
-                                        }
-                                        // Pings and other frames only prove the socket is alive
-                                        Ok(Some(Ok(_))) => {}
                                     }
-                                }
-                                _ = shutdown_rx.recv() => {
-                                    log::info!("Shutting down connection for {sub_id}");
-                                    return;
+                                    _ = shutdown_rx.recv() => {
+                                        log::info!("Shutting down connection for {sub_id}");
+                                        return;
+                                    }
                                 }
                             }
                         }
-                    }
-                    Err(WsError::Http(response)) if response.status() == 401 => {
-                        // Retrying a bad credential gets the IP banned, so stop the whole server
-                        log::error!(
-                            "{server_url} rejected the credential, stopping its connections"
-                        );
-                        Self::set_server_status(
-                            &app_handle,
-                            &statuses,
-                            &server_url,
-                            ServerStatus::NeedsCredentials,
-                        )
-                        .await;
-                        return;
-                    }
-                    Err(WsError::Http(response)) if response.status() == 403 => {
-                        log::error!("No access to {ws_url}");
-                        report(Some(NO_TOPIC_ACCESS.to_string()));
-                        delay_secs = Some(FORBIDDEN_RETRY_SECS);
-                    }
-                    Err(WsError::Http(response)) if response.status() == 429 => {
-                        log::error!("Rate limited by {server_url}");
-                        report(Some(RATE_LIMITED.to_string()));
-                    }
-                    Err(e) => {
-                        log::error!("Failed to connect to {ws_url}: {e}");
-                        report(Some(format!("Can't connect: {e}")));
+                        Err(WsError::Http(response)) if response.status() == 401 => {
+                            // Retrying a bad credential gets the IP banned, so stop the whole server
+                            log::error!(
+                                "{server_url} rejected the credential, stopping its connections"
+                            );
+                            Self::set_server_status(
+                                &app_handle,
+                                &statuses,
+                                &server_url,
+                                ServerStatus::NeedsCredentials,
+                            )
+                            .await;
+                            return;
+                        }
+                        Err(WsError::Http(response)) if response.status() == 403 => {
+                            log::error!("No access to {ws_url}");
+                            report(Some(NO_TOPIC_ACCESS.to_string()));
+                            delay_secs = Some(FORBIDDEN_RETRY_SECS);
+                        }
+                        Err(WsError::Http(response)) if response.status() == 429 => {
+                            log::error!("Rate limited by {server_url}");
+                            report(Some(RATE_LIMITED.to_string()));
+                        }
+                        Err(e) => {
+                            log::error!("Failed to connect to {ws_url}: {e}");
+                            report(Some(format!("Can't connect: {e}")));
+                        }
                     }
                 }
 
@@ -362,6 +448,7 @@ impl ConnectionManager {
         }
         // Removed or edited: its old status no longer applies
         self.server_statuses.write().await.remove(server_url);
+        self.version_gate.forget(server_url).await;
     }
 
     /// Establishes WebSocket connections for all subscriptions.
