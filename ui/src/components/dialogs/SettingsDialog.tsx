@@ -42,6 +42,7 @@ interface SettingsDialogProps {
 	/** Opens straight on this server's login (Servers tab). */
 	editServerUrl?: string | null;
 	onRemoveServer: (url: string) => void;
+	onSyncServer: (url: string) => Promise<void>;
 	onSetDefaultServer: (url: string) => void;
 	autostart: boolean;
 	onAutostartChange: (enabled: boolean) => void;
@@ -84,6 +85,7 @@ export function SettingsDialog({
 	onUpdateServer,
 	editServerUrl,
 	onRemoveServer,
+	onSyncServer,
 	onSetDefaultServer,
 	autostart,
 	onAutostartChange,
@@ -219,6 +221,7 @@ export function SettingsDialog({
 							onUpdateServer={onUpdateServer}
 							editUrl={editServerUrl}
 							onRemoveServer={onRemoveServer}
+							onSyncServer={onSyncServer}
 							onSetDefault={onSetDefaultServer}
 						/>
 					</TabsContent>

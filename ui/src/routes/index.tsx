@@ -80,7 +80,12 @@ function App() {
 		retryLoad,
 		serverStatuses,
 		updateServer,
+		syncServer,
 	} = useApp();
+	const [serverToRemove, setServerToRemove] = useState<string | null>(null);
+	const serverToRemoveTopics = subscriptionsWithUnread.filter(
+		(s) => s.serverUrl === serverToRemove,
+	).length;
 
 	const currentTopicIdRef = useRef(currentTopicId);
 	useEffect(() => {
@@ -213,7 +218,8 @@ function App() {
 					onAddServer={handleAddServer}
 					onUpdateServer={updateServer}
 					editServerUrl={editServerUrl}
-					onRemoveServer={removeServer}
+					onRemoveServer={setServerToRemove}
+					onSyncServer={syncServer}
 					onSetDefaultServer={setDefaultServer}
 					autostart={autostart}
 					onAutostartChange={setAutostart}
@@ -265,6 +271,21 @@ function App() {
 				confirmLabel="Unsubscribe"
 				variant="destructive"
 				onConfirm={handleConfirmRemove}
+			/>
+
+			<ConfirmDialog
+				open={serverToRemove !== null}
+				onOpenChange={(open) => {
+					if (!open) setServerToRemove(null);
+				}}
+				title="Remove server?"
+				description={`Its ${serverToRemoveTopics} topic${serverToRemoveTopics === 1 ? "" : "s"} and their messages are deleted.`}
+				confirmLabel="Remove"
+				variant="destructive"
+				onConfirm={() => {
+					if (serverToRemove) removeServer(serverToRemove);
+					setServerToRemove(null);
+				}}
 			/>
 
 			<UpdateToast

@@ -4,9 +4,11 @@ import {
 	EyeOff,
 	Loader2,
 	Pencil,
+	RefreshCw,
 	Server,
 	Trash2,
 } from "lucide-react";
+import { useState } from "react";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -26,6 +28,7 @@ import {
 	type ServerInput,
 	useServerForm,
 } from "@/hooks/useServerForm";
+import { cn } from "@/lib/utils";
 import type { ServerConfig } from "@/types/ntfy";
 
 const AUTH_MODES: { id: AuthMode; label: string }[] = [
@@ -39,6 +42,7 @@ interface ServerConfigFormProps {
 	onAddServer: (server: ServerInput) => Promise<unknown> | undefined;
 	onUpdateServer: (server: ServerInput) => Promise<unknown> | undefined;
 	onRemoveServer: (url: string) => void;
+	onSyncServer: (url: string) => Promise<void>;
 	onSetDefault: (url: string) => void;
 	/** Opens the form on this server's login, e.g. from a "needs credentials" flag. */
 	editUrl?: string | null;
@@ -49,9 +53,17 @@ export function ServerConfigForm({
 	onAddServer,
 	onUpdateServer,
 	onRemoveServer,
+	onSyncServer,
 	onSetDefault,
 	editUrl,
 }: ServerConfigFormProps) {
+	const [syncing, setSyncing] = useState<string | null>(null);
+	const handleSync = async (url: string) => {
+		setSyncing(url);
+		await onSyncServer(url);
+		setSyncing(null);
+	};
+
 	const {
 		formData,
 		setUrl,
@@ -154,6 +166,23 @@ export function ServerConfigForm({
 										Set default
 									</Button>
 								)}
+								{(server.username || server.token) && (
+									<Button
+										variant="ghost"
+										size="icon"
+										className="h-8 w-8"
+										aria-label={`Sync topics with the account on ${server.url}`}
+										disabled={syncing === server.url}
+										onClick={() => handleSync(server.url)}
+									>
+										<RefreshCw
+											className={cn(
+												"h-4 w-4",
+												syncing === server.url && "animate-spin",
+											)}
+										/>
+									</Button>
+								)}
 								<Button
 									variant="ghost"
 									size="icon"
@@ -180,7 +209,13 @@ export function ServerConfigForm({
 				</div>
 
 				{isOpen ? (
-					<div className="space-y-3 p-4 rounded-lg border border-border">
+					<form
+						className="space-y-3 p-4 rounded-lg border border-border"
+						onSubmit={(e) => {
+							e.preventDefault();
+							handleSubmit();
+						}}
+					>
 						<div className="space-y-2">
 							<Label htmlFor="server-url">Server URL</Label>
 							<Input
@@ -255,7 +290,7 @@ export function ServerConfigForm({
 						)}
 
 						<div className="flex gap-2 pt-2">
-							<Button onClick={handleSubmit} disabled={!canSubmit}>
+							<Button type="submit" disabled={!canSubmit}>
 								{isLoading ? (
 									<>
 										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -267,11 +302,16 @@ export function ServerConfigForm({
 									"Add Server"
 								)}
 							</Button>
-							<Button variant="ghost" onClick={cancel} disabled={isLoading}>
+							<Button
+								type="button"
+								variant="ghost"
+								onClick={cancel}
+								disabled={isLoading}
+							>
 								Cancel
 							</Button>
 						</div>
-					</div>
+					</form>
 				) : (
 					<Button variant="outline" className="w-full" onClick={startAdding}>
 						Add Server

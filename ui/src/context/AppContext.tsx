@@ -109,6 +109,7 @@ interface AppActions {
 		server: Omit<ServerConfig, "isDefault">,
 	) => Promise<Subscription[]>;
 	updateServer: (server: Omit<ServerConfig, "isDefault">) => Promise<void>;
+	syncServer: (url: string) => Promise<void>;
 	removeServer: (url: string) => Promise<void>;
 	setDefaultServer: (url: string) => Promise<void>;
 	setAutostart: (enabled: boolean) => Promise<void>;
@@ -536,15 +537,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 				setSettings(loaded);
 				const added = loaded.servers.find((s) => s.url === saved.url);
 
-				// If server has credentials, sync subscriptions
+				// With a login, bring in the account's topics. The server stays saved
+				// if that fails; the sync button retries it.
 				if (added && (added.username || added.token)) {
-					const synced = await syncApi.syncSubscriptions(saved.url);
-
-					// Also refresh subscriptions to include synced ones
-					const subs = await subscriptionsApi.getAll();
-					setSubscriptions(subs);
-
-					return synced;
+					try {
+						const synced = await syncApi.syncSubscriptions(saved.url);
+						setSubscriptions(await subscriptionsApi.getAll());
+						return synced;
+					} catch (err) {
+						toast.error("Server added, but syncing its topics failed", {
+							description: classifyError(err).userMessage,
+						});
+					}
 				}
 				return [];
 			}
@@ -569,27 +573,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		[],
 	);
 
-	const removeServer = useCallback(async (url: string) => {
-		if (isTauri()) {
-			try {
-				await settingsApi.removeServer(url);
+	const syncServer = useCallback(async (url: string) => {
+		if (!isTauri()) return;
+		try {
+			const subs = await syncApi.syncSubscriptions(url);
+			toast.success(
+				`Synced ${subs.length} topic${subs.length === 1 ? "" : "s"}`,
+			);
+		} catch (err) {
+			toast.error(classifyError(err).userMessage, {
+				description: "Sync failed",
+			});
+		}
+	}, []);
+
+	const removeServer = useCallback(
+		async (url: string) => {
+			if (isTauri()) {
+				try {
+					await settingsApi.removeServer(url);
+					// Its topics are gone too (local only; the account keeps them)
+					const removed = subscriptionsRef.current.filter(
+						(s) => s.serverUrl === url,
+					);
+					for (const sub of removed) notifications.clearTopic(sub.id);
+					const removedIds = new Set(removed.map((s) => s.id));
+					setSubscriptions((prev) => prev.filter((s) => s.serverUrl !== url));
+					setCurrentTopicId((current) =>
+						current && removedIds.has(current) ? null : current,
+					);
+					// The default may have moved to another server
+					setSettings(await settingsApi.get());
+					toast.success("Server removed");
+				} catch (err) {
+					const classified = classifyError(err);
+					toast.error(classified.userMessage);
+					console.error("[Settings Error]", err);
+				}
+			} else {
 				setSettings((prev) => ({
 					...prev,
 					servers: prev.servers.filter((s) => s.url !== url),
 				}));
-				toast.success("Server removed");
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage);
-				console.error("[Settings Error]", err);
 			}
-		} else {
-			setSettings((prev) => ({
-				...prev,
-				servers: prev.servers.filter((s) => s.url !== url),
-			}));
-		}
-	}, []);
+		},
+		[notifications.clearTopic],
+	);
 
 	const setDefaultServer = useCallback(async (url: string) => {
 		if (isTauri()) {
@@ -816,6 +845,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			setTheme,
 			addServer,
 			updateServer,
+			syncServer,
 			removeServer,
 			setDefaultServer,
 			setAutostart,
@@ -868,6 +898,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			setTheme,
 			addServer,
 			updateServer,
+			syncServer,
 			removeServer,
 			setDefaultServer,
 			setAutostart,
