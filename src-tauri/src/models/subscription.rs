@@ -35,6 +35,11 @@ impl Subscription {
     }
 }
 
+/// Paths the ntfy server routes itself, so they can't be topics.
+const RESERVED_TOPICS: [&str; 10] = [
+    "docs", "static", "file", "app", "metrics", "account", "settings", "signup", "login", "v1",
+];
+
 /// Data required to create a new subscription.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -72,6 +77,12 @@ impl CreateSubscription {
             ));
         }
 
+        if RESERVED_TOPICS.contains(&topic) {
+            return Err(AppError::InvalidUrl(format!(
+                "\"{topic}\" is reserved by ntfy and can't be used as a topic"
+            )));
+        }
+
         // Validate server URL
         if self.server_url.trim().is_empty() {
             return Err(AppError::InvalidUrl(
@@ -95,5 +106,31 @@ impl CreateSubscription {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sub(topic: &str) -> CreateSubscription {
+        CreateSubscription {
+            topic: topic.to_string(),
+            server_url: "https://ntfy.sh".to_string(),
+            display_name: None,
+        }
+    }
+
+    #[test]
+    fn rejects_reserved_topic_names() {
+        for name in ["docs", "v1", "file", "account"] {
+            assert!(sub(name).validate().is_err(), "{name} must be rejected");
+        }
+    }
+
+    #[test]
+    fn accepts_regular_topic() {
+        assert!(sub("alerts").validate().is_ok());
+        assert!(sub("docs2").validate().is_ok());
     }
 }

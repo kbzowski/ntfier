@@ -131,7 +131,6 @@ impl ConnectionManager {
             .parse()
             .map_err(|e| AppError::InvalidUrl(format!("Invalid WebSocket URL {ws_url}: {e}")))?;
         let sub_id = subscription.id.clone();
-        let is_muted = subscription.muted;
         let app_handle = self.app_handle.clone();
         let connections = Arc::clone(&self.connections);
 
@@ -180,7 +179,6 @@ impl ConnectionManager {
                                                         &app_handle,
                                                         &sub_id,
                                                         ntfy_msg,
-                                                        is_muted,
                                                     ).await;
                                                 }
                                             }
@@ -291,9 +289,14 @@ impl ConnectionManager {
         app_handle: &AppHandle,
         subscription_id: &str,
         ntfy_msg: NtfyMessage,
-        is_muted: bool,
     ) {
         let db: tauri::State<Database> = app_handle.state();
+        // Read per message so a mute toggled after connect applies right away
+        let is_muted = db
+            .get_subscription_by_id(subscription_id)
+            .ok()
+            .flatten()
+            .is_some_and(|s| s.muted);
 
         // Check if notification already exists by ntfy_id to prevent duplicates
         if db

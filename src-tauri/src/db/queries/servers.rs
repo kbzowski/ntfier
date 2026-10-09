@@ -103,6 +103,24 @@ impl Database {
 
             diesel::delete(servers::table.filter(servers::url.eq(url))).execute(conn)?;
 
+            // Keep a default server: promote the first remaining one if the default was removed
+            let has_default: bool = diesel::select(diesel::dsl::exists(
+                servers::table.filter(servers::is_default.eq(1)),
+            ))
+            .get_result(conn)?;
+            if !has_default {
+                if let Some(first_id) = servers::table
+                    .select(servers::id)
+                    .order(diesel::dsl::sql::<diesel::sql_types::BigInt>("rowid"))
+                    .first::<String>(conn)
+                    .optional()?
+                {
+                    diesel::update(servers::table.filter(servers::id.eq(first_id)))
+                        .set(servers::is_default.eq(1))
+                        .execute(conn)?;
+                }
+            }
+
             Ok(username)
         })?;
 
@@ -135,5 +153,29 @@ impl Database {
         })?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn removing_default_server_promotes_another() {
+        let db = Database::new(std::path::Path::new(":memory:")).unwrap();
+        db.add_server(ServerConfig {
+            url: "https://other.example".to_string(),
+            username: None,
+            password: None,
+            is_default: false,
+        })
+        .unwrap();
+
+        db.remove_server("https://ntfy.sh").unwrap();
+
+        assert_eq!(
+            db.get_default_server_url().unwrap(),
+            "https://other.example"
+        );
     }
 }

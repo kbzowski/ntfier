@@ -1,4 +1,6 @@
-use tauri::State;
+use tauri::{AppHandle, State};
+
+use crate::commands::notifications::refresh_tray;
 
 use crate::db::Database;
 use crate::error::AppError;
@@ -31,12 +33,15 @@ pub fn add_server(db: State<'_, Database>, server: ServerConfig) -> Result<(), A
 #[tauri::command]
 #[specta::specta]
 pub async fn remove_server(
+    app_handle: AppHandle,
     db: State<'_, Database>,
     conn_manager: State<'_, ConnectionManager>,
     url: String,
 ) -> Result<(), AppError> {
     conn_manager.disconnect_server(&url).await;
-    db.remove_server(&url)
+    db.remove_server(&url)?;
+    refresh_tray(app_handle);
+    Ok(())
 }
 
 #[tauri::command]
