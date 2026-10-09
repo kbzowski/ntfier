@@ -527,6 +527,17 @@ impl ConnectionManager {
                             }
                         }
                     }
+                    Err(WsError::Http(response)) if response.status() == 401 => {
+                        // Same rule as subscriptions: retrying a bad credential gets the IP banned
+                        Self::set_server_status(
+                            &app_handle,
+                            &statuses,
+                            &server_url,
+                            ServerStatus::NeedsCredentials,
+                        )
+                        .await;
+                        return;
+                    }
                     Err(e) => log::warn!("Can't watch the sync topic of {server_url}: {e}"),
                 }
 
