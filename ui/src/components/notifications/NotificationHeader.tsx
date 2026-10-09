@@ -2,6 +2,7 @@ import { ChevronRight, Star, Trash2 } from "lucide-react";
 import { type MouseEvent, memo } from "react";
 import { cn } from "@/lib/utils";
 import { PriorityBadge } from "./PriorityBadge";
+import { RelativeTime } from "./RelativeTime";
 
 interface NotificationHeaderProps {
 	title: string;
@@ -13,23 +14,6 @@ interface NotificationHeaderProps {
 	isFavorite?: boolean;
 	onToggleFavorite?: () => void;
 	onDelete?: () => void;
-}
-
-function formatTimestamp(timestamp: number): string {
-	const now = Date.now();
-	const diff = now - timestamp;
-
-	const seconds = Math.floor(diff / 1000);
-	const minutes = Math.floor(seconds / 60);
-	const hours = Math.floor(minutes / 60);
-	const days = Math.floor(hours / 24);
-
-	if (seconds < 60) return "just now";
-	if (minutes < 60) return `${minutes}m ago`;
-	if (hours < 24) return `${hours}h ago`;
-	if (days < 7) return `${days}d ago`;
-
-	return new Date(timestamp).toLocaleDateString();
 }
 
 export const NotificationHeader = memo(function NotificationHeader({
@@ -102,9 +86,10 @@ export const NotificationHeader = memo(function NotificationHeader({
 					</button>
 				)}
 				<PriorityBadge priority={priority} />
-				<span className="text-xs text-muted-foreground whitespace-nowrap">
-					{formatTimestamp(timestamp)}
-				</span>
+				<RelativeTime
+					timestamp={timestamp}
+					className="text-xs text-muted-foreground whitespace-nowrap"
+				/>
 			</div>
 		</div>
 	);
