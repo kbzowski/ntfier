@@ -367,7 +367,11 @@ impl ConnectionManager {
                                             }
                                             Ok(Some(Ok(Message::Text(text)))) => {
                                                 if let Ok(ntfy_msg) = serde_json::from_str::<NtfyMessage>(&text) {
-                                                    Self::receive_message(&app_handle, &sub_id, ntfy_msg).await;
+                                                    if let Err(e) = Self::receive_message(&app_handle, &sub_id, ntfy_msg).await {
+                                                    // Reconnect from the cursor, which is still before this message
+                                                    log::error!("Failed to store a message for {sub_id}: {e}");
+                                                    break;
+                                                }
                                                 }
                                             }
                                             Ok(Some(Err(e))) => {
@@ -631,7 +635,14 @@ impl ConnectionManager {
     /// Stores it (ignoring duplicates and tombstones), moves the cursor, tells the UI
     /// and shows a toast when it's fresh, unmuted and not ignored. Server deletes and
     /// clears apply to the message's sequence and aren't stored.
-    pub async fn receive_message(app_handle: &AppHandle, subscription_id: &str, msg: NtfyMessage) {
+    ///
+    /// Errs only when storing failed. The caller must then stop reading this stream:
+    /// a later message would move the cursor past the lost one.
+    pub async fn receive_message(
+        app_handle: &AppHandle,
+        subscription_id: &str,
+        msg: NtfyMessage,
+    ) -> Result<(), AppError> {
         let db: tauri::State<Database> = app_handle.state();
 
         let applied = match msg.event.as_str() {
@@ -642,17 +653,14 @@ impl ConnectionManager {
             "message_clear" => {
                 Some(db.clear_sequence(subscription_id, msg.sequence_id(), msg.time * 1000))
             }
-            _ => return,
+            _ => return Ok(()),
         };
         if let Some(result) = applied {
-            if let Err(e) = result {
-                log::error!("Failed to apply {} for {subscription_id}: {e}", msg.event);
-                return;
-            }
+            result?;
             Self::remove_toast(app_handle, subscription_id, msg.sequence_id());
             let _ = db.advance_message_cursor(subscription_id, msg.time);
             Self::subscription_changed(app_handle, subscription_id).await;
-            return;
+            return Ok(());
         }
 
         // An update (or a message with its own sequence id) can replace a shown version
@@ -660,8 +668,8 @@ impl ConnectionManager {
         let sequence_id = msg.sequence_id().to_string();
 
         // Read per message so a mute toggled after connect applies right away
-        let Some(subscription) = db.get_subscription_by_id(subscription_id).ok().flatten() else {
-            return;
+        let Some(subscription) = db.get_subscription_by_id(subscription_id)? else {
+            return Ok(());
         };
         let is_muted = subscription.muted;
 
@@ -697,20 +705,13 @@ impl ConnectionManager {
         notification.ignored = ignored;
 
         let inserted =
-            match db.insert_notification_with_ntfy_id(&notification, &ntfy_id, &sequence_id) {
-                Ok(inserted) => inserted,
-                Err(e) => {
-                    // Cursor stays put so the next connect asks for this message again
-                    log::error!("Failed to save notification: {e}");
-                    return;
-                }
-            };
+            db.insert_notification_with_ntfy_id(&notification, &ntfy_id, &sequence_id)?;
         if let Err(e) = db.advance_message_cursor(subscription_id, msg_time) {
             log::error!("Failed to move cursor for {subscription_id}: {e}");
         }
         if !inserted {
             log::debug!("Notification {ntfy_id} already stored, skipping");
-            return;
+            return Ok(());
         }
         // Stored with all tags; the UI and toast get emoji tags as emoji
         let notification = notification.with_emojis();
@@ -732,6 +733,7 @@ impl ConnectionManager {
                 Self::show_notification(&handle, &notification).await;
             });
         }
+        Ok(())
     }
 
     /// Tells the UI to reload a subscription whose stored messages changed in place.

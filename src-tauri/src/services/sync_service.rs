@@ -174,7 +174,11 @@ impl SyncService {
         };
 
         for msg in messages {
-            ConnectionManager::receive_message(handle, &sub.id, msg).await;
+            if let Err(e) = ConnectionManager::receive_message(handle, &sub.id, msg).await {
+                // Stop so the cursor stays before the message that wasn't stored
+                log::error!("Failed to store a message for {}: {e}", sub.id);
+                return;
+            }
         }
     }
 }
