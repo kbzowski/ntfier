@@ -6,7 +6,7 @@ use diesel::prelude::*;
 
 use super::schema::{ignore_rules, notifications, servers, settings, subscriptions};
 use super::types::{JsonActions, JsonAttachments, JsonTags};
-use crate::models::{Notification, Priority, Subscription};
+use crate::models::{Notification, NotificationAction, Priority, Subscription};
 
 // ===== Server =====
 
@@ -104,7 +104,12 @@ impl NotificationRow {
             priority: Priority::from(self.priority as i8),
             tags: self.tags.into_inner(),
             timestamp: self.timestamp,
-            actions: self.actions.into_inner(),
+            actions: self
+                .actions
+                .into_inner()
+                .into_iter()
+                .map(NotificationAction::without_dead_view)
+                .collect(),
             attachments: self.attachments.into_inner(),
             read: self.read == 1,
             is_expanded: self.is_expanded == 1,

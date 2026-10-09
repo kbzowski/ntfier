@@ -77,7 +77,22 @@ pub struct Notification {
     pub sequence_id: Option<String>,
 }
 
+impl NotificationAction {
+    /// A `view` without a URL (an old `copy` or `broadcast` row) can't run: hide it.
+    pub fn without_dead_view(mut self) -> Self {
+        if self.action == ActionType::View && self.url.is_none() {
+            self.action = ActionType::Unknown;
+        }
+        self
+    }
+}
+
 impl Notification {
+    /// Tag of this message's toast: its sequence, so a newer version replaces it.
+    pub fn toast_tag(&self) -> &str {
+        self.sequence_id.as_deref().unwrap_or(&self.id)
+    }
+
     /// Moves tags that are emoji shortcodes from `tags` to `emojis`.
     pub fn with_emojis(mut self) -> Self {
         let (emojis, tags): (Vec<_>, Vec<_>) = std::mem::take(&mut self.tags)
@@ -111,7 +126,8 @@ impl Notification {
 #[serde(rename_all = "camelCase")]
 pub struct NotificationAction {
     pub id: String,
-    /// Rows stored before the type was kept are treated as `view`.
+    /// Rows stored before the type was kept are treated as `view`, as the app did then
+    /// (an old `http` action without a method looks exactly the same).
     #[serde(default = "ActionType::legacy")]
     pub action: ActionType,
     pub label: String,
@@ -354,5 +370,20 @@ mod tests {
 
         let untitled = message(r#"{"id":"a","time":1,"event":"message","topic":"t"}"#);
         assert_eq!(untitled.display_title("alerts"), "alerts");
+    }
+
+    #[test]
+    fn old_action_rows_stay_view_unless_they_have_no_url() {
+        let old: NotificationAction = serde_json::from_str(
+            r#"{"id":"a","label":"Open","url":"https://x.io","method":null,"clear":false}"#,
+        )
+        .unwrap();
+        assert_eq!(old.without_dead_view().action, ActionType::View);
+
+        let old_copy: NotificationAction = serde_json::from_str(
+            r#"{"id":"b","label":"Copy","url":null,"method":null,"clear":false}"#,
+        )
+        .unwrap();
+        assert_eq!(old_copy.without_dead_view().action, ActionType::Unknown);
     }
 }

@@ -970,22 +970,26 @@ impl ConnectionManager {
                 .actions
                 .iter()
                 .filter(|a| a.action != ActionType::Unknown)
-                .map(|a| ToastButton {
-                    label: a.label.clone(),
-                    arguments: format!("action:{}:{}", notification.id, a.id),
-                    protocol: false,
+                .map(|a| match (&a.action, &a.url) {
+                    // Windows opens these itself, so they work after a restart too
+                    (ActionType::View, Some(url)) if !a.clear => ToastButton {
+                        label: a.label.clone(),
+                        arguments: url.clone(),
+                        protocol: true,
+                    },
+                    _ => ToastButton {
+                        label: a.label.clone(),
+                        arguments: format!("action:{}:{}", notification.id, a.id),
+                        protocol: false,
+                    },
                 })
                 .collect()
         } else {
             Vec::new()
         };
 
-        let sequence_id = notification
-            .sequence_id
-            .as_deref()
-            .unwrap_or(&notification.id);
         let content = ToastContent {
-            tag: sequence_id,
+            tag: notification.toast_tag(),
             group: &notification.topic_id,
             title: &text.title,
             body: &text.body,

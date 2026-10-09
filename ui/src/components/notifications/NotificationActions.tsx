@@ -17,7 +17,7 @@ export const NotificationActions = memo(function NotificationActions({
 	notificationId,
 	actions,
 }: NotificationActionsProps) {
-	const [running, setRunning] = useState<string | null>(null);
+	const [running, setRunning] = useState<ReadonlySet<string>>(new Set());
 
 	const handleClick = useCallback(
 		async (e: React.MouseEvent, action: NotificationAction) => {
@@ -29,15 +29,30 @@ export const NotificationActions = memo(function NotificationActions({
 				return;
 			}
 
-			setRunning(action.id);
+			setRunning((prev) => new Set(prev).add(action.id));
 			try {
 				await notificationsApi.runAction(notificationId, action.id);
 				if (action.action === "copy") toast.success("Copied");
 			} catch (err) {
-				toast.error(classifyError(err).userMessage);
+				const url = action.action === "view" ? action.url : null;
+				toast.error(classifyError(err).userMessage, {
+					action: url
+						? {
+								label: "Copy URL",
+								onClick: () => {
+									navigator.clipboard.writeText(url);
+									toast.success("URL copied to clipboard");
+								},
+							}
+						: undefined,
+				});
 				console.error("[Action error]", err);
 			} finally {
-				setRunning(null);
+				setRunning((prev) => {
+					const next = new Set(prev);
+					next.delete(action.id);
+					return next;
+				});
 			}
 		},
 		[notificationId],
@@ -57,10 +72,10 @@ export const NotificationActions = memo(function NotificationActions({
 						variant={action.clear ? "ghost" : "outline"}
 						size="sm"
 						className="h-8 text-xs gap-1.5 transition-all duration-150 hover:bg-accent hover:shadow-sm active:scale-95"
-						disabled={running === action.id}
+						disabled={running.has(action.id)}
 						onClick={(e) => handleClick(e, action)}
 					>
-						{running === action.id ? (
+						{running.has(action.id) ? (
 							<Loader2 className="h-3 w-3 animate-spin" />
 						) : (
 							<Icon className="h-3 w-3" />

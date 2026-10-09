@@ -213,7 +213,10 @@ export type Notification = {
 /**  An action button attached to a notification. */
 export type NotificationAction = {
 	id: string,
-	/**  Rows stored before the type was kept are treated as `view`. */
+	/**
+	 *  Rows stored before the type was kept are treated as `view`, as the app did then
+	 *  (an old `http` action without a method looks exactly the same).
+	 */
 	action?: ActionType,
 	label: string,
 	url: string | null,

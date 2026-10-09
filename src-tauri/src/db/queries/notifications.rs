@@ -52,8 +52,11 @@ impl Database {
     /// One stored message by id.
     pub fn get_notification(&self, id: &str) -> Result<Option<Notification>, AppError> {
         let mut conn = self.conn()?;
+        // Hidden rows don't count: an old toast must not run a deleted message's action
         let row: Option<NotificationRow> = notifications::table
             .filter(notifications::id.eq(id))
+            .filter(notifications::deleted.eq(0))
+            .filter(notifications::superseded.eq(0))
             .first(&mut *conn)
             .optional()?;
         Ok(row.map(NotificationRow::into_notification))

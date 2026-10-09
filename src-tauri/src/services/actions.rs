@@ -45,9 +45,7 @@ pub async fn run_action(
 
     if action.clear {
         db.mark_notification_read(notification_id)?;
-        if let Some(sequence_id) = &notification.sequence_id {
-            ConnectionManager::remove_toast(app, &notification.topic_id, sequence_id);
-        }
+        ConnectionManager::remove_toast(app, &notification.topic_id, notification.toast_tag());
         let _ = app.emit("subscription:changed", &notification.topic_id);
         app.state::<TrayManager>().refresh_from_db(app).await;
     }
