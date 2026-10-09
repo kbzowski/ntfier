@@ -114,6 +114,7 @@ impl NotificationRow {
             click: self.click,
             icon: self.icon,
             emojis: Vec::new(),
+            sequence_id: self.sequence_id,
         }
         .with_emojis()
     }

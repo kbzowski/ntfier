@@ -60,6 +60,8 @@ thiserror = "2"
 url = "2"
 pulldown-cmark = { version = "0.13", default-features = false }
 base64 = "0.22"
+# Already in the tree via tauri-plugin-shell; opens click and view URLs from Rust
+open = "5"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 
 # Secure credential storage - platform-native backends ship in `default` since v4
@@ -68,9 +70,9 @@ tauri-plugin-window-state = "2"
 
 # Windows-specific enhanced notifications
 [target.'cfg(windows)'.dependencies]
-# Pinned to 0.7 to match what notify-rust pulls in via tauri-plugin-notification.
-# 0.8 needs windows 0.62 and would add a third copy of the windows crate.
-tauri-winrt-notification = "0.7"
+# Own toasts (Tag/Group for replace and remove). 0.61 is the copy notify-rust already
+# pulls in via tauri-winrt-notification, so this adds no new windows crate.
+windows = { version = "0.61", features = ["Data_Xml_Dom", "Foundation", "UI_Notifications"] }
 
 # Type-safe bindings between Rust and TypeScript.
 # These three hard-pin each other and must move as a unit.

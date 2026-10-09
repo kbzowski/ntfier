@@ -6,8 +6,11 @@ mod sync_service;
 #[cfg(test)]
 pub mod test_server;
 mod text_attachment;
+#[cfg(windows)]
+pub mod toast;
 mod tray_manager;
 mod update_service;
+pub mod url_opener;
 
 pub use connection_manager::ConnectionManager;
 pub use ntfy_client::NtfyClient;

@@ -2612,6 +2612,7 @@ dependencies = [
  "keyring",
  "libsqlite3-sys",
  "log",
+ "open",
  "pulldown-cmark",
  "reqwest",
  "rustls",
@@ -2630,12 +2631,12 @@ dependencies = [
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
  "tauri-specta",
- "tauri-winrt-notification",
  "thiserror 2.0.18",
  "tokio",
  "tokio-tungstenite",
  "url",
  "uuid",
+ "windows",
 ]
 
 [[package]]

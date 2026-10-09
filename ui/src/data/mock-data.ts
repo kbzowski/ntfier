@@ -68,6 +68,7 @@ export const mockNotifications: Notification[] = [
 		click: null,
 		icon: null,
 		emojis: [],
+		sequenceId: null,
 	},
 	{
 		id: "notif-2",
@@ -96,6 +97,7 @@ export const mockNotifications: Notification[] = [
 		click: null,
 		icon: null,
 		emojis: [],
+		sequenceId: null,
 	},
 	{
 		id: "notif-3",
@@ -116,6 +118,7 @@ export const mockNotifications: Notification[] = [
 		click: null,
 		icon: null,
 		emojis: [],
+		sequenceId: null,
 	},
 	{
 		id: "notif-4",
@@ -161,6 +164,7 @@ export const mockNotifications: Notification[] = [
 		click: null,
 		icon: null,
 		emojis: [],
+		sequenceId: null,
 	},
 	{
 		id: "notif-5",
@@ -189,6 +193,7 @@ export const mockNotifications: Notification[] = [
 		click: null,
 		icon: null,
 		emojis: [],
+		sequenceId: null,
 	},
 	{
 		id: "notif-6",
@@ -217,6 +222,7 @@ export const mockNotifications: Notification[] = [
 		click: null,
 		icon: null,
 		emojis: [],
+		sequenceId: null,
 	},
 	{
 		id: "notif-7",
@@ -245,6 +251,7 @@ export const mockNotifications: Notification[] = [
 		click: null,
 		icon: null,
 		emojis: [],
+		sequenceId: null,
 	},
 	{
 		id: "notif-8",
@@ -265,6 +272,7 @@ export const mockNotifications: Notification[] = [
 		click: null,
 		icon: null,
 		emojis: [],
+		sequenceId: null,
 	},
 	{
 		id: "notif-9",
@@ -293,6 +301,7 @@ export const mockNotifications: Notification[] = [
 		click: null,
 		icon: null,
 		emojis: [],
+		sequenceId: null,
 	},
 	{
 		id: "notif-10",
@@ -323,6 +332,7 @@ export const mockNotifications: Notification[] = [
 		click: null,
 		icon: null,
 		emojis: [],
+		sequenceId: null,
 	},
 	{
 		id: "notif-11",
@@ -343,6 +353,7 @@ export const mockNotifications: Notification[] = [
 		click: null,
 		icon: null,
 		emojis: [],
+		sequenceId: null,
 	},
 	{
 		id: "notif-12",
@@ -381,6 +392,7 @@ export const mockNotifications: Notification[] = [
 		click: null,
 		icon: null,
 		emojis: [],
+		sequenceId: null,
 	},
 	{
 		id: "notif-13",
@@ -426,6 +438,7 @@ export const mockNotifications: Notification[] = [
 		click: null,
 		icon: null,
 		emojis: [],
+		sequenceId: null,
 	},
 ];
 

@@ -201,6 +201,8 @@ export type Notification = {
 	 *  Computed on read; those tags are left out of `tags`.
 	 */
 	emojis: string[],
+	/**  All versions of this message share it. */
+	sequenceId: string | null,
 };
 
 /**  An action button attached to a notification. */

@@ -378,6 +378,7 @@ pub mod tests {
             click: None,
             icon: None,
             emojis: vec![],
+            sequence_id: None,
         }
     }
 

@@ -28,7 +28,7 @@ use crate::models::{
     ServerStatus, ServerStatusEntry, Subscription, SubscriptionError,
 };
 use crate::services::ntfy_client::{VersionCheck, NO_TOPIC_ACCESS, RATE_LIMITED};
-use crate::services::{text_attachment, NtfyClient, SyncService, TrayManager};
+use crate::services::{text_attachment, url_opener, NtfyClient, SyncService, TrayManager};
 
 /// Connection entry storing both the shutdown sender and a unique connection ID.
 /// The ID is used to detect stale connections after a race condition.
@@ -634,6 +634,7 @@ impl ConnectionManager {
                 log::error!("Failed to apply {} for {subscription_id}: {e}", msg.event);
                 return;
             }
+            Self::remove_toast(app_handle, subscription_id, msg.sequence_id());
             let _ = db.advance_message_cursor(subscription_id, msg.time);
             Self::subscription_changed(app_handle, subscription_id).await;
             return;
@@ -881,29 +882,22 @@ impl ConnectionManager {
         Self::show_winrt_notification_sync(app_handle, notification, text, settings, image, icon);
     }
 
-    /// Selects the toast sound, or `None` to silence it.
+    /// The toast sound for a priority, or `None` for silence.
     #[cfg(windows)]
-    const fn select_toast_sound(
-        sound_enabled: bool,
-        priority: i32,
-    ) -> Option<tauri_winrt_notification::Sound> {
-        use tauri_winrt_notification::Sound;
-
+    const fn select_toast_sound(sound_enabled: bool, priority: i32) -> Option<&'static str> {
         if !sound_enabled {
             return None;
         }
         if priority >= 4 {
-            Some(Sound::SMS)
+            Some("ms-winsoundevent:Notification.SMS")
         } else if priority >= 3 {
-            Some(Sound::Default)
+            Some("ms-winsoundevent:Notification.Default")
         } else {
             None
         }
     }
 
-    /// Synchronous part of `WinRT` notification display.
-    ///
-    /// Separated from async to avoid Send issues with Toast type.
+    /// Synchronous part of the Windows toast (the `WinRT` objects aren't `Send`).
     #[cfg(windows)]
     fn show_winrt_notification_sync(
         app_handle: &AppHandle,
@@ -914,65 +908,85 @@ impl ConnectionManager {
         icon: Option<crate::services::image_cache::CachedImage>,
     ) {
         use crate::services::image_cache::ImageOrientation;
-        use tauri_winrt_notification::{Duration, IconCrop, Scenario, Toast};
+        use crate::services::toast::{self, ToastButton, ToastContent};
 
-        // Get the app's AUMID (Application User Model ID)
-        // Tauri apps use the bundle identifier from tauri.conf.json
+        // Landscape images go above the text, portrait ones below it (no cropping)
+        let (hero_image, inline_image) = match &cached_image {
+            Some(c) if matches!(c.orientation, ImageOrientation::Landscape) => {
+                (Some(c.path.as_path()), None)
+            }
+            Some(c) => (None, Some(c.path.as_path())),
+            None => (None, None),
+        };
+
+        let buttons = if settings.notification_show_actions {
+            notification
+                .actions
+                .iter()
+                .filter_map(|a| {
+                    a.url.as_ref().map(|url| ToastButton {
+                        label: a.label.clone(),
+                        arguments: url.clone(),
+                        protocol: true,
+                    })
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        let sequence_id = notification
+            .sequence_id
+            .as_deref()
+            .unwrap_or(&notification.id);
+        let content = ToastContent {
+            tag: sequence_id,
+            group: &notification.topic_id,
+            title: &text.title,
+            body: &text.body,
+            hero_image,
+            inline_image,
+            app_logo: icon.as_ref().map(|i| i.path.as_path()),
+            buttons,
+            clickable: notification.click.is_some(),
+            alarm: settings.notification_force_display,
+            long: notification.priority as i32 >= 4,
+            sound: Self::select_toast_sound(
+                settings.notification_sound,
+                notification.priority as i32,
+            ),
+        };
+
+        let click = notification.click.clone();
+        let on_activated = move |arguments: String| {
+            if arguments == toast::CLICK_ARGUMENT {
+                if let Some(url) = &click {
+                    if let Err(e) = url_opener::open_url(url) {
+                        log::error!("Toast click: {e}");
+                    }
+                }
+            }
+        };
+
         let aumid = app_handle.config().identifier.as_str();
-
-        let mut toast = Toast::new(aumid).title(&text.title).text1(&text.body);
-        if let Some(ref icon) = icon {
-            toast = toast.icon(&icon.path, IconCrop::Square, "");
-        }
-
-        // Force display - ignores Focus Assist using Scenario::Alarm
-        if settings.notification_force_display {
-            toast = toast.scenario(Scenario::Alarm);
-        }
-
-        // Duration based on priority
-        if notification.priority as i32 >= 4 {
-            toast = toast.duration(Duration::Long);
-        }
-
-        // Must always be called: an unset audio element makes Windows play the default
-        // toast sound, so silence requires an explicit `.sound(None)`.
-        toast = toast.sound(Self::select_toast_sound(
-            settings.notification_sound,
-            notification.priority as i32,
-        ));
-
-        // Action buttons from ntfy (max 3 buttons supported by Windows)
-        if settings.notification_show_actions && !notification.actions.is_empty() {
-            for action in notification.actions.iter().take(3) {
-                if let Some(ref url) = action.url {
-                    toast = toast.add_button(&action.label, url);
-                }
-            }
-        }
-
-        // Image display based on orientation:
-        // - Landscape/square images: use hero() for prominent display above text
-        // - Portrait images: use image() for inline display below text (avoids cropping)
-        if let Some(ref cached) = cached_image {
-            match cached.orientation {
-                ImageOrientation::Landscape => {
-                    // Hero image above text - ideal for landscape images
-                    toast = toast.hero(&cached.path, "");
-                }
-                ImageOrientation::Portrait => {
-                    // Inline image below text - better for portrait images
-                    // Windows will display it centered and properly scaled
-                    toast = toast.image(&cached.path, "");
-                }
-            }
-        }
-
-        if let Err(e) = toast.show() {
-            log::error!("Failed to show WinRT notification: {e}");
-            // Fallback to native notification on error
+        if let Err(e) = toast::show(aumid, &content, on_activated) {
+            log::error!("Failed to show Windows toast: {e}");
             Self::show_native_notification(app_handle, notification, text, Some(settings));
         }
+    }
+
+    /// Removes the toast of a message's sequence, if one is shown.
+    fn remove_toast(app_handle: &AppHandle, subscription_id: &str, sequence_id: &str) {
+        #[cfg(windows)]
+        if let Err(e) = crate::services::toast::remove(
+            app_handle.config().identifier.as_str(),
+            sequence_id,
+            subscription_id,
+        ) {
+            log::debug!("No toast removed for {sequence_id}: {e}");
+        }
+        #[cfg(not(windows))]
+        let _ = (app_handle, subscription_id, sequence_id);
     }
 }
 
@@ -1123,7 +1137,6 @@ pub mod tests {
 #[cfg(all(test, windows))]
 mod toast_tests {
     use super::*;
-    use tauri_winrt_notification::Sound;
 
     #[test]
     fn test_sound_disabled_is_silent_at_every_priority() {
@@ -1137,18 +1150,13 @@ mod toast_tests {
 
     #[test]
     fn test_sound_enabled_uses_priority() {
-        assert!(matches!(
-            ConnectionManager::select_toast_sound(true, 5),
-            Some(Sound::SMS)
-        ));
-        assert!(matches!(
-            ConnectionManager::select_toast_sound(true, 4),
-            Some(Sound::SMS)
-        ));
-        assert!(matches!(
+        let sms = Some("ms-winsoundevent:Notification.SMS");
+        assert_eq!(ConnectionManager::select_toast_sound(true, 5), sms);
+        assert_eq!(ConnectionManager::select_toast_sound(true, 4), sms);
+        assert_eq!(
             ConnectionManager::select_toast_sound(true, 3),
-            Some(Sound::Default)
-        ));
+            Some("ms-winsoundevent:Notification.Default")
+        );
     }
 
     #[test]

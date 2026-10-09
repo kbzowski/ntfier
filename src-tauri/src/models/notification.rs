@@ -72,6 +72,8 @@ pub struct Notification {
     /// Emoji for the tags that are emoji shortcodes, shown before the title.
     /// Computed on read; those tags are left out of `tags`.
     pub emojis: Vec<String>,
+    /// All versions of this message share it.
+    pub sequence_id: Option<String>,
 }
 
 impl Notification {
@@ -217,6 +219,7 @@ impl NtfyMessage {
     /// # Arguments
     /// * `topic_id` - The subscription ID this notification belongs to
     pub fn into_notification(self, topic_id: String) -> Notification {
+        let sequence_id = self.sequence_id().to_string();
         let actions = self
             .actions
             .unwrap_or_default()
@@ -255,6 +258,7 @@ impl NtfyMessage {
             markdown: self
                 .content_type
                 .is_some_and(|t| t.starts_with("text/markdown")),
+            sequence_id: Some(sequence_id),
             click: self.click,
             icon: self.icon,
             emojis: Vec::new(),
