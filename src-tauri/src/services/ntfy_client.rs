@@ -210,3 +210,22 @@ impl NtfyClient {
         Ok(messages)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::test_server;
+
+    #[tokio::test]
+    async fn account_with_password() {
+        let Some(url) = test_server::url() else {
+            return;
+        };
+        let account = NtfyClient::new()
+            .unwrap()
+            .get_account(&url, test_server::USER, test_server::PASS)
+            .await
+            .unwrap();
+        assert_eq!(account.username, test_server::USER);
+    }
+}
