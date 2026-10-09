@@ -1,8 +1,9 @@
-import { open } from "@tauri-apps/plugin-shell";
 import { ChevronRight, ExternalLink, Star, Trash2 } from "lucide-react";
 import { type MouseEvent, memo, useState } from "react";
+import { toast } from "sonner";
 import { useShowImages } from "@/context/ShowImagesContext";
-import { isTauri } from "@/lib/tauri";
+import { classifyError } from "@/lib/error-classification";
+import { isTauri, notificationsApi } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { PriorityBadge } from "./PriorityBadge";
 import { RelativeTime } from "./RelativeTime";
@@ -60,7 +61,9 @@ export const NotificationHeader = memo(function NotificationHeader({
 		e.stopPropagation();
 		if (!click) return;
 		if (isTauri()) {
-			open(click).catch((err) => console.error("[Open click URL]", err));
+			notificationsApi
+				.openUrl(click)
+				.catch((err) => toast.error(classifyError(err).userMessage));
 		} else {
 			window.open(click, "_blank", "noopener,noreferrer");
 		}

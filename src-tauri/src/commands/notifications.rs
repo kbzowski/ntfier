@@ -13,6 +13,13 @@ pub fn refresh_tray(app_handle: AppHandle) {
     });
 }
 
+/// Opens a message's `click` URL (web and mail links only, like toasts and view actions).
+#[tauri::command]
+#[specta::specta]
+pub fn open_url(url: String) -> Result<(), AppError> {
+    crate::services::url_opener::open_url(&url)
+}
+
 /// Runs an action button of a message (view, http or copy).
 #[tauri::command]
 #[specta::specta]

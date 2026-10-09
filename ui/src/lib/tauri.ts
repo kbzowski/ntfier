@@ -153,6 +153,10 @@ export const notificationsApi = {
 		unwrap(await commands.deleteNotification(id));
 	},
 
+	openUrl: async (url: string) => {
+		unwrap(await commands.openUrl(url));
+	},
+
 	runAction: async (notificationId: string, actionId: string) => {
 		unwrap(await commands.runAction(notificationId, actionId));
 	},

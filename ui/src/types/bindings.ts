@@ -16,6 +16,8 @@ export const commands = {
 	setNotificationExpanded: (id: string, expanded: boolean) => typedError<null, AppError>(__TAURI_INVOKE("set_notification_expanded", { id, expanded })),
 	/**  Runs an action button of a message (view, http or copy). */
 	runAction: (notificationId: string, actionId: string) => typedError<null, AppError>(__TAURI_INVOKE("run_action", { notificationId, actionId })),
+	/**  Opens a message's `click` URL (web and mail links only, like toasts and view actions). */
+	openUrl: (url: string) => typedError<null, AppError>(__TAURI_INVOKE("open_url", { url })),
 	getUnreadCount: (subscriptionId: string) => typedError<number, AppError>(__TAURI_INVOKE("get_unread_count", { subscriptionId })),
 	getTotalUnreadCount: () => typedError<number, AppError>(__TAURI_INVOKE("get_total_unread_count")),
 	getIgnoreRules: () => typedError<IgnoreRule[], AppError>(__TAURI_INVOKE("get_ignore_rules")),
