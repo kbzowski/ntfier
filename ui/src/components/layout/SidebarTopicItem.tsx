@@ -1,4 +1,5 @@
 import {
+	AlertTriangle,
 	Bell,
 	BellOff,
 	Hash,
@@ -25,7 +26,8 @@ import { cn } from "@/lib/utils";
 import type { Subscription } from "@/types/ntfy";
 
 interface SidebarTopicItemProps {
-	subscription: Subscription;
+	/** `error` is the subscription's connection problem, if any. */
+	subscription: Subscription & { error?: string | null };
 	isSelected: boolean;
 	onSelect: (id: string) => void;
 	onToggleMute: (id: string) => void;
@@ -76,6 +78,14 @@ export const SidebarTopicItem = memo(function SidebarTopicItem({
 						<span className="flex-1 truncate text-sm">
 							{subscription.displayName || subscription.topic}
 						</span>
+						{subscription.error && (
+							<AlertTriangle
+								className="h-3.5 w-3.5 text-destructive shrink-0"
+								aria-label={subscription.error}
+							>
+								<title>{subscription.error}</title>
+							</AlertTriangle>
+						)}
 						{subscription.muted && (
 							<VolumeX
 								className="h-3 w-3 text-muted-foreground shrink-0"

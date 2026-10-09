@@ -21,8 +21,11 @@ export const commands = {
 	deleteIgnoreRule: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_ignore_rule", { id })),
 	getSettings: () => typedError<AppSettings, AppError>(__TAURI_INVOKE("get_settings")),
 	setTheme: (theme: ThemeMode) => typedError<null, AppError>(__TAURI_INVOKE("set_theme", { theme })),
-	/**  Returns the server's canonical URL, the form it's stored and compared in. */
-	addServer: (server: ServerConfig) => typedError<string, AppError>(__TAURI_INVOKE("add_server", { server })),
+	addServer: (server: ServerConfig) => typedError<SavedServer, AppError>(__TAURI_INVOKE("add_server", { server })),
+	/**  Changes a server's login in place and reconnects its subscriptions with it. */
+	updateServer: (server: ServerConfig) => typedError<SavedServer, AppError>(__TAURI_INVOKE("update_server", { server })),
+	/**  Servers that are blocked from connecting (the `server:status` events so far). */
+	getServerStatuses: () => typedError<ServerStatusEntry[], AppError>(__TAURI_INVOKE("get_server_statuses")),
 	removeServer: (url: string) => typedError<null, AppError>(__TAURI_INVOKE("remove_server", { url })),
 	setDefaultServer: (url: string) => typedError<null, AppError>(__TAURI_INVOKE("set_default_server", { url })),
 	setMinimizeToTray: (enabled: boolean) => typedError<null, AppError>(__TAURI_INVOKE("set_minimize_to_tray", { enabled })),
@@ -81,7 +84,13 @@ export const commands = {
  *  type AppError = { Database: string } | { WebSocket: string } | ...
  *  ```
  */
-export type AppError = ({ Database: string }) & { Connection?: never; Credential?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ WebSocket: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; Validation?: never } | ({ Serialization: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ NotFound: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Validation: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; WebSocket?: never } | ({ InvalidUrl: string }) & { Connection?: never; Credential?: never; Database?: never; NotFound?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Connection: string }) & { Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Credential: string }) & { Connection?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Updater: string }) & { Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Validation?: never; WebSocket?: never };
+export type AppError = ({ Database: string }) & { Auth?: never; Connection?: never; Credential?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ WebSocket: string }) & { Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; Updater?: never; Validation?: never } | ({ Serialization: string }) & { Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ NotFound: string }) & { Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; RateLimited?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Validation: string }) & { Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; Updater?: never; WebSocket?: never } | ({ InvalidUrl: string }) & { Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; NotFound?: never; RateLimited?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Connection: string }) & { Auth?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Credential: string }) & { Auth?: never; Connection?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | 
+/**  401: the server rejected the credential. */
+({ Auth: string }) & { Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | 
+/**  403: no access to the topic. */
+({ Forbidden: string }) & { Auth?: never; Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | 
+/**  429: the server rate-limits us. */
+({ RateLimited: string }) & { Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Updater: string }) & { Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; Validation?: never; WebSocket?: never };
 
 /**  Application-wide settings. */
 export type AppSettings = {
@@ -188,12 +197,35 @@ export type NotificationDisplayMethod =
 /**  Windows-specific enhanced notifications with action buttons and force display. */
 "windows_enhanced";
 
+/**  A saved server's canonical URL, plus a warning when the login wasn't kept. */
+export type SavedServer = {
+	url: string,
+	warning: string | null,
+};
+
 /**  Configuration for a single ntfy server. */
 export type ServerConfig = {
 	url: string,
+	/**  Set for a username + password login. */
 	username: string | null,
 	password: string | null,
+	/**  Access token (`tk_...`), used when there's no username. */
+	token?: string | null,
 	isDefault: boolean,
+};
+
+/**
+ *  Whether the app may connect to a server. Anything but `Ok` stops every connection
+ *  to it until the server is edited (or, for a version problem, the app restarts).
+ */
+export type ServerStatus = { kind: "ok" } | 
+/**  The server rejected the credential (401). */
+{ kind: "needsCredentials" };
+
+/**  Payload of the `server:status` event and of `get_server_statuses`. */
+export type ServerStatusEntry = {
+	url: string,
+	status: ServerStatus,
 };
 
 /**  A subscription to a topic on an ntfy server. */

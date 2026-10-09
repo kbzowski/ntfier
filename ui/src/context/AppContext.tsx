@@ -24,7 +24,11 @@ import {
 	subscriptionsApi,
 	syncApi,
 } from "@/lib/tauri";
-import type { IgnoreRule } from "@/types/bindings";
+import type { IgnoreRule, ServerStatusEntry } from "@/types/bindings";
+
+/** Payload of the backend's `subscription:error` event. */
+type SubscriptionError = { id: string; message: string | null };
+
 import type {
 	AppSettings,
 	Notification,
@@ -58,6 +62,9 @@ interface AppState {
 
 	// Startup load failure, shown instead of the list
 	loadError: string | null;
+
+	// Servers blocked from connecting, and per-subscription connection errors
+	serverStatuses: ServerStatusEntry[];
 }
 
 interface AppActions {
@@ -101,6 +108,7 @@ interface AppActions {
 	addServer: (
 		server: Omit<ServerConfig, "isDefault">,
 	) => Promise<Subscription[]>;
+	updateServer: (server: Omit<ServerConfig, "isDefault">) => Promise<void>;
 	removeServer: (url: string) => Promise<void>;
 	setDefaultServer: (url: string) => Promise<void>;
 	setAutostart: (enabled: boolean) => Promise<void>;
@@ -181,6 +189,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [autostart, setAutostartState] = useState(false);
 	const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
 	const [loadError, setLoadError] = useState<string | null>(null);
+	const [serverStatuses, setServerStatuses] = useState<ServerStatusEntry[]>([]);
+	const [subscriptionErrors, setSubscriptionErrors] = useState<
+		Record<string, string>
+	>({});
 
 	const refreshIgnoreRules = useCallback(async () => {
 		try {
@@ -201,15 +213,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		try {
 			if (isTauri()) {
 				// Load all data in parallel to avoid waterfall
-				const [subs, loadedSettings, autostartEnabled] = await Promise.all([
-					subscriptionsApi.getAll(),
-					settingsApi.get(),
-					autostartApi.isEnabled(),
-				]);
+				const [subs, loadedSettings, autostartEnabled, statuses] =
+					await Promise.all([
+						subscriptionsApi.getAll(),
+						settingsApi.get(),
+						autostartApi.isEnabled(),
+						settingsApi.getServerStatuses(),
+					]);
 
 				setSubscriptions(subs);
 				setSettings(loadedSettings);
 				setAutostartState(autostartEnabled);
+				setServerStatuses(statuses);
 			} else {
 				setSubscriptions(mockSubscriptions);
 				setSettings(mockSettings);
@@ -300,6 +315,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			},
 			[notifications.reloadTopic],
 		),
+	);
+
+	useTauriEvent<ServerStatusEntry>(
+		"server:status",
+		useCallback((entry: ServerStatusEntry) => {
+			setServerStatuses((prev) => [
+				...prev.filter((s) => s.url !== entry.url),
+				...(entry.status.kind === "ok" ? [] : [entry]),
+			]);
+		}, []),
+	);
+
+	useTauriEvent<SubscriptionError>(
+		"subscription:error",
+		useCallback(({ id, message }: SubscriptionError) => {
+			setSubscriptionErrors((prev) => {
+				const { [id]: _, ...rest } = prev;
+				return message ? { ...rest, [id]: message } : rest;
+			});
+		}, []),
 	);
 
 	// Listen for navigate:subscription event (from tray icon click)
@@ -477,17 +512,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			server: Omit<ServerConfig, "isDefault">,
 		): Promise<Subscription[]> => {
 			if (isTauri()) {
-				const url = await settingsApi.addServer(server);
-				server = { ...server, url };
+				const saved = await settingsApi.addServer(server);
+				if (saved.warning) toast.warning(saved.warning);
+				const loaded = await settingsApi.get();
+				setSettings(loaded);
+				const added = loaded.servers.find((s) => s.url === saved.url);
 
 				// If server has credentials, sync subscriptions
-				if (server.username && server.password) {
-					const synced = await syncApi.syncSubscriptions(url);
-					const newServer: ServerConfig = { ...server, isDefault: false };
-					setSettings((prev) => ({
-						...prev,
-						servers: [...prev.servers, newServer],
-					}));
+				if (added && (added.username || added.token)) {
+					const synced = await syncApi.syncSubscriptions(saved.url);
 
 					// Also refresh subscriptions to include synced ones
 					const subs = await subscriptionsApi.getAll();
@@ -495,6 +528,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 					return synced;
 				}
+				return [];
 			}
 			const newServer: ServerConfig = { ...server, isDefault: false };
 			setSettings((prev) => ({
@@ -502,6 +536,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 				servers: [...prev.servers, newServer],
 			}));
 			return [];
+		},
+		[],
+	);
+
+	const updateServer = useCallback(
+		async (server: Omit<ServerConfig, "isDefault">) => {
+			if (!isTauri()) return;
+			const saved = await settingsApi.updateServer(server);
+			if (saved.warning) toast.warning(saved.warning);
+			else toast.success("Login updated");
+			setSettings(await settingsApi.get());
 		},
 		[],
 	);
@@ -707,8 +752,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			unreadCount: notifications.byTopic.has(sub.id)
 				? notifications.getUnreadCount(sub.id)
 				: sub.unreadCount,
+			error: subscriptionErrors[sub.id] ?? null,
 		}));
-	}, [subscriptions, notifications.byTopic, notifications.getUnreadCount]);
+	}, [
+		subscriptions,
+		notifications.byTopic,
+		notifications.getUnreadCount,
+		subscriptionErrors,
+	]);
 
 	const value = useMemo<AppContextValue>(
 		() => ({
@@ -724,6 +775,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			autostart,
 			updateInfo,
 			loadError,
+			serverStatuses,
 
 			// Actions
 			retryLoad: loadData,
@@ -745,6 +797,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			getTotalUnread: notifications.getTotalUnread,
 			setTheme,
 			addServer,
+			updateServer,
 			removeServer,
 			setDefaultServer,
 			setAutostart,
@@ -778,6 +831,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			autostart,
 			updateInfo,
 			loadError,
+			serverStatuses,
 			loadData,
 			addSubscription,
 			removeSubscription,
@@ -795,6 +849,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			notifications.getTotalUnread,
 			setTheme,
 			addServer,
+			updateServer,
 			removeServer,
 			setDefaultServer,
 			setAutostart,

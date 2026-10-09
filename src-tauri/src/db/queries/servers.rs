@@ -18,19 +18,23 @@ impl Database {
         let rows: Vec<ServerRow> = servers::table.load(&mut *conn)?;
         drop(conn);
 
-        // Try to get passwords from OS keychain first, fall back to DB
+        // The secret is a password with a username, an access token without one
         Ok(rows
             .into_iter()
             .map(|row| {
-                let password = row
-                    .username
-                    .as_ref()
-                    .and_then(|u| credential_manager::get_password(u, &row.url).ok().flatten());
+                let secret = credential_manager::get_secret(&row.url).ok().flatten();
+                let username = row.username.filter(|u| !u.is_empty());
+                let (password, token) = if username.is_some() {
+                    (secret, None)
+                } else {
+                    (None, secret)
+                };
 
                 ServerConfig {
                     url: row.url,
-                    username: row.username,
+                    username,
                     password,
+                    token,
                     is_default: row.is_default == 1,
                 }
             })
@@ -53,11 +57,7 @@ impl Database {
     /// Adds a new server.
     pub fn add_server(&self, mut server: ServerConfig) -> Result<String, AppError> {
         server.url = canonical_url(&server.url)?;
-
-        // Store password in OS keychain if we have both username and password
-        if let (Some(ref username), Some(ref password)) = (&server.username, &server.password) {
-            credential_manager::store_password(username, &server.url, password)?;
-        }
+        let username = Self::store_credential(&server)?;
 
         let mut conn = self.conn()?;
         let id = uuid::Uuid::new_v4().to_string();
@@ -66,7 +66,7 @@ impl Database {
         let new_server = NewServer {
             id: &id,
             url: &server.url,
-            username: server.username.as_deref(),
+            username: username.as_deref(),
             is_default: i32::from(server.is_default),
         };
 
@@ -77,19 +77,45 @@ impl Database {
         Ok(server.url)
     }
 
+    /// Replaces a server's credential. The URL identifies the server and can't change.
+    pub fn update_server_credential(&self, server: &ServerConfig) -> Result<(), AppError> {
+        let username = Self::store_credential(server)?;
+
+        let mut conn = self.conn()?;
+        let updated = diesel::update(servers::table.filter(servers::url.eq(&server.url)))
+            .set(servers::username.eq(username))
+            .execute(&mut *conn)?;
+        if updated == 0 {
+            return Err(AppError::NotFound(format!(
+                "Server {} not found",
+                server.url
+            )));
+        }
+        Ok(())
+    }
+
+    /// Puts the server's secret in the keychain (or removes it) and returns the username
+    /// to store: only a password login has one.
+    fn store_credential(server: &ServerConfig) -> Result<Option<String>, AppError> {
+        let username = server.username.as_deref().filter(|u| !u.is_empty());
+        let secret = match username {
+            Some(_) => server.password.as_deref(),
+            None => server.token.as_deref(),
+        }
+        .filter(|s| !s.is_empty());
+
+        match secret {
+            Some(secret) => credential_manager::store_secret(&server.url, secret)?,
+            None => credential_manager::delete_secret(&server.url)?,
+        }
+        Ok(username.filter(|_| secret.is_some()).map(str::to_string))
+    }
+
     /// Removes a server and all its subscriptions.
     pub fn remove_server(&self, url: &str) -> Result<(), AppError> {
         let mut conn = self.conn()?;
 
-        // Run DB operations in a transaction
-        let username: Option<String> = conn.transaction::<_, diesel::result::Error, _>(|conn| {
-            let username: Option<String> = servers::table
-                .filter(servers::url.eq(url))
-                .select(servers::username)
-                .first(conn)
-                .optional()?
-                .flatten();
-
+        conn.transaction::<_, diesel::result::Error, _>(|conn| {
             // Delete subscriptions for this server
             let server_ids: Vec<String> = servers::table
                 .filter(servers::url.eq(url))
@@ -121,14 +147,12 @@ impl Database {
                 }
             }
 
-            Ok(username)
+            Ok(())
         })?;
 
         // Clean up keychain after successful transaction (best-effort)
-        if let Some(ref username) = username {
-            if let Err(e) = credential_manager::delete_password(username, url) {
-                log::warn!("Failed to clean up keychain for {username}@{url}: {e}");
-            }
+        if let Err(e) = credential_manager::delete_secret(url) {
+            log::warn!("Failed to clean up keychain for {url}: {e}");
         }
 
         Ok(())
@@ -167,6 +191,7 @@ mod tests {
             url: "https://other.example".to_string(),
             username: None,
             password: None,
+            token: None,
             is_default: false,
         })
         .unwrap();

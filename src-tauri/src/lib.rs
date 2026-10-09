@@ -56,6 +56,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::get_settings,
         commands::set_theme,
         commands::add_server,
+        commands::update_server,
+        commands::get_server_statuses,
         commands::remove_server,
         commands::set_default_server,
         commands::set_minimize_to_tray,

@@ -8,113 +8,143 @@ import { useCallback, useState } from "react";
 import { getErrorMessage } from "@/lib/error-classification";
 import type { ServerConfig } from "@/types/ntfy";
 
-interface ServerFormData {
-	url: string;
-	username: string;
-	password: string;
-}
+export type AuthMode = "none" | "password" | "token";
+
+export type ServerInput = Omit<ServerConfig, "isDefault">;
 
 interface UseServerFormOptions {
-	onSubmit: (server: Omit<ServerConfig, "isDefault">) => Promise<unknown>;
+	onAdd: (server: ServerInput) => Promise<unknown>;
+	onUpdate: (server: ServerInput) => Promise<unknown>;
+	/** Server whose login the form starts out editing. */
+	initial?: ServerConfig;
 }
 
-interface UseServerFormReturn {
-	formData: ServerFormData;
-	setUrl: (url: string) => void;
-	setUsername: (username: string) => void;
-	setPassword: (password: string) => void;
-	showPassword: boolean;
-	toggleShowPassword: () => void;
-	isAdding: boolean;
-	startAdding: () => void;
-	cancelAdding: () => void;
-	isLoading: boolean;
-	error: string | null;
-	clearError: () => void;
-	handleSubmit: () => Promise<void>;
-	canSubmit: boolean;
+/** The URL of the server being edited, or `null` when adding a new one. */
+type FormMode = { editing: string | null } | null;
+
+function authModeOf(server: ServerConfig): AuthMode {
+	if (server.username) return "password";
+	if (server.token) return "token";
+	return "none";
 }
 
 /**
- * Hook for managing server configuration form state.
- *
- * Provides form data, validation, loading states, and error handling
- * for adding new ntfy servers.
- *
- * @param options.onSubmit - Callback to handle form submission
+ * Hook for the server form: add a server, or edit the login of an existing one
+ * (the URL can't change). One credential per server: password or access token.
  */
 export function useServerForm({
-	onSubmit,
-}: UseServerFormOptions): UseServerFormReturn {
-	const [url, setUrl] = useState("");
-	const [username, setUsername] = useState("");
-	const [password, setPassword] = useState("");
-	const [showPassword, setShowPassword] = useState(false);
-	const [isAdding, setIsAdding] = useState(false);
+	onAdd,
+	onUpdate,
+	initial,
+}: UseServerFormOptions) {
+	const [mode, setMode] = useState<FormMode>(
+		initial ? { editing: initial.url } : null,
+	);
+	const [url, setUrl] = useState(initial?.url ?? "");
+	const [authMode, setAuthMode] = useState<AuthMode>(
+		initial ? authModeOf(initial) : "none",
+	);
+	const [username, setUsername] = useState(initial?.username ?? "");
+	const [password, setPassword] = useState(initial?.password ?? "");
+	const [token, setToken] = useState(initial?.token ?? "");
+	const [showSecret, setShowSecret] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const reset = useCallback(() => {
-		setUrl("");
-		setUsername("");
-		setPassword("");
-		setShowPassword(false);
+	const fill = useCallback((server: ServerConfig | null) => {
+		setUrl(server?.url ?? "");
+		setAuthMode(server ? authModeOf(server) : "none");
+		setUsername(server?.username ?? "");
+		setPassword(server?.password ?? "");
+		setToken(server?.token ?? "");
+		setShowSecret(false);
 	}, []);
 
 	const startAdding = useCallback(() => {
-		setIsAdding(true);
-	}, []);
+		fill(null);
+		setMode({ editing: null });
+	}, [fill]);
 
-	const cancelAdding = useCallback(() => {
-		setIsAdding(false);
-		reset();
-	}, [reset]);
+	const startEditing = useCallback(
+		(server: ServerConfig) => {
+			fill(server);
+			setMode({ editing: server.url });
+		},
+		[fill],
+	);
 
-	const toggleShowPassword = useCallback(() => {
-		setShowPassword((prev) => !prev);
+	const cancel = useCallback(() => {
+		setMode(null);
+		fill(null);
+	}, [fill]);
+
+	const toggleShowSecret = useCallback(() => {
+		setShowSecret((prev) => !prev);
 	}, []);
 
 	const clearError = useCallback(() => {
 		setError(null);
 	}, []);
 
+	const credentialComplete =
+		authMode === "none" ||
+		(authMode === "password" && !!username.trim() && !!password) ||
+		(authMode === "token" && !!token.trim());
+
 	const handleSubmit = useCallback(async () => {
-		if (!url.trim()) return;
+		if (!url.trim() || !mode || !credentialComplete) return;
 
 		setIsLoading(true);
 		setError(null);
 
-		try {
-			await onSubmit({
-				url: url.trim(),
-				username: username.trim() || null,
-				password: password || null,
-			});
+		const server: ServerInput = {
+			url: url.trim(),
+			username: authMode === "password" ? username.trim() : null,
+			password: authMode === "password" ? password : null,
+			token: authMode === "token" ? token.trim() : null,
+		};
 
-			reset();
-			setIsAdding(false);
+		try {
+			await (mode.editing ? onUpdate(server) : onAdd(server));
+			setMode(null);
+			fill(null);
 		} catch (err) {
-			console.error("Failed to add server:", err);
+			console.error("Failed to save server:", err);
 			setError(getErrorMessage(err));
 		} finally {
 			setIsLoading(false);
 		}
-	}, [url, username, password, onSubmit, reset]);
+	}, [
+		url,
+		mode,
+		credentialComplete,
+		authMode,
+		username,
+		password,
+		token,
+		onAdd,
+		onUpdate,
+		fill,
+	]);
 
 	return {
-		formData: { url, username, password },
+		formData: { url, authMode, username, password, token },
 		setUrl,
+		setAuthMode,
 		setUsername,
 		setPassword,
-		showPassword,
-		toggleShowPassword,
-		isAdding,
+		setToken,
+		showSecret,
+		toggleShowSecret,
+		isOpen: mode !== null,
+		editingUrl: mode?.editing ?? null,
 		startAdding,
-		cancelAdding,
+		startEditing,
+		cancel,
 		isLoading,
 		error,
 		clearError,
 		handleSubmit,
-		canSubmit: !!url.trim() && !isLoading,
+		canSubmit: !!url.trim() && credentialComplete && !isLoading,
 	};
 }

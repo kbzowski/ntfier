@@ -28,6 +28,7 @@ import {
 	type ThemeMode,
 	type UpdateInfo,
 } from "@/types/bindings";
+import { BackendError } from "./error-classification";
 
 // Re-export types for consumers
 export type {
@@ -89,7 +90,7 @@ function unwrap<T>(result: Result<T, AppError>): T {
 	if (result.status === "ok") {
 		return result.data;
 	}
-	throw new Error(getErrorMessage(result.error));
+	throw new BackendError(getErrorMessage(result.error));
 }
 
 // ===== Subscriptions API =====
@@ -178,6 +179,11 @@ export const settingsApi = {
 				isDefault: false,
 			}),
 		),
+
+	updateServer: async (server: Omit<ServerConfig, "isDefault">) =>
+		unwrap(await commands.updateServer({ ...server, isDefault: false })),
+
+	getServerStatuses: async () => unwrap(await commands.getServerStatuses()),
 
 	removeServer: async (url: string) => {
 		unwrap(await commands.removeServer(url));

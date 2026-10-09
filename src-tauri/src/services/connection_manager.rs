@@ -3,29 +3,31 @@
 //! Maintains persistent WebSocket connections to ntfy servers for each subscription.
 //! Handles automatic reconnection with exponential backoff on connection failures.
 
-use base64::{engine::general_purpose::STANDARD, Engine};
 use futures_util::StreamExt;
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::{
     connect_async,
-    tungstenite::{client::ClientRequestBuilder, http::Uri, Message},
+    tungstenite::{client::ClientRequestBuilder, http::Uri, Error as WsError, Message},
 };
 use url::Url;
 
 use crate::config::connection::{
-    CATCH_UP_TOAST_MAX_AGE_SECS, JITTER_MAX_SECS, READ_TIMEOUT_SECS, RETRY_BACKOFF_SECS,
+    CATCH_UP_TOAST_MAX_AGE_SECS, FORBIDDEN_RETRY_SECS, JITTER_MAX_SECS, READ_TIMEOUT_SECS,
+    RETRY_BACKOFF_SECS,
 };
 use crate::db::Database;
 use crate::error::AppError;
 use crate::models::{
     is_ignored, Notification, NotificationDisplayMethod, NotificationSettings, NtfyMessage,
-    Subscription,
+    ServerStatus, ServerStatusEntry, Subscription, SubscriptionError,
 };
+use crate::services::ntfy_client::{NO_TOPIC_ACCESS, RATE_LIMITED};
 use crate::services::TrayManager;
 
 /// Connection entry storing both the shutdown sender and a unique connection ID.
@@ -35,6 +37,9 @@ struct ConnectionEntry {
     shutdown_tx: mpsc::Sender<()>,
 }
 
+/// Servers that may not be connected to, keyed by canonical URL. Absent means ok.
+type ServerStatuses = Arc<RwLock<HashMap<String, ServerStatus>>>;
+
 /// Manages WebSocket connections to ntfy servers.
 ///
 /// Each subscription gets its own WebSocket connection that receives
@@ -43,6 +48,7 @@ struct ConnectionEntry {
 pub struct ConnectionManager {
     app_handle: AppHandle,
     connections: Arc<RwLock<HashMap<String, ConnectionEntry>>>,
+    server_statuses: ServerStatuses,
     next_connection_id: AtomicU64,
 }
 
@@ -52,6 +58,7 @@ impl ConnectionManager {
         Self {
             app_handle,
             connections: Arc::new(RwLock::new(HashMap::new())),
+            server_statuses: Arc::new(RwLock::new(HashMap::new())),
             next_connection_id: AtomicU64::new(1),
         }
     }
@@ -61,35 +68,87 @@ impl ConnectionManager {
         self.next_connection_id.fetch_add(1, Ordering::Relaxed)
     }
 
-    /// Builds HTTP Basic auth header for the given server URL if credentials exist.
-    fn get_auth_header(&self, server_url: &str) -> Option<String> {
-        let db: tauri::State<Database> = self.app_handle.state();
-        let settings = db.get_settings().ok()?;
+    /// The `Authorization` header for a server's current credential.
+    fn auth_header(app_handle: &AppHandle, server_url: &str) -> Option<String> {
+        let db: tauri::State<Database> = app_handle.state();
+        db.get_servers_with_credentials()
+            .ok()?
+            .into_iter()
+            .find(|s| s.url == server_url)?
+            .auth_header()
+    }
 
-        let Some(server) = settings.servers.iter().find(|s| s.url == server_url) else {
-            log::debug!("No server found for URL '{server_url}'");
-            return None;
-        };
+    /// Every server that is currently blocked from connecting.
+    pub async fn server_statuses(&self) -> Vec<ServerStatusEntry> {
+        self.server_statuses
+            .read()
+            .await
+            .iter()
+            .map(|(url, status)| ServerStatusEntry {
+                url: url.clone(),
+                status: status.clone(),
+            })
+            .collect()
+    }
 
-        let (Some(username), Some(password)) = (server.username.as_ref(), server.password.as_ref())
-        else {
-            log::debug!(
-                "Server '{}' has no credentials (username: {}, password: {})",
-                server.url,
-                server.username.is_some(),
-                server.password.is_some()
-            );
-            return None;
-        };
-
-        if username.is_empty() {
-            log::debug!("Server '{}' has empty username", server.url);
-            return None;
+    /// Records a server's status and tells the UI.
+    async fn set_server_status(
+        app_handle: &AppHandle,
+        statuses: &ServerStatuses,
+        url: &str,
+        status: ServerStatus,
+    ) {
+        {
+            let mut map = statuses.write().await;
+            if status == ServerStatus::Ok {
+                map.remove(url);
+            } else {
+                map.insert(url.to_string(), status.clone());
+            }
         }
+        let entry = ServerStatusEntry {
+            url: url.to_string(),
+            status,
+        };
+        if let Err(e) = app_handle.emit("server:status", entry) {
+            log::error!("Failed to emit server status: {e}");
+        }
+    }
 
-        let credentials = format!("{username}:{password}");
-        let encoded = STANDARD.encode(credentials.as_bytes());
-        Some(format!("Basic {encoded}"))
+    /// Flags a server so none of its subscriptions connect until it's edited.
+    pub async fn block_server(&self, url: &str, status: ServerStatus) {
+        Self::set_server_status(&self.app_handle, &self.server_statuses, url, status).await;
+    }
+
+    /// Clears the server's status and reconnects all of its subscriptions, which picks up
+    /// a changed credential. Each keeps its cursor.
+    pub async fn reconnect_server(&self, url: &str) {
+        Self::set_server_status(
+            &self.app_handle,
+            &self.server_statuses,
+            url,
+            ServerStatus::Ok,
+        )
+        .await;
+        let db: tauri::State<Database> = self.app_handle.state();
+        if let Ok(subs) = db.get_all_subscriptions() {
+            for sub in subs.iter().filter(|s| s.server_url == url) {
+                if let Err(e) = self.connect(sub).await {
+                    log::error!("Failed to reconnect {}: {e}", sub.id);
+                }
+            }
+        }
+    }
+
+    /// Shows or clears the error on one subscription in the UI.
+    fn report_subscription_error(app_handle: &AppHandle, id: &str, message: Option<String>) {
+        let payload = SubscriptionError {
+            id: id.to_string(),
+            message,
+        };
+        if let Err(e) = app_handle.emit("subscription:error", payload) {
+            log::error!("Failed to emit subscription error: {e}");
+        }
     }
 
     /// Establishes a WebSocket connection for a subscription.
@@ -123,12 +182,18 @@ impl ConnectionManager {
         let topic = subscription.topic.clone();
         let app_handle = self.app_handle.clone();
         let connections = Arc::clone(&self.connections);
-
-        let auth_header = self.get_auth_header(&subscription.server_url);
+        let statuses = Arc::clone(&self.server_statuses);
 
         tokio::spawn(async move {
             let mut reconnect_attempt: usize = 0;
-            let read_timeout = std::time::Duration::from_secs(READ_TIMEOUT_SECS);
+            let read_timeout = Duration::from_secs(READ_TIMEOUT_SECS);
+            let mut shown_error: Option<String> = None;
+            let mut report = |message: Option<String>| {
+                if message != shown_error {
+                    Self::report_subscription_error(&app_handle, &sub_id, message.clone());
+                    shown_error = message;
+                }
+            };
 
             loop {
                 // Check if this connection is still the current one (race condition protection)
@@ -143,6 +208,12 @@ impl ConnectionManager {
                         );
                         return;
                     }
+                }
+
+                // A flagged server (bad credential, too old) gets no retries until it's edited
+                if statuses.read().await.contains_key(&server_url) {
+                    log::info!("Server {server_url} is blocked, not connecting {sub_id}");
+                    return;
                 }
 
                 // Resume from the newest stored message; a new subscription gets the whole cache
@@ -168,14 +239,17 @@ impl ConnectionManager {
 
                 log::info!("Connecting to WebSocket: {ws_url}");
 
+                // Read every attempt so an edited credential applies on the next connect
                 let mut request = ClientRequestBuilder::new(ws_uri);
-                if let Some(ref auth) = auth_header {
+                if let Some(auth) = Self::auth_header(&app_handle, &server_url) {
                     request = request.with_header("Authorization", auth);
                 }
 
+                let mut delay_secs = None;
                 match connect_async(request).await {
                     Ok((ws_stream, _)) => {
                         log::info!("Connected to {ws_url}");
+                        report(None);
                         // Reset backoff on successful connection
                         reconnect_attempt = 0;
                         let (_write, mut read) = ws_stream.split();
@@ -212,13 +286,39 @@ impl ConnectionManager {
                             }
                         }
                     }
+                    Err(WsError::Http(response)) if response.status() == 401 => {
+                        // Retrying a bad credential gets the IP banned, so stop the whole server
+                        log::error!(
+                            "{server_url} rejected the credential, stopping its connections"
+                        );
+                        Self::set_server_status(
+                            &app_handle,
+                            &statuses,
+                            &server_url,
+                            ServerStatus::NeedsCredentials,
+                        )
+                        .await;
+                        return;
+                    }
+                    Err(WsError::Http(response)) if response.status() == 403 => {
+                        log::error!("No access to {ws_url}");
+                        report(Some(NO_TOPIC_ACCESS.to_string()));
+                        delay_secs = Some(FORBIDDEN_RETRY_SECS);
+                    }
+                    Err(WsError::Http(response)) if response.status() == 429 => {
+                        log::error!("Rate limited by {server_url}");
+                        report(Some(RATE_LIMITED.to_string()));
+                    }
                     Err(e) => {
                         log::error!("Failed to connect to {ws_url}: {e}");
+                        report(Some(format!("Can't connect: {e}")));
                     }
                 }
 
                 // Exponential backoff with jitter
-                let delay = RETRY_BACKOFF_SECS[reconnect_attempt.min(RETRY_BACKOFF_SECS.len() - 1)];
+                let delay = delay_secs.unwrap_or_else(|| {
+                    RETRY_BACKOFF_SECS[reconnect_attempt.min(RETRY_BACKOFF_SECS.len() - 1)]
+                });
                 // ponytail: clock nanos are enough entropy to break up a thundering herd;
                 // this is not a cryptographic path, so it doesn't warrant a rand dependency.
                 let jitter = std::time::SystemTime::now()
@@ -231,7 +331,10 @@ impl ConnectionManager {
                     total_delay,
                     reconnect_attempt + 1
                 );
-                tokio::time::sleep(std::time::Duration::from_secs(total_delay)).await;
+                tokio::select! {
+                    () = tokio::time::sleep(Duration::from_secs(total_delay)) => {}
+                    _ = shutdown_rx.recv() => return,
+                }
                 reconnect_attempt = (reconnect_attempt + 1).min(RETRY_BACKOFF_SECS.len() - 1);
             }
         });
@@ -257,6 +360,8 @@ impl ConnectionManager {
                 }
             }
         }
+        // Removed or edited: its old status no longer applies
+        self.server_statuses.write().await.remove(server_url);
     }
 
     /// Establishes WebSocket connections for all subscriptions.
@@ -706,6 +811,30 @@ pub mod tests {
             let got = read_ws(&url, &topic, since, 2).await;
             let bodies: Vec<_> = got.iter().map(|m| m.message.as_deref().unwrap()).collect();
             assert_eq!(bodies, ["one", "two"], "since={since:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn locked_topic_is_403_on_ws_connect() {
+        let Some(url) = test_server::url() else {
+            return;
+        };
+        let ws_url =
+            ConnectionManager::build_ws_url(&url, test_server::LOCKED_TOPIC, None).unwrap();
+        let auth = crate::models::ServerConfig {
+            url: url.clone(),
+            username: Some(test_server::USER.to_string()),
+            password: Some(test_server::PASS.to_string()),
+            token: None,
+            is_default: false,
+        }
+        .auth_header()
+        .unwrap();
+        let request =
+            ClientRequestBuilder::new(ws_url.parse().unwrap()).with_header("Authorization", auth);
+        match connect_async(request).await {
+            Err(WsError::Http(response)) => assert_eq!(response.status(), 403),
+            other => panic!("expected 403, got {:?}", other.map(|_| ())),
         }
     }
 

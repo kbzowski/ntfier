@@ -1,3 +1,7 @@
+//! Server secrets (password or access token) in the OS keychain.
+//!
+//! A server has at most one credential, so the secret is keyed by its canonical URL.
+
 use crate::error::AppError;
 use keyring::Entry;
 use log::{debug, info};
@@ -6,115 +10,82 @@ use std::sync::{Mutex, OnceLock};
 
 const SERVICE_NAME: &str = "ntfier";
 
-/// In-memory cache for credentials to avoid repeatedly accessing OS keychain
-/// Key: (username, `server_url`), Value: password
-static CREDENTIAL_CACHE: OnceLock<Mutex<HashMap<(String, String), String>>> = OnceLock::new();
+/// In-memory cache to avoid repeatedly accessing the OS keychain.
+/// Key: server URL, value: secret.
+static CREDENTIAL_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
 
-fn get_cache() -> &'static Mutex<HashMap<(String, String), String>> {
-    CREDENTIAL_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+fn get_cache() -> Result<std::sync::MutexGuard<'static, HashMap<String, String>>, AppError> {
+    CREDENTIAL_CACHE
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .map_err(|e| AppError::Credential(format!("Failed to lock credential cache: {e}")))
 }
 
-/// Create a keyring entry for the given username and server URL
-/// Key format: ntfier_[username]_[server]
-fn create_entry(username: &str, server_url: &str) -> Result<Entry, AppError> {
-    let key = format!("{username}_{server_url}");
-    Entry::new(SERVICE_NAME, &key)
+fn create_entry(key: &str) -> Result<Entry, AppError> {
+    Entry::new(SERVICE_NAME, key)
         .map_err(|e| AppError::Credential(format!("Failed to create keyring entry: {e}")))
 }
 
-/// Store password in OS keychain and cache
-pub fn store_password(username: &str, server_url: &str, password: &str) -> Result<(), AppError> {
-    debug!("Storing credential for server");
-    let entry = create_entry(username, server_url)?;
-    entry
-        .set_password(password)
-        .map_err(|e| AppError::Credential(format!("Failed to store password: {e}")))?;
-
-    // Update cache
-    let cache_key = (username.to_string(), server_url.to_string());
-    let mut cache = get_cache()
-        .lock()
-        .map_err(|e| AppError::Credential(format!("Failed to lock credential cache: {e}")))?;
-    cache.insert(cache_key, password.to_string());
-
-    info!("Credential stored successfully");
-    Ok(())
-}
-
-/// Get password from cache or OS keychain
-pub fn get_password(username: &str, server_url: &str) -> Result<Option<String>, AppError> {
-    let cache_key = (username.to_string(), server_url.to_string());
-
-    // Check cache first
-    {
-        let cache = get_cache()
-            .lock()
-            .map_err(|e| AppError::Credential(format!("Failed to lock credential cache: {e}")))?;
-        if let Some(password) = cache.get(&cache_key) {
-            debug!("Credential retrieved from cache");
-            return Ok(Some(password.clone()));
-        }
-    }
-
-    // Cache miss - fetch from OS keychain
-    let entry = create_entry(username, server_url)?;
-    match entry.get_password() {
-        Ok(password) => {
-            debug!("Credential retrieved from keychain");
-
-            // Store in cache for future use
-            let mut cache = get_cache().lock().map_err(|e| {
-                AppError::Credential(format!("Failed to lock credential cache: {e}"))
-            })?;
-            cache.insert(cache_key, password.clone());
-
-            Ok(Some(password))
-        }
-        Err(keyring::Error::NoEntry) => {
-            debug!("No credential found in keychain");
-            Ok(None)
-        }
-        Err(e) => Err(AppError::Credential(format!("Failed to get password: {e}"))),
+fn read_entry(key: &str) -> Result<Option<String>, AppError> {
+    match create_entry(key)?.get_password() {
+        Ok(secret) => Ok(Some(secret)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(AppError::Credential(format!("Failed to get secret: {e}"))),
     }
 }
 
-/// Delete password from OS keychain and cache
-pub fn delete_password(username: &str, server_url: &str) -> Result<(), AppError> {
-    debug!("Deleting credential from keychain");
-
-    // Remove from cache first
-    let cache_key = (username.to_string(), server_url.to_string());
-    let mut cache = get_cache()
-        .lock()
-        .map_err(|e| AppError::Credential(format!("Failed to lock credential cache: {e}")))?;
-    cache.remove(&cache_key);
-    drop(cache); // Release lock before calling keychain
-
-    let entry = create_entry(username, server_url)?;
-    match entry.delete_credential() {
-        Ok(()) => {
-            info!("Credential deleted successfully");
-            Ok(())
-        }
-        Err(keyring::Error::NoEntry) => {
-            debug!("No credential to delete");
-            Ok(())
-        }
+fn delete_entry(key: &str) -> Result<(), AppError> {
+    match create_entry(key)?.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => Err(AppError::Credential(format!(
-            "Failed to delete password: {e}"
+            "Failed to delete secret: {e}"
         ))),
     }
 }
 
-/// Clear all cached credentials from memory
-/// Useful for logout or security purposes
-#[allow(dead_code)]
-pub fn clear_cache() -> Result<(), AppError> {
-    debug!("Clearing credential cache");
-    let mut cache = get_cache()
-        .lock()
-        .map_err(|e| AppError::Credential(format!("Failed to lock credential cache: {e}")))?;
-    cache.clear();
-    info!("Credential cache cleared");
+/// Stores a server's secret in the OS keychain and cache.
+pub fn store_secret(server_url: &str, secret: &str) -> Result<(), AppError> {
+    debug!("Storing credential for server");
+    create_entry(server_url)?
+        .set_password(secret)
+        .map_err(|e| AppError::Credential(format!("Failed to store secret: {e}")))?;
+    get_cache()?.insert(server_url.to_string(), secret.to_string());
+    info!("Credential stored successfully");
     Ok(())
+}
+
+/// Gets a server's secret from the cache or OS keychain.
+pub fn get_secret(server_url: &str) -> Result<Option<String>, AppError> {
+    if let Some(secret) = get_cache()?.get(server_url) {
+        return Ok(Some(secret.clone()));
+    }
+    let secret = read_entry(server_url)?;
+    if let Some(ref s) = secret {
+        get_cache()?.insert(server_url.to_string(), s.clone());
+    }
+    Ok(secret)
+}
+
+/// Deletes a server's secret from the OS keychain and cache.
+pub fn delete_secret(server_url: &str) -> Result<(), AppError> {
+    get_cache()?.remove(server_url);
+    delete_entry(server_url)
+}
+
+/// Moves a password stored under the old `<username>_<url>` key to the URL-only key.
+/// Best-effort: a failure only means the user has to enter the password again.
+pub fn migrate_legacy_password(username: &str, server_url: &str) {
+    let legacy_key = format!("{username}_{server_url}");
+    match read_entry(&legacy_key) {
+        Ok(Some(password)) => {
+            if let Err(e) = store_secret(server_url, &password) {
+                log::warn!("Failed to migrate credential for {server_url}: {e}");
+                return;
+            }
+            let _ = delete_entry(&legacy_key);
+            info!("Migrated credential for {server_url} to the URL-only key");
+        }
+        Ok(None) => {}
+        Err(e) => log::warn!("Failed to read legacy credential for {server_url}: {e}"),
+    }
 }

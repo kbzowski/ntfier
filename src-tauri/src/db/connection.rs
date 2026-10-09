@@ -54,6 +54,7 @@ impl Database {
 
         log::info!("Database migrations completed");
 
+        Self::migrate_legacy_credentials(&mut conn)?;
         Self::canonicalize_server_urls(&mut conn)?;
 
         // Initialize default server if needed
@@ -88,8 +89,8 @@ impl Database {
                 }
             };
 
-            // The row whose keychain entry needs to follow it to the new URL
-            let renamed = conn.transaction::<_, diesel::result::Error, _>(|conn| {
+            // Whether this row survived, so its keychain entry follows it to the new URL
+            let kept = conn.transaction::<_, diesel::result::Error, _>(|conn| {
                 let target: Option<ServerRow> = servers::table
                     .filter(servers::url.eq(&canonical))
                     .first(conn)
@@ -112,15 +113,13 @@ impl Database {
                     .set(servers::url.eq(&canonical))
                     .execute(conn)?;
 
-                Ok((keep.id == row.id)
-                    .then_some(row.username.clone())
-                    .flatten())
+                Ok(keep.id == row.id)
             })?;
 
             log::info!("Server URL '{}' is now '{canonical}'", row.url);
 
-            if let Some(username) = renamed {
-                Self::move_keychain_entry(&username, &row.url, &canonical);
+            if kept {
+                Self::move_keychain_entry(&row.url, &canonical);
             }
         }
 
@@ -183,15 +182,28 @@ impl Database {
         Ok(())
     }
 
-    /// Best-effort: a failure only means the user has to enter the password again.
-    fn move_keychain_entry(username: &str, old_url: &str, new_url: &str) {
-        match credential_manager::get_password(username, old_url) {
-            Ok(Some(password)) => {
-                if let Err(e) = credential_manager::store_password(username, new_url, &password) {
+    /// Moves passwords stored under the old `<username>_<url>` keychain key.
+    fn migrate_legacy_credentials(conn: &mut SqliteConnection) -> Result<(), AppError> {
+        let rows: Vec<(String, Option<String>)> = servers::table
+            .select((servers::url, servers::username))
+            .load(conn)?;
+        for (url, username) in rows {
+            if let Some(username) = username.filter(|u| !u.is_empty()) {
+                credential_manager::migrate_legacy_password(&username, &url);
+            }
+        }
+        Ok(())
+    }
+
+    /// Best-effort: a failure only means the user has to enter the secret again.
+    fn move_keychain_entry(old_url: &str, new_url: &str) {
+        match credential_manager::get_secret(old_url) {
+            Ok(Some(secret)) => {
+                if let Err(e) = credential_manager::store_secret(new_url, &secret) {
                     log::warn!("Failed to move credential to {new_url}: {e}");
                     return;
                 }
-                let _ = credential_manager::delete_password(username, old_url);
+                let _ = credential_manager::delete_secret(old_url);
             }
             Ok(None) => {}
             Err(e) => log::warn!("Failed to read credential for {old_url}: {e}"),

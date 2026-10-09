@@ -12,6 +12,7 @@ import { UpdateToast } from "@/components/common/UpdateToast";
 import { AddSubscriptionDialog } from "@/components/dialogs/AddSubscriptionDialog";
 import { ConfirmDialog } from "@/components/dialogs/ConfirmDialog";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ServerStatusBanner } from "@/components/layout/ServerStatusBanner";
 import { ErrorCard } from "@/components/ui/error-card";
 
 const SettingsDialog = lazy(() =>
@@ -29,6 +30,7 @@ export const Route = createFileRoute("/")({ component: App });
 
 function App() {
 	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [editServerUrl, setEditServerUrl] = useState<string | null>(null);
 	const [addSubscriptionOpen, setAddSubscriptionOpen] = useState(false);
 	const [confirmDialog, setConfirmDialog] = useState<{
 		open: boolean;
@@ -76,6 +78,8 @@ function App() {
 		setUpdateInfo,
 		loadError,
 		retryLoad,
+		serverStatuses,
+		updateServer,
 	} = useApp();
 
 	const currentTopicIdRef = useRef(currentTopicId);
@@ -125,6 +129,14 @@ function App() {
 	);
 
 	const handleOpenSettings = useCallback(() => setSettingsOpen(true), []);
+	const handleSettingsOpenChange = useCallback((open: boolean) => {
+		setSettingsOpen(open);
+		if (!open) setEditServerUrl(null);
+	}, []);
+	const handleEditServer = useCallback((url: string) => {
+		setEditServerUrl(url);
+		setSettingsOpen(true);
+	}, []);
 	const handleOpenAddSubscription = useCallback(
 		() => setAddSubscriptionOpen(true),
 		[],
@@ -155,6 +167,10 @@ function App() {
 				onOpenSettings={handleOpenSettings}
 				onAddSubscription={handleOpenAddSubscription}
 			>
+				<ServerStatusBanner
+					statuses={serverStatuses}
+					onEditServer={handleEditServer}
+				/>
 				{loadError ? (
 					<ErrorCard
 						className="m-6"
@@ -187,7 +203,7 @@ function App() {
 			<Suspense fallback={null}>
 				<SettingsDialog
 					open={settingsOpen}
-					onOpenChange={setSettingsOpen}
+					onOpenChange={handleSettingsOpenChange}
 					themeId={themeId}
 					onThemeChange={setThemeId}
 					isSystemMode={isSystemMode}
@@ -195,6 +211,8 @@ function App() {
 					availableThemes={availableThemes}
 					servers={settings.servers}
 					onAddServer={handleAddServer}
+					onUpdateServer={updateServer}
+					editServerUrl={editServerUrl}
 					onRemoveServer={removeServer}
 					onSetDefaultServer={setDefaultServer}
 					autostart={autostart}

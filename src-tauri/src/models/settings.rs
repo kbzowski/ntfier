@@ -29,19 +29,29 @@ pub enum NotificationDisplayMethod {
 #[serde(rename_all = "camelCase")]
 pub struct ServerConfig {
     pub url: String,
+    /// Set for a username + password login.
     pub username: Option<String>,
     pub password: Option<String>,
+    /// Access token (`tk_...`), used when there's no username.
+    #[serde(default)]
+    pub token: Option<String>,
     pub is_default: bool,
 }
 
 impl ServerConfig {
-    /// Returns username and password if both are present and username is non-empty.
-    pub fn credentials(&self) -> Option<(&str, &str)> {
-        self.username
-            .as_ref()
-            .filter(|u| !u.is_empty())
-            .zip(self.password.as_ref())
-            .map(|(u, p)| (u.as_str(), p.as_str()))
+    /// The `Authorization` header value for this server's credential, if it has one.
+    pub fn auth_header(&self) -> Option<String> {
+        use base64::{engine::general_purpose::STANDARD, Engine};
+
+        let nonempty = |s: &Option<String>| s.clone().filter(|v| !v.is_empty());
+        match (nonempty(&self.username), nonempty(&self.password)) {
+            (Some(user), Some(pass)) => Some(format!(
+                "Basic {}",
+                STANDARD.encode(format!("{user}:{pass}"))
+            )),
+            (Some(_), None) => None,
+            (None, _) => nonempty(&self.token).map(|t| format!("Bearer {t}")),
+        }
     }
 }
 
@@ -123,6 +133,7 @@ impl Default for AppSettings {
                 url: "https://ntfy.sh".to_string(),
                 username: None,
                 password: None,
+                token: None,
                 is_default: true,
             }],
             default_server: "https://ntfy.sh".to_string(),

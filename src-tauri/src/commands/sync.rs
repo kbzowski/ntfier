@@ -2,7 +2,7 @@ use tauri::{AppHandle, State};
 
 use crate::db::Database;
 use crate::error::AppError;
-use crate::models::{canonical_url, Subscription};
+use crate::models::{canonical_url, ServerStatus, Subscription};
 use crate::services::{ConnectionManager, NtfyClient, SyncService};
 
 /// Sync subscriptions from a server that has user credentials
@@ -29,26 +29,21 @@ pub async fn sync_subscriptions(
             AppError::NotFound(format!("Server {server_url} not found"))
         })?;
 
-    log::info!(
-        "Found server: {} (has username: {}, has password: {})",
-        server.url,
-        server.username.is_some(),
-        server.password.is_some()
-    );
-
-    // Check if server has credentials
-    let username = server
-        .username
-        .as_ref()
-        .ok_or_else(|| AppError::Connection("Server has no username configured".to_string()))?;
-    let password = server
-        .password
-        .as_ref()
-        .ok_or_else(|| AppError::Connection("Server has no password configured".to_string()))?;
+    let auth = server
+        .auth_header()
+        .ok_or_else(|| AppError::Validation("Server has no login configured".to_string()))?;
 
     // Fetch account info from ntfy server
     let client = NtfyClient::new()?;
-    let account = client.get_account(&server_url, username, password).await?;
+    let account = match client.get_account(&server_url, Some(&auth)).await {
+        Err(e @ AppError::Auth(_)) => {
+            conn_manager
+                .block_server(&server_url, ServerStatus::NeedsCredentials)
+                .await;
+            return Err(e);
+        }
+        result => result?,
+    };
 
     log::info!(
         "Got {} subscriptions from ntfy server",
@@ -110,14 +105,7 @@ pub async fn sync_subscriptions(
         synced_subscriptions.len()
     );
     for sub in &synced_subscriptions {
-        SyncService::poll_subscription(
-            &app_handle,
-            &client,
-            sub,
-            Some(username.as_str()),
-            Some(password.as_str()),
-        )
-        .await;
+        SyncService::poll_subscription(&app_handle, &client, sub, Some(&auth)).await;
     }
 
     log::info!("Notification sync completed for server {server_url}");

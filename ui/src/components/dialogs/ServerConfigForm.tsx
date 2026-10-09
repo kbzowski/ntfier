@@ -3,6 +3,7 @@ import {
 	Eye,
 	EyeOff,
 	Loader2,
+	Pencil,
 	Server,
 	Trash2,
 } from "lucide-react";
@@ -19,44 +20,84 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useServerForm } from "@/hooks/useServerForm";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+	type AuthMode,
+	type ServerInput,
+	useServerForm,
+} from "@/hooks/useServerForm";
 import type { ServerConfig } from "@/types/ntfy";
+
+const AUTH_MODES: { id: AuthMode; label: string }[] = [
+	{ id: "none", label: "No login" },
+	{ id: "password", label: "Username and password" },
+	{ id: "token", label: "Access token" },
+];
 
 interface ServerConfigFormProps {
 	servers: ServerConfig[];
-	onAddServer: (
-		server: Omit<ServerConfig, "isDefault">,
-	) => Promise<unknown> | undefined;
+	onAddServer: (server: ServerInput) => Promise<unknown> | undefined;
+	onUpdateServer: (server: ServerInput) => Promise<unknown> | undefined;
 	onRemoveServer: (url: string) => void;
 	onSetDefault: (url: string) => void;
+	/** Opens the form on this server's login, e.g. from a "needs credentials" flag. */
+	editUrl?: string | null;
 }
 
 export function ServerConfigForm({
 	servers,
 	onAddServer,
+	onUpdateServer,
 	onRemoveServer,
 	onSetDefault,
+	editUrl,
 }: ServerConfigFormProps) {
 	const {
 		formData,
 		setUrl,
+		setAuthMode,
 		setUsername,
 		setPassword,
-		showPassword,
-		toggleShowPassword,
-		isAdding,
+		setToken,
+		showSecret,
+		toggleShowSecret,
+		isOpen,
+		editingUrl,
 		startAdding,
-		cancelAdding,
+		startEditing,
+		cancel,
 		isLoading,
 		error,
 		clearError,
 		handleSubmit,
 		canSubmit,
 	} = useServerForm({
-		onSubmit: async (server) => {
+		onAdd: async (server) => {
 			await onAddServer(server);
 		},
+		onUpdate: async (server) => {
+			await onUpdateServer(server);
+		},
+		initial: servers.find((s) => s.url === editUrl),
 	});
+
+	const secretToggle = (
+		<Button
+			type="button"
+			variant="ghost"
+			size="icon"
+			className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+			aria-label={showSecret ? "Hide secret" : "Show secret"}
+			onClick={toggleShowSecret}
+			disabled={isLoading}
+		>
+			{showSecret ? (
+				<EyeOff className="h-4 w-4 text-muted-foreground" />
+			) : (
+				<Eye className="h-4 w-4 text-muted-foreground" />
+			)}
+		</Button>
+	);
 
 	return (
 		<>
@@ -96,9 +137,9 @@ export function ServerConfigForm({
 										</Badge>
 									)}
 								</div>
-								{server.username && (
+								{(server.username || server.token) && (
 									<span className="text-xs text-muted-foreground">
-										{server.username}
+										{server.username ?? "Access token"}
 									</span>
 								)}
 							</div>
@@ -113,6 +154,15 @@ export function ServerConfigForm({
 										Set default
 									</Button>
 								)}
+								<Button
+									variant="ghost"
+									size="icon"
+									className="h-8 w-8"
+									aria-label={`Edit login for ${server.url}`}
+									onClick={() => startEditing(server)}
+								>
+									<Pencil className="h-4 w-4" />
+								</Button>
 								{servers.length > 1 && (
 									<Button
 										variant="ghost"
@@ -129,7 +179,7 @@ export function ServerConfigForm({
 					))}
 				</div>
 
-				{isAdding ? (
+				{isOpen ? (
 					<div className="space-y-3 p-4 rounded-lg border border-border">
 						<div className="space-y-2">
 							<Label htmlFor="server-url">Server URL</Label>
@@ -138,47 +188,72 @@ export function ServerConfigForm({
 								placeholder="https://ntfy.sh"
 								value={formData.url}
 								onChange={(e) => setUrl(e.target.value)}
-								disabled={isLoading}
+								disabled={isLoading || !!editingUrl}
 							/>
 						</div>
-						<div className="space-y-2">
-							<Label htmlFor="server-username">Username (optional)</Label>
-							<Input
-								id="server-username"
-								placeholder="username"
-								value={formData.username}
-								onChange={(e) => setUsername(e.target.value)}
-								disabled={isLoading}
-							/>
-						</div>
-						<div className="space-y-2">
-							<Label htmlFor="server-password">Password (optional)</Label>
-							<div className="relative">
-								<Input
-									id="server-password"
-									type={showPassword ? "text" : "password"}
-									placeholder="password"
-									value={formData.password}
-									onChange={(e) => setPassword(e.target.value)}
-									disabled={isLoading}
-								/>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-									aria-label={showPassword ? "Hide password" : "Show password"}
-									onClick={toggleShowPassword}
-									disabled={isLoading}
-								>
-									{showPassword ? (
-										<EyeOff className="h-4 w-4 text-muted-foreground" />
-									) : (
-										<Eye className="h-4 w-4 text-muted-foreground" />
-									)}
-								</Button>
+
+						<RadioGroup
+							value={formData.authMode}
+							onValueChange={(value) => setAuthMode(value as AuthMode)}
+							className="space-y-1"
+							aria-label="Login"
+						>
+							{AUTH_MODES.map((mode) => (
+								<div key={mode.id} className="flex items-center gap-2">
+									<RadioGroupItem value={mode.id} id={`auth-${mode.id}`} />
+									<Label htmlFor={`auth-${mode.id}`} className="font-normal">
+										{mode.label}
+									</Label>
+								</div>
+							))}
+						</RadioGroup>
+
+						{formData.authMode === "password" && (
+							<>
+								<div className="space-y-2">
+									<Label htmlFor="server-username">Username</Label>
+									<Input
+										id="server-username"
+										placeholder="username"
+										value={formData.username}
+										onChange={(e) => setUsername(e.target.value)}
+										disabled={isLoading}
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="server-password">Password</Label>
+									<div className="relative">
+										<Input
+											id="server-password"
+											type={showSecret ? "text" : "password"}
+											placeholder="password"
+											value={formData.password}
+											onChange={(e) => setPassword(e.target.value)}
+											disabled={isLoading}
+										/>
+										{secretToggle}
+									</div>
+								</div>
+							</>
+						)}
+
+						{formData.authMode === "token" && (
+							<div className="space-y-2">
+								<Label htmlFor="server-token">Access token</Label>
+								<div className="relative">
+									<Input
+										id="server-token"
+										type={showSecret ? "text" : "password"}
+										placeholder="tk_..."
+										value={formData.token}
+										onChange={(e) => setToken(e.target.value)}
+										disabled={isLoading}
+									/>
+									{secretToggle}
+								</div>
 							</div>
-						</div>
+						)}
+
 						<div className="flex gap-2 pt-2">
 							<Button onClick={handleSubmit} disabled={!canSubmit}>
 								{isLoading ? (
@@ -186,15 +261,13 @@ export function ServerConfigForm({
 										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
 										Connecting...
 									</>
+								) : editingUrl ? (
+									"Save"
 								) : (
 									"Add Server"
 								)}
 							</Button>
-							<Button
-								variant="ghost"
-								onClick={cancelAdding}
-								disabled={isLoading}
-							>
+							<Button variant="ghost" onClick={cancel} disabled={isLoading}>
 								Cancel
 							</Button>
 						</div>

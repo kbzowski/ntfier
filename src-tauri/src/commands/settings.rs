@@ -4,8 +4,14 @@ use crate::commands::notifications::refresh_tray;
 
 use crate::db::Database;
 use crate::error::AppError;
-use crate::models::{AppSettings, NotificationDisplayMethod, ServerConfig, ThemeMode};
-use crate::services::ConnectionManager;
+use serde::Serialize;
+use specta::Type;
+
+use crate::models::{
+    canonical_url, AppSettings, NotificationDisplayMethod, ServerConfig, ServerStatusEntry,
+    ThemeMode,
+};
+use crate::services::{ConnectionManager, NtfyClient};
 
 #[tauri::command]
 #[specta::specta]
@@ -24,11 +30,73 @@ pub fn set_theme(db: State<'_, Database>, theme: ThemeMode) -> Result<(), AppErr
     db.set_setting("theme", theme_str)
 }
 
+/// A saved server's canonical URL, plus a warning when the login wasn't kept.
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedServer {
+    pub url: String,
+    pub warning: Option<String>,
+}
+
+/// Checks the credential with `/v1/account` before it's saved; a 401 is the error.
+/// A server without user accounts answers anonymously: then the login is dropped.
+async fn check_credential(
+    mut server: ServerConfig,
+) -> Result<(ServerConfig, Option<String>), AppError> {
+    server.url = canonical_url(&server.url)?;
+    let Some(auth) = server.auth_header() else {
+        return Ok((server, None));
+    };
+    let account = NtfyClient::new()?
+        .get_account(&server.url, Some(&auth))
+        .await?;
+    if account.is_signed_in() {
+        return Ok((server, None));
+    }
+    server.username = None;
+    server.password = None;
+    server.token = None;
+    Ok((
+        server,
+        Some("This server has no user accounts, so it was saved without the login.".to_string()),
+    ))
+}
+
 #[tauri::command]
 #[specta::specta]
-/// Returns the server's canonical URL, the form it's stored and compared in.
-pub fn add_server(db: State<'_, Database>, server: ServerConfig) -> Result<String, AppError> {
-    db.add_server(server)
+pub async fn add_server(
+    db: State<'_, Database>,
+    server: ServerConfig,
+) -> Result<SavedServer, AppError> {
+    let (server, warning) = check_credential(server).await?;
+    let url = db.add_server(server)?;
+    Ok(SavedServer { url, warning })
+}
+
+/// Changes a server's login in place and reconnects its subscriptions with it.
+#[tauri::command]
+#[specta::specta]
+pub async fn update_server(
+    db: State<'_, Database>,
+    conn_manager: State<'_, ConnectionManager>,
+    server: ServerConfig,
+) -> Result<SavedServer, AppError> {
+    let (server, warning) = check_credential(server).await?;
+    db.update_server_credential(&server)?;
+    conn_manager.reconnect_server(&server.url).await;
+    Ok(SavedServer {
+        url: server.url,
+        warning,
+    })
+}
+
+/// Servers that are blocked from connecting (the `server:status` events so far).
+#[tauri::command]
+#[specta::specta]
+pub async fn get_server_statuses(
+    conn_manager: State<'_, ConnectionManager>,
+) -> Result<Vec<ServerStatusEntry>, AppError> {
+    Ok(conn_manager.server_statuses().await)
 }
 
 #[tauri::command]

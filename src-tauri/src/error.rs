@@ -36,6 +36,18 @@ pub enum AppError {
     #[error("Credential error: {0}")]
     Credential(String),
 
+    /// 401: the server rejected the credential.
+    #[error("{0}")]
+    Auth(String),
+
+    /// 403: no access to the topic.
+    #[error("{0}")]
+    Forbidden(String),
+
+    /// 429: the server rate-limits us.
+    #[error("{0}")]
+    RateLimited(String),
+
     #[error("Updater error: {0}")]
     Updater(String),
 }

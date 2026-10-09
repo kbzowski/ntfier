@@ -151,11 +151,26 @@ function extractErrorMessage(error: unknown): string {
 	return "An unknown error occurred";
 }
 
+/** An error from a backend command, whose message is already meant for the user. */
+export class BackendError extends Error {}
+
 /**
  * Classifies an error and generates user-friendly message
  */
 export function classifyError(error: unknown): ClassifiedError {
 	const message = extractErrorMessage(error);
+
+	if (error instanceof BackendError) {
+		return {
+			type: ErrorType.UNKNOWN,
+			severity: ErrorSeverity.MEDIUM,
+			message,
+			userMessage: message,
+			recoverable: true,
+			retryable: true,
+			originalError: error,
+		};
+	}
 
 	// Match against known patterns
 	for (const pattern of errorPatterns) {

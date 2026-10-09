@@ -36,6 +36,11 @@ interface SettingsDialogProps {
 	onAddServer: (
 		server: Omit<ServerConfig, "isDefault">,
 	) => Promise<unknown> | undefined;
+	onUpdateServer: (
+		server: Omit<ServerConfig, "isDefault">,
+	) => Promise<unknown> | undefined;
+	/** Opens straight on this server's login (Servers tab). */
+	editServerUrl?: string | null;
 	onRemoveServer: (url: string) => void;
 	onSetDefaultServer: (url: string) => void;
 	autostart: boolean;
@@ -76,6 +81,8 @@ export function SettingsDialog({
 	availableThemes,
 	servers,
 	onAddServer,
+	onUpdateServer,
+	editServerUrl,
 	onRemoveServer,
 	onSetDefaultServer,
 	autostart,
@@ -120,7 +127,7 @@ export function SettingsDialog({
 					<DialogTitle>Settings</DialogTitle>
 				</DialogHeader>
 
-				<Tabs defaultValue="appearance">
+				<Tabs defaultValue={editServerUrl ? "servers" : "appearance"}>
 					<TabsList
 						className={cn(
 							"grid w-full",
@@ -209,6 +216,8 @@ export function SettingsDialog({
 						<ServerConfigForm
 							servers={servers}
 							onAddServer={onAddServer}
+							onUpdateServer={onUpdateServer}
+							editUrl={editServerUrl}
 							onRemoveServer={onRemoveServer}
 							onSetDefault={onSetDefaultServer}
 						/>

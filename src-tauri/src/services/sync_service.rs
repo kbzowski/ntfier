@@ -5,7 +5,8 @@
 use tauri::{AppHandle, Manager};
 
 use crate::db::Database;
-use crate::models::{canonical_url, CreateSubscription};
+use crate::error::AppError;
+use crate::models::{canonical_url, CreateSubscription, ServerStatus};
 use crate::services::{ConnectionManager, NtfyClient};
 
 /// Synchronization service for subscriptions and notifications.
@@ -30,9 +31,8 @@ impl SyncService {
         };
 
         for server in &settings.servers {
-            let (username, password) = match server.credentials() {
-                Some(creds) => creds,
-                None => continue,
+            let Some(auth) = server.auth_header() else {
+                continue;
             };
 
             log::info!("Syncing subscriptions from: {}", server.url);
@@ -45,8 +45,14 @@ impl SyncService {
                 }
             };
 
-            let account = match client.get_account(&server.url, username, password).await {
+            let account = match client.get_account(&server.url, Some(&auth)).await {
                 Ok(a) => a,
+                Err(AppError::Auth(_)) => {
+                    conn_manager
+                        .block_server(&server.url, ServerStatus::NeedsCredentials)
+                        .await;
+                    continue;
+                }
                 Err(e) => {
                     log::error!("Failed to sync from {}: {}", server.url, e);
                     continue;
@@ -105,14 +111,13 @@ impl SyncService {
         handle: &AppHandle,
         client: &NtfyClient,
         sub: &crate::models::Subscription,
-        username: Option<&str>,
-        password: Option<&str>,
+        auth: Option<&str>,
     ) {
         let db: tauri::State<Database> = handle.state();
         let since = db.get_message_cursor(&sub.id).ok().flatten();
 
         let messages = match client
-            .get_messages(&sub.server_url, &sub.topic, since, username, password)
+            .get_messages(&sub.server_url, &sub.topic, since, auth)
             .await
         {
             Ok(m) => m,

@@ -60,12 +60,11 @@ pub async fn delete_notification(
             // Look up subscription to get server_url and topic
             if let Some(subscription) = db.get_subscription_by_id(&subscription_id)? {
                 // Find credentials for this server
-                let servers = db.get_servers_with_credentials()?;
-                let server = servers.iter().find(|s| s.url == subscription.server_url);
-
-                let (username, password) = server
-                    .and_then(|s| s.credentials())
-                    .map_or((None, None), |(u, p)| (Some(u), Some(p)));
+                let auth = db
+                    .get_servers_with_credentials()?
+                    .into_iter()
+                    .find(|s| s.url == subscription.server_url)
+                    .and_then(|s| s.auth_header());
 
                 match NtfyClient::new() {
                     Ok(client) => {
@@ -74,8 +73,7 @@ pub async fn delete_notification(
                                 &subscription.server_url,
                                 &subscription.topic,
                                 &sequence_id,
-                                username,
-                                password,
+                                auth.as_deref(),
                             )
                             .await
                         {
