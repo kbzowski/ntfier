@@ -13,9 +13,9 @@ use crate::models::{canonical_url, is_ignored, CreateSubscription, Subscription}
 
 /// Base SELECT/FROM/JOIN shared by all subscription queries.
 const SUBSCRIPTION_BASE_QUERY: &str = "\
-    SELECT s.id, s.topic, srv.url as server_url, s.display_name, s.muted, s.last_sync, \
-           (SELECT MAX(n.timestamp) FROM notifications n WHERE n.subscription_id = s.id) as last_notif, \
-           (SELECT COUNT(*) FROM notifications n WHERE n.subscription_id = s.id AND n.read = 0) as unread \
+    SELECT s.id, s.topic, srv.url as server_url, s.display_name, s.muted, \
+           (SELECT MAX(n.timestamp) FROM notifications n WHERE n.subscription_id = s.id AND n.deleted = 0) as last_notif, \
+           (SELECT COUNT(*) FROM notifications n WHERE n.subscription_id = s.id AND n.read = 0 AND n.deleted = 0) as unread \
     FROM subscriptions s \
     JOIN servers srv ON s.server_id = srv.id";
 
@@ -36,6 +36,7 @@ impl Database {
 
         let unread_rows: Vec<(String, Option<String>)> = notifications::table
             .filter(notifications::read.eq(0))
+            .filter(notifications::deleted.eq(0))
             .select((notifications::subscription_id, notifications::title))
             .load(&mut *conn)?;
 
@@ -53,31 +54,29 @@ impl Database {
         Ok(subs)
     }
 
-    /// Gets a subscription with its last sync timestamp.
-    pub fn get_subscription_with_last_sync(
-        &self,
-        id: &str,
-    ) -> Result<Option<(Subscription, Option<i64>)>, AppError> {
+    /// The subscription's cursor: time (ntfy seconds) of its newest stored message.
+    pub fn get_message_cursor(&self, id: &str) -> Result<Option<i64>, AppError> {
         let mut conn = self.conn()?;
 
-        let query = format!("{SUBSCRIPTION_BASE_QUERY} WHERE s.id = ?");
-        let rows: Vec<SubscriptionQueryRow> = sql_query(query)
-            .bind::<diesel::sql_types::Text, _>(id)
-            .load(&mut *conn)?;
-
-        Ok(rows.into_iter().next().map(|row| {
-            let last_sync = row.last_sync;
-            (Subscription::from(row), last_sync)
-        }))
+        Ok(subscriptions::table
+            .filter(subscriptions::id.eq(id))
+            .select(subscriptions::last_message_time)
+            .first::<Option<i64>>(&mut *conn)
+            .optional()?
+            .flatten())
     }
 
-    /// Updates the last sync timestamp for a subscription.
-    pub fn update_subscription_last_sync(&self, id: &str, timestamp: i64) -> Result<(), AppError> {
+    /// Moves the cursor to `time` if that's newer. Never moves it back.
+    pub fn advance_message_cursor(&self, id: &str, time: i64) -> Result<(), AppError> {
         let mut conn = self.conn()?;
 
-        diesel::update(subscriptions::table.filter(subscriptions::id.eq(id)))
-            .set(subscriptions::last_sync.eq(timestamp))
-            .execute(&mut *conn)?;
+        sql_query(
+            "UPDATE subscriptions SET last_message_time = MAX(COALESCE(last_message_time, 0), ?) \
+             WHERE id = ?",
+        )
+        .bind::<diesel::sql_types::BigInt, _>(time)
+        .bind::<diesel::sql_types::Text, _>(id)
+        .execute(&mut *conn)?;
 
         Ok(())
     }

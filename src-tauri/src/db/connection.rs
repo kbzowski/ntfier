@@ -147,6 +147,14 @@ impl Database {
                 .optional()?;
 
             if let Some(keep_sub) = existing {
+                // Copies of a message both servers stored would break the unique ntfy_id
+                diesel::sql_query(
+                    "DELETE FROM notifications WHERE subscription_id = ? AND ntfy_id IN \
+                     (SELECT ntfy_id FROM notifications WHERE subscription_id = ?)",
+                )
+                .bind::<diesel::sql_types::Text, _>(&sub_id)
+                .bind::<diesel::sql_types::Text, _>(&keep_sub)
+                .execute(conn)?;
                 diesel::update(
                     notifications::table.filter(notifications::subscription_id.eq(&sub_id)),
                 )

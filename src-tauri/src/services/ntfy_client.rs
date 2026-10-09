@@ -132,8 +132,8 @@ impl NtfyClient {
         Ok(())
     }
 
-    /// Fetch messages from a topic since a given timestamp
-    /// If since is None, fetches all available messages (up to server limit)
+    /// Polls a topic for messages since `since` (ntfy seconds, inclusive), or all cached
+    /// messages when `None`. Returns every event; the receive path picks the messages.
     pub async fn get_messages(
         &self,
         server_url: &str,
@@ -177,6 +177,12 @@ impl NtfyClient {
             )));
         }
 
+        // The server keeps the newest messages that fit and drops older ones, so there's
+        // nothing to page back to; only a huge `since=all` replay hits this.
+        if response.headers().contains_key("x-messages-truncated") {
+            log::warn!("{server_url}/{topic}: server dropped older messages from this poll");
+        }
+
         let text = response
             .text()
             .await
@@ -189,12 +195,7 @@ impl NtfyClient {
                 continue;
             }
             match serde_json::from_str::<NtfyMessage>(line) {
-                Ok(msg) => {
-                    // Only include actual messages, not open/keepalive events
-                    if msg.event == "message" {
-                        messages.push(msg);
-                    }
-                }
+                Ok(msg) => messages.push(msg),
                 Err(e) => {
                     log::warn!("Failed to parse message: {e} - line: {line}");
                 }

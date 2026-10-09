@@ -1,13 +1,12 @@
 //! Synchronization service for subscriptions and notifications.
 //!
-//! Handles syncing subscriptions from ntfy servers and fetching
-//! historical notifications for each subscription.
+//! Handles syncing subscriptions from ntfy accounts and the manual message poll.
 
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 use crate::db::Database;
-use crate::models::{canonical_url, is_ignored, CreateSubscription};
-use crate::services::{ConnectionManager, NtfyClient, TrayManager};
+use crate::models::{canonical_url, CreateSubscription};
+use crate::services::{ConnectionManager, NtfyClient};
 
 /// Synchronization service for subscriptions and notifications.
 pub struct SyncService;
@@ -98,87 +97,22 @@ impl SyncService {
         log::info!("Subscription sync completed");
     }
 
-    /// Syncs notifications for all subscriptions from their servers.
+    /// Polls one subscription from its cursor (the manual sync).
     ///
-    /// Fetches messages newer than each subscription's last sync timestamp
-    /// and stores them in the database.
-    pub async fn sync_notifications(handle: &AppHandle) {
-        let db: tauri::State<Database> = handle.state();
-
-        let settings = match db.get_settings() {
-            Ok(s) => s,
-            Err(e) => {
-                log::error!("Failed to get settings for notification sync: {e}");
-                return;
-            }
-        };
-
-        let subscriptions = match db.get_all_subscriptions() {
-            Ok(s) => s,
-            Err(e) => {
-                log::error!("Failed to get subscriptions for notification sync: {e}");
-                return;
-            }
-        };
-
-        let client = match NtfyClient::new() {
-            Ok(c) => c,
-            Err(e) => {
-                log::error!("Failed to create ntfy client: {e}");
-                return;
-            }
-        };
-
-        for sub in subscriptions {
-            // Find server credentials for this subscription
-            let server = settings.servers.iter().find(|s| s.url == sub.server_url);
-            let (username, password) = match server {
-                Some(s) => (s.username.as_deref(), s.password.as_deref()),
-                None => (None, None),
-            };
-
-            Self::sync_subscription_notifications(handle, &db, &client, &sub, username, password)
-                .await;
-        }
-
-        log::info!("Notification sync completed");
-    }
-
-    /// Syncs notifications for a single subscription.
-    ///
-    /// If `username` and `password` are provided, they are used for authentication.
-    /// Otherwise, credentials are looked up from the `servers` list.
-    ///
-    /// Shows system notifications for each new message unless the subscription is muted.
-    pub async fn sync_subscription_notifications(
+    /// Live delivery and catch-up go through the WebSocket; this is the same catch-up as a
+    /// one-off poll, fed through the shared receive path.
+    pub async fn poll_subscription(
         handle: &AppHandle,
-        db: &Database,
         client: &NtfyClient,
         sub: &crate::models::Subscription,
         username: Option<&str>,
         password: Option<&str>,
     ) {
-        let last_sync = match db.get_subscription_with_last_sync(&sub.id) {
-            Ok(Some((_, last_sync))) => last_sync,
-            Ok(None) => {
-                log::warn!("Subscription {} not found", sub.id);
-                return;
-            }
-            Err(e) => {
-                log::error!("Failed to get last_sync for {}: {}", sub.id, e);
-                return;
-            }
-        };
-
-        log::info!(
-            "Syncing notifications for {}/{} (since: {:?})",
-            sub.server_url,
-            sub.topic,
-            last_sync
-        );
+        let db: tauri::State<Database> = handle.state();
+        let since = db.get_message_cursor(&sub.id).ok().flatten();
 
         let messages = match client
-            .get_messages(&sub.server_url, &sub.topic, last_sync, username, password)
+            .get_messages(&sub.server_url, &sub.topic, since, username, password)
             .await
         {
             Ok(m) => m,
@@ -193,77 +127,8 @@ impl SyncService {
             }
         };
 
-        if messages.is_empty() {
-            log::info!("No new messages for {}/{}", sub.server_url, sub.topic);
-        } else {
-            log::info!(
-                "Found {} new messages for {}/{}",
-                messages.len(),
-                sub.server_url,
-                sub.topic
-            );
-        }
-
-        let mut max_timestamp: i64 = last_sync.unwrap_or(0);
-
-        let mut new_notifications = Vec::new();
-
-        let rules = db.get_ignore_rules().unwrap_or_default();
-
         for msg in messages {
-            if db
-                .notification_exists_by_ntfy_id(msg.ntfy_id())
-                .unwrap_or(false)
-            {
-                continue;
-            }
-
-            let ntfy_id = msg.ntfy_id().to_string();
-            let msg_time = msg.time;
-            let mut notification = msg.into_notification(sub.id.clone());
-            notification.ignored = is_ignored(&notification.title, &notification.topic_id, &rules);
-
-            // Auto-mark as read for muted topics
-            if sub.muted {
-                notification.read = true;
-            }
-
-            if let Err(e) = db.insert_notification_with_ntfy_id(&notification, &ntfy_id) {
-                log::error!("Failed to insert notification: {e}");
-            } else {
-                log::info!(
-                    "Inserted notification: {} - {}",
-                    notification.title,
-                    notification.message
-                );
-                new_notifications.push(notification);
-            }
-
-            if msg_time > max_timestamp {
-                max_timestamp = msg_time;
-            }
-        }
-
-        // Emit events and show system notifications for new messages
-        for notification in &new_notifications {
-            if let Err(e) = handle.emit("notification:new", notification) {
-                log::error!("Failed to emit notification event: {e}");
-            }
-
-            if !sub.muted && !notification.ignored {
-                ConnectionManager::show_notification(handle, notification).await;
-            }
-        }
-
-        // Update tray icon if there were new notifications
-        if !new_notifications.is_empty() {
-            let tray_manager: tauri::State<TrayManager> = handle.state();
-            tray_manager.refresh_from_db(handle).await;
-        }
-
-        let new_sync_time = std::cmp::max(max_timestamp + 1, chrono::Utc::now().timestamp());
-        if let Err(e) = db.update_subscription_last_sync(&sub.id, new_sync_time) {
-            log::error!("Failed to update last_sync for {}: {}", sub.id, e);
+            ConnectionManager::receive_message(handle, &sub.id, msg).await;
         }
     }
 }

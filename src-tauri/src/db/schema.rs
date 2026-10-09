@@ -16,7 +16,7 @@ diesel::table! {
         topic -> Text,
         display_name -> Nullable<Text>,
         muted -> Integer,
-        last_sync -> Nullable<BigInt>,
+        last_message_time -> Nullable<BigInt>,
     }
 }
 
@@ -35,6 +35,7 @@ diesel::table! {
         attachments -> Text,
         is_expanded -> Integer,
         is_favorite -> Integer,
+        deleted -> Integer,
     }
 }
 

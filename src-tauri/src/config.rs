@@ -9,4 +9,11 @@ pub mod connection {
     /// Maximum random jitter in seconds added to backoff intervals.
     /// Helps prevent thundering herd when multiple connections retry simultaneously.
     pub const JITTER_MAX_SECS: u64 = 3;
+
+    /// Nothing received (message, keepalive, ping) for this long means the socket is dead.
+    /// ntfy sends a keepalive every 45s by default.
+    pub const READ_TIMEOUT_SECS: u64 = 120;
+
+    /// Catch-up messages older than this go into the list without a toast.
+    pub const CATCH_UP_TOAST_MAX_AGE_SECS: i64 = 10 * 60;
 }

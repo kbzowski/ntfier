@@ -110,9 +110,8 @@ pub async fn sync_subscriptions(
         synced_subscriptions.len()
     );
     for sub in &synced_subscriptions {
-        SyncService::sync_subscription_notifications(
+        SyncService::poll_subscription(
             &app_handle,
-            &db,
             &client,
             sub,
             Some(username.as_str()),

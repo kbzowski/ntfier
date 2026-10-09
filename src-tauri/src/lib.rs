@@ -12,8 +12,7 @@
 //! 3. Configure window close behavior (minimize to tray)
 //! 4. Spawn async task for:
 //!    - Syncing subscriptions from configured servers
-//!    - Fetching missed notifications
-//!    - Establishing WebSocket connections for real-time updates
+//!    - Establishing WebSocket connections, which also catch up on missed messages
 
 mod commands;
 mod config;
@@ -265,24 +264,22 @@ pub fn run() {
                     log::warn!("Failed to load tray icons: {e}");
                 }
 
-                // 1. First sync subscriptions from all servers (creates new subscriptions)
+                // 1. Sync subscriptions from all servers (creates new subscriptions)
                 SyncService::sync_subscriptions(&handle).await;
 
                 // Notify frontend that subscriptions are synced
                 log::info!("Emitting subscriptions:synced event");
                 let _ = handle.emit("subscriptions:synced", ());
 
-                // 2. Then sync notifications for all subscriptions (fetches missed messages)
-                SyncService::sync_notifications(&handle).await;
-
-                // 3. Finally connect WebSocket for all subscriptions (real-time updates)
+                // 2. Connect every subscription; each resumes from its cursor, so missed
+                //    messages arrive as catch-up over the WebSocket
                 let conn_manager: tauri::State<ConnectionManager> = handle.state();
                 conn_manager.connect_all().await;
 
-                // 4. Update tray icon based on unread count (force initial update)
+                // 3. Update tray icon based on unread count (force initial update)
                 tray_manager.initial_refresh(&handle).await;
 
-                // 5. Check for updates (non-blocking)
+                // 4. Check for updates (non-blocking)
                 if let Ok(Some(update_info)) =
                     services::UpdateService::check_for_update(&handle).await
                 {

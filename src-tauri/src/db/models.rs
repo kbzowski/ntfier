@@ -45,7 +45,7 @@ pub struct SubscriptionRow {
     pub topic: String,
     pub display_name: Option<String>,
     pub muted: i32,
-    pub last_sync: Option<i64>,
+    pub last_message_time: Option<i64>,
 }
 
 /// A new subscription to insert.
@@ -80,6 +80,8 @@ pub struct NotificationRow {
     pub attachments: JsonAttachments,
     pub is_expanded: i32,
     pub is_favorite: i32,
+    #[allow(dead_code)]
+    pub deleted: i32,
 }
 
 impl NotificationRow {
@@ -148,8 +150,6 @@ pub struct SubscriptionQueryRow {
     pub display_name: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Integer)]
     pub muted: i32,
-    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::BigInt>)]
-    pub last_sync: Option<i64>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::BigInt>)]
     pub last_notif: Option<i64>,
     #[diesel(sql_type = diesel::sql_types::BigInt)]

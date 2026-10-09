@@ -17,7 +17,9 @@ use tokio_tungstenite::{
 };
 use url::Url;
 
-use crate::config::connection::{JITTER_MAX_SECS, RETRY_BACKOFF_SECS};
+use crate::config::connection::{
+    CATCH_UP_TOAST_MAX_AGE_SECS, JITTER_MAX_SECS, READ_TIMEOUT_SECS, RETRY_BACKOFF_SECS,
+};
 use crate::db::Database;
 use crate::error::AppError;
 use crate::models::{
@@ -114,11 +116,11 @@ impl ConnectionManager {
             );
         }
 
-        let ws_url = Self::build_ws_url(subscription)?;
-        let ws_uri: Uri = ws_url
-            .parse()
-            .map_err(|e| AppError::InvalidUrl(format!("Invalid WebSocket URL {ws_url}: {e}")))?;
+        // Fail early on a bad URL; the loop rebuilds it with the current cursor
+        Self::build_ws_url(&subscription.server_url, &subscription.topic, None)?;
         let sub_id = subscription.id.clone();
+        let server_url = subscription.server_url.clone();
+        let topic = subscription.topic.clone();
         let app_handle = self.app_handle.clone();
         let connections = Arc::clone(&self.connections);
 
@@ -126,6 +128,7 @@ impl ConnectionManager {
 
         tokio::spawn(async move {
             let mut reconnect_attempt: usize = 0;
+            let read_timeout = std::time::Duration::from_secs(READ_TIMEOUT_SECS);
 
             loop {
                 // Check if this connection is still the current one (race condition protection)
@@ -142,9 +145,30 @@ impl ConnectionManager {
                     }
                 }
 
+                // Resume from the newest stored message; a new subscription gets the whole cache
+                let since = app_handle
+                    .state::<Database>()
+                    .get_message_cursor(&sub_id)
+                    .ok()
+                    .flatten();
+                let ws_url = match Self::build_ws_url(&server_url, &topic, since) {
+                    Ok(url) => url,
+                    Err(e) => {
+                        log::error!("Can't build WebSocket URL for {sub_id}: {e}");
+                        return;
+                    }
+                };
+                let ws_uri: Uri = match ws_url.parse() {
+                    Ok(uri) => uri,
+                    Err(e) => {
+                        log::error!("Invalid WebSocket URL {ws_url}: {e}");
+                        return;
+                    }
+                };
+
                 log::info!("Connecting to WebSocket: {ws_url}");
 
-                let mut request = ClientRequestBuilder::new(ws_uri.clone());
+                let mut request = ClientRequestBuilder::new(ws_uri);
                 if let Some(ref auth) = auth_header {
                     request = request.with_header("Authorization", auth);
                 }
@@ -158,28 +182,27 @@ impl ConnectionManager {
 
                         loop {
                             tokio::select! {
-                                msg = read.next() => {
+                                msg = tokio::time::timeout(read_timeout, read.next()) => {
                                     match msg {
-                                        Some(Ok(Message::Text(text))) => {
+                                        Err(_) => {
+                                            log::warn!("Nothing from {ws_url} for {READ_TIMEOUT_SECS}s, reconnecting");
+                                            break;
+                                        }
+                                        Ok(Some(Ok(Message::Text(text)))) => {
                                             if let Ok(ntfy_msg) = serde_json::from_str::<NtfyMessage>(&text) {
-                                                if ntfy_msg.event == "message" {
-                                                    Self::handle_notification(
-                                                        &app_handle,
-                                                        &sub_id,
-                                                        ntfy_msg,
-                                                    ).await;
-                                                }
+                                                Self::receive_message(&app_handle, &sub_id, ntfy_msg).await;
                                             }
                                         }
-                                        Some(Err(e)) => {
+                                        Ok(Some(Err(e))) => {
                                             log::error!("WebSocket error: {e}");
                                             break;
                                         }
-                                        None => {
+                                        Ok(None) => {
                                             log::info!("WebSocket closed");
                                             break;
                                         }
-                                        _ => {}
+                                        // Pings and other frames only prove the socket is alive
+                                        Ok(Some(Ok(_))) => {}
                                     }
                                 }
                                 _ = shutdown_rx.recv() => {
@@ -248,9 +271,14 @@ impl ConnectionManager {
         }
     }
 
-    /// Converts HTTP(S) URL to WebSocket URL for the subscription's topic.
-    fn build_ws_url(subscription: &Subscription) -> Result<String, AppError> {
-        let mut parsed = Url::parse(&subscription.server_url)
+    /// Builds the topic's WebSocket URL, resuming at `since` (ntfy seconds, inclusive)
+    /// or replaying everything the server has cached when there's no cursor yet.
+    pub(crate) fn build_ws_url(
+        server_url: &str,
+        topic: &str,
+        since: Option<i64>,
+    ) -> Result<String, AppError> {
+        let mut parsed = Url::parse(server_url)
             .map_err(|e| AppError::InvalidUrl(format!("Invalid server URL: {e}")))?;
 
         let ws_scheme = match parsed.scheme() {
@@ -262,23 +290,32 @@ impl ConnectionManager {
             .set_scheme(ws_scheme)
             .map_err(|()| AppError::InvalidUrl("Failed to set WebSocket scheme".to_string()))?;
 
-        // Ensure path ends with /<topic>/ws
-        let topic = &subscription.topic;
-        let mut path = parsed.path().trim_end_matches('/').to_string();
-        path.push('/');
-        path.push_str(topic);
-        path.push_str("/ws");
+        let path = format!("{}/{topic}/ws", parsed.path().trim_end_matches('/'));
         parsed.set_path(&path);
+        let since = since.map_or_else(|| "all".to_string(), |t| t.to_string());
+        parsed.set_query(Some(&format!("since={since}")));
 
         Ok(parsed.to_string())
     }
 
-    async fn handle_notification(
-        app_handle: &AppHandle,
-        subscription_id: &str,
-        ntfy_msg: NtfyMessage,
-    ) {
+    /// Whether a received message is recent enough to toast. Live messages always are;
+    /// catch-up older than `CATCH_UP_TOAST_MAX_AGE_SECS` goes into the list silently.
+    // shortcut: compares the server's message time with our clock, so a server clock more
+    // than 10 min off also silences live toasts; tell live and replayed apart if that bites.
+    const fn should_toast(msg_time: i64, now: i64) -> bool {
+        now - msg_time < CATCH_UP_TOAST_MAX_AGE_SECS
+    }
+
+    /// The one receive path for every message: live, catch-up, backfill and manual sync.
+    ///
+    /// Stores it (ignoring duplicates and tombstones), moves the cursor, tells the UI
+    /// and shows a toast when it's fresh, unmuted and not ignored.
+    pub async fn receive_message(app_handle: &AppHandle, subscription_id: &str, msg: NtfyMessage) {
+        if msg.event != "message" {
+            return;
+        }
         let db: tauri::State<Database> = app_handle.state();
+
         // Read per message so a mute toggled after connect applies right away
         let is_muted = db
             .get_subscription_by_id(subscription_id)
@@ -286,20 +323,9 @@ impl ConnectionManager {
             .flatten()
             .is_some_and(|s| s.muted);
 
-        // Check if notification already exists by ntfy_id to prevent duplicates
-        if db
-            .notification_exists_by_ntfy_id(ntfy_msg.ntfy_id())
-            .unwrap_or(false)
-        {
-            log::debug!(
-                "Notification {} already exists, skipping",
-                ntfy_msg.ntfy_id()
-            );
-            return;
-        }
-
-        let ntfy_id = ntfy_msg.ntfy_id().to_string();
-        let mut notification = ntfy_msg.into_notification(subscription_id.to_string());
+        let msg_time = msg.time;
+        let ntfy_id = msg.ntfy_id().to_string();
+        let mut notification = msg.into_notification(subscription_id.to_string());
 
         // Auto-mark as read for muted topics
         if is_muted {
@@ -310,8 +336,20 @@ impl ConnectionManager {
         let ignored = is_ignored(&notification.title, &notification.topic_id, &rules);
         notification.ignored = ignored;
 
-        if let Err(e) = db.insert_notification_with_ntfy_id(&notification, &ntfy_id) {
-            log::error!("Failed to save notification: {e}");
+        let inserted = match db.insert_notification_with_ntfy_id(&notification, &ntfy_id) {
+            Ok(inserted) => inserted,
+            Err(e) => {
+                // Cursor stays put so the next connect asks for this message again
+                log::error!("Failed to save notification: {e}");
+                return;
+            }
+        };
+        if let Err(e) = db.advance_message_cursor(subscription_id, msg_time) {
+            log::error!("Failed to move cursor for {subscription_id}: {e}");
+        }
+        if !inserted {
+            log::debug!("Notification {ntfy_id} already stored, skipping");
+            return;
         }
 
         if let Err(e) = app_handle.emit("notification:new", &notification) {
@@ -322,11 +360,10 @@ impl ConnectionManager {
         let tray_manager: tauri::State<TrayManager> = app_handle.state();
         tray_manager.refresh_from_db(app_handle).await;
 
-        if !is_muted && !ignored {
+        if !is_muted && !ignored && Self::should_toast(msg_time, chrono::Utc::now().timestamp()) {
             let handle = app_handle.clone();
-            let notif = notification.clone();
             tokio::spawn(async move {
-                Self::show_notification(&handle, &notif).await;
+                Self::show_notification(&handle, &notification).await;
             });
         }
     }
@@ -566,8 +603,80 @@ impl ConnectionManager {
     }
 }
 
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::services::test_server;
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+
+    #[test]
+    fn ws_url_resumes_from_cursor() {
+        assert_eq!(
+            ConnectionManager::build_ws_url("https://ntfy.sh", "alerts", Some(1_700_000_000))
+                .unwrap(),
+            "wss://ntfy.sh/alerts/ws?since=1700000000"
+        );
+        assert_eq!(
+            ConnectionManager::build_ws_url("http://host:8080/ntfy", "a", None).unwrap(),
+            "ws://host:8080/ntfy/a/ws?since=all"
+        );
+    }
+
+    #[test]
+    fn only_fresh_messages_toast() {
+        let now = 1_000_000;
+        assert!(ConnectionManager::should_toast(now, now));
+        assert!(ConnectionManager::should_toast(now - 599, now));
+        assert!(!ConnectionManager::should_toast(now - 600, now));
+    }
+
+    /// Reads the next `count` events other than open/keepalive from a topic's WebSocket.
+    pub async fn read_ws(
+        url: &str,
+        topic: &str,
+        since: Option<i64>,
+        count: usize,
+    ) -> Vec<NtfyMessage> {
+        let ws_url = ConnectionManager::build_ws_url(url, topic, since).unwrap();
+        let request = ws_url.into_client_request().unwrap();
+        let (mut stream, _) = connect_async(request).await.unwrap();
+        let mut got = Vec::new();
+        while got.len() < count {
+            let frame = tokio::time::timeout(std::time::Duration::from_secs(5), stream.next())
+                .await
+                .expect("timed out waiting for message")
+                .unwrap()
+                .unwrap();
+            if let Message::Text(text) = frame {
+                let msg: NtfyMessage = serde_json::from_str(&text).unwrap();
+                if msg.event != "open" && msg.event != "keepalive" {
+                    got.push(msg);
+                }
+            }
+        }
+        got
+    }
+
+    #[tokio::test]
+    async fn ws_since_replays_inclusive() {
+        let Some(url) = test_server::url() else {
+            return;
+        };
+        let topic = test_server::unique_topic("resume");
+        let first = test_server::publish(&url, &topic, "one", &[]).await;
+        test_server::publish(&url, &topic, "two", &[]).await;
+        let first_time = first["time"].as_i64().unwrap();
+
+        for since in [Some(first_time), None] {
+            let got = read_ws(&url, &topic, since, 2).await;
+            let bodies: Vec<_> = got.iter().map(|m| m.message.as_deref().unwrap()).collect();
+            assert_eq!(bodies, ["one", "two"], "since={since:?}");
+        }
+    }
+}
+
 #[cfg(all(test, windows))]
-mod tests {
+mod toast_tests {
     use super::*;
     use tauri_winrt_notification::Sound;
 

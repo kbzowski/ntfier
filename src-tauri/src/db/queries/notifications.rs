@@ -21,6 +21,7 @@ impl Database {
 
         let rows: Vec<NotificationRow> = notifications::table
             .filter(notifications::subscription_id.eq(subscription_id))
+            .filter(notifications::deleted.eq(0))
             .order(notifications::timestamp.desc())
             .load(&mut *conn)?;
 
@@ -34,60 +35,14 @@ impl Database {
             .collect())
     }
 
-    /// Checks if a notification with the given `ntfy_id` exists.
-    pub fn notification_exists_by_ntfy_id(&self, ntfy_id: &str) -> Result<bool, AppError> {
-        use diesel::dsl::count_star;
-
-        let mut conn = self.conn()?;
-
-        let count: i64 = notifications::table
-            .filter(notifications::ntfy_id.eq(ntfy_id))
-            .select(count_star())
-            .first(&mut *conn)?;
-
-        Ok(count > 0)
-    }
-
-    /// Inserts or replaces a notification.
-    #[allow(dead_code)]
-    pub fn insert_notification(&self, notification: &Notification) -> Result<(), AppError> {
-        let mut conn = self.conn()?;
-
-        let title_ref = if notification.title.is_empty() {
-            None
-        } else {
-            Some(notification.title.as_str())
-        };
-
-        let new_notification = NewNotification {
-            id: &notification.id,
-            subscription_id: &notification.topic_id,
-            ntfy_id: None,
-            title: title_ref,
-            message: &notification.message,
-            priority: notification.priority as i32,
-            tags: JsonTags::new(notification.tags.clone()),
-            timestamp: notification.timestamp,
-            read: i32::from(notification.read),
-            actions: JsonActions::new(notification.actions.clone()),
-            attachments: JsonAttachments::new(notification.attachments.clone()),
-            is_expanded: i32::from(notification.is_expanded),
-            is_favorite: i32::from(notification.is_favorite),
-        };
-
-        diesel::replace_into(notifications::table)
-            .values(&new_notification)
-            .execute(&mut *conn)?;
-
-        Ok(())
-    }
-
-    /// Inserts a notification with `ntfy_id` for deduplication (ignores if exists).
+    /// Inserts a notification unless its `ntfy_id` is already stored (tombstones included).
+    ///
+    /// Returns whether a row was inserted.
     pub fn insert_notification_with_ntfy_id(
         &self,
         notification: &Notification,
         ntfy_id: &str,
-    ) -> Result<(), AppError> {
+    ) -> Result<bool, AppError> {
         let mut conn = self.conn()?;
 
         let title_ref = if notification.title.is_empty() {
@@ -112,11 +67,11 @@ impl Database {
             is_favorite: i32::from(notification.is_favorite),
         };
 
-        diesel::insert_or_ignore_into(notifications::table)
+        let inserted = diesel::insert_or_ignore_into(notifications::table)
             .values(&new_notification)
             .execute(&mut *conn)?;
 
-        Ok(())
+        Ok(inserted == 1)
     }
 
     /// Marks a notification as read.
@@ -162,6 +117,7 @@ impl Database {
 
         let rows: Vec<NotificationRow> = notifications::table
             .filter(notifications::is_favorite.eq(1))
+            .filter(notifications::deleted.eq(0))
             .order(notifications::timestamp.desc())
             .load(&mut *conn)?;
 
@@ -202,11 +158,12 @@ impl Database {
         Ok(result)
     }
 
-    /// Deletes a notification.
+    /// Deletes a notification, keeping a hidden tombstone so a replay can't bring it back.
     pub fn delete_notification(&self, id: &str) -> Result<(), AppError> {
         let mut conn = self.conn()?;
 
-        diesel::delete(notifications::table.filter(notifications::id.eq(id)))
+        diesel::update(notifications::table.filter(notifications::id.eq(id)))
+            .set(notifications::deleted.eq(1))
             .execute(&mut *conn)?;
 
         Ok(())
@@ -224,6 +181,7 @@ impl Database {
             let count: i64 = notifications::table
                 .filter(notifications::subscription_id.eq(subscription_id))
                 .filter(notifications::read.eq(0))
+                .filter(notifications::deleted.eq(0))
                 .select(count_star())
                 .first(&mut *conn)?;
 
@@ -233,6 +191,7 @@ impl Database {
         let titles: Vec<Option<String>> = notifications::table
             .filter(notifications::subscription_id.eq(subscription_id))
             .filter(notifications::read.eq(0))
+            .filter(notifications::deleted.eq(0))
             .select(notifications::title)
             .load(&mut *conn)?;
 
@@ -257,6 +216,7 @@ impl Database {
             let count: i64 = notifications::table
                 .inner_join(subscriptions::table)
                 .filter(notifications::read.eq(0))
+                .filter(notifications::deleted.eq(0))
                 .filter(subscriptions::muted.eq(0))
                 .select(count_star())
                 .first(&mut *conn)?;
@@ -267,6 +227,7 @@ impl Database {
         let rows: Vec<(String, Option<String>)> = notifications::table
             .inner_join(subscriptions::table)
             .filter(notifications::read.eq(0))
+            .filter(notifications::deleted.eq(0))
             .filter(subscriptions::muted.eq(0))
             .select((notifications::subscription_id, notifications::title))
             .load(&mut *conn)?;
@@ -277,5 +238,81 @@ impl Database {
             .count();
 
         Ok(count as i32)
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::models::{CreateSubscription, Priority};
+
+    pub fn db_with_sub() -> (Database, String) {
+        let db = Database::new(std::path::Path::new(":memory:")).unwrap();
+        let sub = db
+            .create_subscription(CreateSubscription {
+                topic: "alerts".to_string(),
+                server_url: "https://ntfy.sh".to_string(),
+                display_name: None,
+            })
+            .unwrap();
+        (db, sub.id)
+    }
+
+    pub fn notification(sub_id: &str, time: i64) -> Notification {
+        Notification {
+            id: uuid::Uuid::new_v4().to_string(),
+            topic_id: sub_id.to_string(),
+            title: String::new(),
+            message: "hi".to_string(),
+            priority: Priority::Default,
+            tags: vec![],
+            timestamp: time * 1000,
+            actions: vec![],
+            attachments: vec![],
+            read: false,
+            is_expanded: false,
+            is_favorite: false,
+            ignored: false,
+        }
+    }
+
+    #[test]
+    fn duplicate_ntfy_id_is_ignored() {
+        let (db, sub) = db_with_sub();
+        assert!(db
+            .insert_notification_with_ntfy_id(&notification(&sub, 1), "m1")
+            .unwrap());
+        assert!(!db
+            .insert_notification_with_ntfy_id(&notification(&sub, 1), "m1")
+            .unwrap());
+        assert_eq!(db.get_notifications_by_subscription(&sub).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn deleted_message_stays_hidden_after_replay() {
+        let (db, sub) = db_with_sub();
+        let n = notification(&sub, 1);
+        db.insert_notification_with_ntfy_id(&n, "m1").unwrap();
+        db.delete_notification(&n.id).unwrap();
+
+        assert!(!db
+            .insert_notification_with_ntfy_id(&notification(&sub, 1), "m1")
+            .unwrap());
+        assert!(db
+            .get_notifications_by_subscription(&sub)
+            .unwrap()
+            .is_empty());
+        assert_eq!(db.get_unread_count(&sub).unwrap(), 0);
+        assert_eq!(db.get_total_unread_count().unwrap(), 0);
+        assert_eq!(db.get_all_subscriptions().unwrap()[0].unread_count, 0);
+    }
+
+    #[test]
+    fn cursor_only_moves_forward() {
+        let (db, sub) = db_with_sub();
+        assert_eq!(db.get_message_cursor(&sub).unwrap(), None);
+        db.advance_message_cursor(&sub, 10).unwrap();
+        db.advance_message_cursor(&sub, 5).unwrap();
+        assert_eq!(db.get_message_cursor(&sub).unwrap(), Some(10));
     }
 }
