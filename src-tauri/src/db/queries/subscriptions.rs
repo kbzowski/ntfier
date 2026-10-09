@@ -91,7 +91,7 @@ impl Database {
         sub.server_url = canonical_url(&sub.server_url)?;
         let mut conn = self.conn()?;
 
-        let (id, server_url, topic, display_name) = conn
+        let (id, existing, server_url, topic, display_name) = conn
             .transaction::<_, diesel::result::Error, _>(|conn| {
                 // Get or create server
                 let server_id: String = if let Some(id) = servers::table
@@ -117,6 +117,17 @@ impl Database {
                     new_id
                 };
 
+                // Already there (an account sync can add it while the user does): that's success
+                if let Some(id) = subscriptions::table
+                    .filter(subscriptions::server_id.eq(&server_id))
+                    .filter(subscriptions::topic.eq(&sub.topic))
+                    .select(subscriptions::id)
+                    .first::<String>(conn)
+                    .optional()?
+                {
+                    return Ok((id, true, sub.server_url, sub.topic, sub.display_name));
+                }
+
                 let id = uuid::Uuid::new_v4().to_string();
                 let display_name_ref = sub.display_name.as_deref().filter(|s| !s.is_empty());
 
@@ -132,8 +143,15 @@ impl Database {
                     .values(&new_subscription)
                     .execute(conn)?;
 
-                Ok((id, sub.server_url, sub.topic, sub.display_name))
+                Ok((id, false, sub.server_url, sub.topic, sub.display_name))
             })?;
+        drop(conn);
+
+        if existing {
+            return self
+                .get_subscription_by_id(&id)?
+                .ok_or_else(|| AppError::NotFound(format!("Subscription {id} not found")));
+        }
 
         Ok(Subscription {
             id,
@@ -207,5 +225,26 @@ impl Database {
             .load(&mut *conn)?;
 
         Ok(rows.into_iter().next().map(Subscription::from))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn adding_a_topic_twice_returns_the_existing_subscription() {
+        let db = Database::new(std::path::Path::new(":memory:")).unwrap();
+        let add = || {
+            db.create_subscription(CreateSubscription {
+                topic: "alerts".to_string(),
+                server_url: "https://ntfy.sh/".to_string(),
+                display_name: None,
+            })
+            .unwrap()
+        };
+        let first = add();
+        assert_eq!(add().id, first.id);
+        assert_eq!(db.get_all_subscriptions().unwrap().len(), 1);
     }
 }

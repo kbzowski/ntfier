@@ -372,7 +372,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		}) => {
 			if (isTauri()) {
 				const newSub = await subscriptionsApi.add(subscription);
-				setSubscriptions((prev) => [...prev, newSub]);
+				// An account sync may have listed it already
+				setSubscriptions((prev) =>
+					prev.some((s) => s.id === newSub.id) ? prev : [...prev, newSub],
+				);
 				return newSub;
 			}
 			const newSub: Subscription = {
