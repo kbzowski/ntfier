@@ -56,7 +56,7 @@ pub async fn delete_notification(
     // Check if we should also delete remotely
     let delete_local_only = db.get_delete_local_only()?;
     if !delete_local_only {
-        if let Some((Some(ntfy_id), subscription_id)) = db.get_notification_meta(&id)? {
+        if let Some((Some(sequence_id), subscription_id)) = db.get_notification_meta(&id)? {
             // Look up subscription to get server_url and topic
             if let Some(subscription) = db.get_subscription_by_id(&subscription_id)? {
                 // Find credentials for this server
@@ -73,7 +73,7 @@ pub async fn delete_notification(
                             .delete_message(
                                 &subscription.server_url,
                                 &subscription.topic,
-                                &ntfy_id,
+                                &sequence_id,
                                 username,
                                 password,
                             )

@@ -82,6 +82,10 @@ pub struct NotificationRow {
     pub is_favorite: i32,
     #[allow(dead_code)]
     pub deleted: i32,
+    #[allow(dead_code)]
+    pub sequence_id: Option<String>,
+    #[allow(dead_code)]
+    pub superseded: i32,
 }
 
 impl NotificationRow {
@@ -112,6 +116,7 @@ pub struct NewNotification<'a> {
     pub id: &'a str,
     pub subscription_id: &'a str,
     pub ntfy_id: Option<&'a str>,
+    pub sequence_id: Option<&'a str>,
     pub title: Option<&'a str>,
     pub message: &'a str,
     pub priority: i32,

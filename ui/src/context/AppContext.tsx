@@ -290,6 +290,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		}, []),
 	);
 
+	// Stored messages of a subscription changed in place (update, server delete or clear)
+	useTauriEvent<string>(
+		"subscription:changed",
+		useCallback(
+			async (subscriptionId: string) => {
+				await notifications.reloadTopic(subscriptionId);
+				setSubscriptions(await subscriptionsApi.getAll());
+			},
+			[notifications.reloadTopic],
+		),
+	);
+
 	// Listen for navigate:subscription event (from tray icon click)
 	useTauriEvent<string>(
 		"navigate:subscription",

@@ -309,12 +309,34 @@ impl ConnectionManager {
     /// The one receive path for every message: live, catch-up, backfill and manual sync.
     ///
     /// Stores it (ignoring duplicates and tombstones), moves the cursor, tells the UI
-    /// and shows a toast when it's fresh, unmuted and not ignored.
+    /// and shows a toast when it's fresh, unmuted and not ignored. Server deletes and
+    /// clears apply to the message's sequence and aren't stored.
     pub async fn receive_message(app_handle: &AppHandle, subscription_id: &str, msg: NtfyMessage) {
-        if msg.event != "message" {
+        let db: tauri::State<Database> = app_handle.state();
+
+        let applied = match msg.event.as_str() {
+            "message" => None,
+            "message_delete" => {
+                Some(db.delete_sequence(subscription_id, msg.sequence_id(), msg.time * 1000))
+            }
+            "message_clear" => {
+                Some(db.clear_sequence(subscription_id, msg.sequence_id(), msg.time * 1000))
+            }
+            _ => return,
+        };
+        if let Some(result) = applied {
+            if let Err(e) = result {
+                log::error!("Failed to apply {} for {subscription_id}: {e}", msg.event);
+                return;
+            }
+            let _ = db.advance_message_cursor(subscription_id, msg.time);
+            Self::subscription_changed(app_handle, subscription_id).await;
             return;
         }
-        let db: tauri::State<Database> = app_handle.state();
+
+        // An update (or a message with its own sequence id) can replace a shown version
+        let is_update = msg.sequence_id.as_ref().is_some_and(|s| *s != msg.id);
+        let sequence_id = msg.sequence_id().to_string();
 
         // Read per message so a mute toggled after connect applies right away
         let is_muted = db
@@ -336,14 +358,15 @@ impl ConnectionManager {
         let ignored = is_ignored(&notification.title, &notification.topic_id, &rules);
         notification.ignored = ignored;
 
-        let inserted = match db.insert_notification_with_ntfy_id(&notification, &ntfy_id) {
-            Ok(inserted) => inserted,
-            Err(e) => {
-                // Cursor stays put so the next connect asks for this message again
-                log::error!("Failed to save notification: {e}");
-                return;
-            }
-        };
+        let inserted =
+            match db.insert_notification_with_ntfy_id(&notification, &ntfy_id, &sequence_id) {
+                Ok(inserted) => inserted,
+                Err(e) => {
+                    // Cursor stays put so the next connect asks for this message again
+                    log::error!("Failed to save notification: {e}");
+                    return;
+                }
+            };
         if let Err(e) = db.advance_message_cursor(subscription_id, msg_time) {
             log::error!("Failed to move cursor for {subscription_id}: {e}");
         }
@@ -352,13 +375,16 @@ impl ConnectionManager {
             return;
         }
 
-        if let Err(e) = app_handle.emit("notification:new", &notification) {
-            log::error!("Failed to emit notification event: {e}");
+        if is_update {
+            Self::subscription_changed(app_handle, subscription_id).await;
+        } else {
+            if let Err(e) = app_handle.emit("notification:new", &notification) {
+                log::error!("Failed to emit notification event: {e}");
+            }
+            // Update tray icon to show unread badge
+            let tray_manager: tauri::State<TrayManager> = app_handle.state();
+            tray_manager.refresh_from_db(app_handle).await;
         }
-
-        // Update tray icon to show unread badge
-        let tray_manager: tauri::State<TrayManager> = app_handle.state();
-        tray_manager.refresh_from_db(app_handle).await;
 
         if !is_muted && !ignored && Self::should_toast(msg_time, chrono::Utc::now().timestamp()) {
             let handle = app_handle.clone();
@@ -366,6 +392,15 @@ impl ConnectionManager {
                 Self::show_notification(&handle, &notification).await;
             });
         }
+    }
+
+    /// Tells the UI to reload a subscription whose stored messages changed in place.
+    async fn subscription_changed(app_handle: &AppHandle, subscription_id: &str) {
+        if let Err(e) = app_handle.emit("subscription:changed", subscription_id) {
+            log::error!("Failed to emit subscription change: {e}");
+        }
+        let tray_manager: tauri::State<TrayManager> = app_handle.state();
+        tray_manager.refresh_from_db(app_handle).await;
     }
 
     /// Shows a notification using the configured display method.
@@ -672,6 +707,38 @@ pub mod tests {
             let bodies: Vec<_> = got.iter().map(|m| m.message.as_deref().unwrap()).collect();
             assert_eq!(bodies, ["one", "two"], "since={since:?}");
         }
+    }
+
+    #[tokio::test]
+    async fn update_delete_and_clear_arrive_with_sequence_id() {
+        let Some(url) = test_server::url() else {
+            return;
+        };
+        let topic = test_server::unique_topic("seq");
+        let first = test_server::publish(&url, &topic, "v1", &[]).await;
+        let seq = first["id"].as_str().unwrap().to_string();
+        test_server::publish(&url, &topic, "v2", &[("X-Sequence-ID", seq.as_str())]).await;
+
+        let client = reqwest::Client::new();
+        for req in [
+            client.delete(format!("{url}/{topic}/{seq}")),
+            client.put(format!("{url}/{topic}/{seq}/clear")),
+        ] {
+            let resp = req
+                .basic_auth(test_server::USER, Some(test_server::PASS))
+                .send()
+                .await
+                .unwrap();
+            assert!(resp.status().is_success(), "{}", resp.status());
+        }
+
+        let got = read_ws(&url, &topic, None, 4).await;
+        let events: Vec<_> = got.iter().map(|m| m.event.as_str()).collect();
+        assert_eq!(
+            events,
+            ["message", "message", "message_delete", "message_clear"]
+        );
+        assert!(got.iter().all(|m| m.sequence_id() == seq));
     }
 }
 

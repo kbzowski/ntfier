@@ -103,6 +103,8 @@ pub struct NtfyMessage {
     pub click: Option<String>,
     pub actions: Option<Vec<NtfyAction>>,
     pub attachment: Option<NtfyAttachment>,
+    /// Shared by all versions of a message; missing means it equals `id`.
+    pub sequence_id: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -191,5 +193,10 @@ impl NtfyMessage {
     /// Returns the ntfy message ID (used for deduplication).
     pub fn ntfy_id(&self) -> &str {
         &self.id
+    }
+
+    /// The sequence this message (or delete/clear event) belongs to.
+    pub fn sequence_id(&self) -> &str {
+        self.sequence_id.as_deref().unwrap_or(&self.id)
     }
 }

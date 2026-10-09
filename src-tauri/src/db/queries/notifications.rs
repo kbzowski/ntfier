@@ -1,6 +1,7 @@
 //! Notification-related database queries.
 
 use diesel::prelude::*;
+use diesel::Connection;
 
 use crate::db::connection::Database;
 use crate::db::models::{NewNotification, NotificationRow};
@@ -22,6 +23,7 @@ impl Database {
         let rows: Vec<NotificationRow> = notifications::table
             .filter(notifications::subscription_id.eq(subscription_id))
             .filter(notifications::deleted.eq(0))
+            .filter(notifications::superseded.eq(0))
             .order(notifications::timestamp.desc())
             .load(&mut *conn)?;
 
@@ -37,11 +39,14 @@ impl Database {
 
     /// Inserts a notification unless its `ntfy_id` is already stored (tombstones included).
     ///
+    /// The new row becomes the visible version of its sequence: it inherits the favorite
+    /// flag of the version it replaces, and every other version is marked superseded.
     /// Returns whether a row was inserted.
     pub fn insert_notification_with_ntfy_id(
         &self,
         notification: &Notification,
         ntfy_id: &str,
+        sequence_id: &str,
     ) -> Result<bool, AppError> {
         let mut conn = self.conn()?;
 
@@ -55,6 +60,7 @@ impl Database {
             id: &notification.id,
             subscription_id: &notification.topic_id,
             ntfy_id: Some(ntfy_id),
+            sequence_id: Some(sequence_id),
             title: title_ref,
             message: &notification.message,
             priority: notification.priority as i32,
@@ -67,11 +73,84 @@ impl Database {
             is_favorite: i32::from(notification.is_favorite),
         };
 
-        let inserted = diesel::insert_or_ignore_into(notifications::table)
-            .values(&new_notification)
-            .execute(&mut *conn)?;
+        let in_sequence = notifications::subscription_id
+            .eq(&notification.topic_id)
+            .and(notifications::sequence_id.eq(sequence_id));
 
-        Ok(inserted == 1)
+        let inserted = conn.transaction::<_, diesel::result::Error, _>(|conn| {
+            let previous_favorite: Option<i32> = notifications::table
+                .filter(in_sequence)
+                .order((notifications::timestamp.desc(), notifications::id.desc()))
+                .select(notifications::is_favorite)
+                .first(conn)
+                .optional()?;
+
+            let inserted = diesel::insert_or_ignore_into(notifications::table)
+                .values(NewNotification {
+                    is_favorite: previous_favorite.unwrap_or(new_notification.is_favorite),
+                    ..new_notification
+                })
+                .execute(conn)?;
+            if inserted == 0 {
+                return Ok(false);
+            }
+
+            // Only the newest version stays visible (a replay may deliver an older one later)
+            diesel::sql_query(
+                "UPDATE notifications SET superseded = (id != ( \
+                     SELECT id FROM notifications WHERE subscription_id = ?1 AND sequence_id = ?2 \
+                     ORDER BY timestamp DESC, rowid DESC LIMIT 1)) \
+                 WHERE subscription_id = ?1 AND sequence_id = ?2",
+            )
+            .bind::<diesel::sql_types::Text, _>(&notification.topic_id)
+            .bind::<diesel::sql_types::Text, _>(sequence_id)
+            .execute(conn)?;
+            Ok(true)
+        })?;
+
+        Ok(inserted)
+    }
+
+    /// Applies a server `message_delete`: hides the sequence's versions up to `time` (ms).
+    pub fn delete_sequence(
+        &self,
+        subscription_id: &str,
+        sequence_id: &str,
+        time: i64,
+    ) -> Result<(), AppError> {
+        let mut conn = self.conn()?;
+
+        diesel::update(
+            notifications::table
+                .filter(notifications::subscription_id.eq(subscription_id))
+                .filter(notifications::sequence_id.eq(sequence_id))
+                .filter(notifications::timestamp.le(time)),
+        )
+        .set(notifications::deleted.eq(1))
+        .execute(&mut *conn)?;
+
+        Ok(())
+    }
+
+    /// Applies a server `message_clear`: marks the sequence's versions up to `time` (ms) read.
+    pub fn clear_sequence(
+        &self,
+        subscription_id: &str,
+        sequence_id: &str,
+        time: i64,
+    ) -> Result<(), AppError> {
+        let mut conn = self.conn()?;
+
+        diesel::update(
+            notifications::table
+                .filter(notifications::subscription_id.eq(subscription_id))
+                .filter(notifications::sequence_id.eq(sequence_id))
+                .filter(notifications::timestamp.le(time)),
+        )
+        .set(notifications::read.eq(1))
+        .execute(&mut *conn)?;
+
+        Ok(())
     }
 
     /// Marks a notification as read.
@@ -118,6 +197,7 @@ impl Database {
         let rows: Vec<NotificationRow> = notifications::table
             .filter(notifications::is_favorite.eq(1))
             .filter(notifications::deleted.eq(0))
+            .filter(notifications::superseded.eq(0))
             .order(notifications::timestamp.desc())
             .load(&mut *conn)?;
 
@@ -142,20 +222,25 @@ impl Database {
         Ok(())
     }
 
-    /// Gets `ntfy_id` and `subscription_id` for a notification (needed for remote delete).
+    /// Gets the sequence id (falling back to `ntfy_id`) and `subscription_id` of a
+    /// notification, needed for remote delete.
     pub fn get_notification_meta(
         &self,
         id: &str,
     ) -> Result<Option<(Option<String>, String)>, AppError> {
         let mut conn = self.conn()?;
 
-        let result: Option<(Option<String>, String)> = notifications::table
+        let result: Option<(Option<String>, Option<String>, String)> = notifications::table
             .filter(notifications::id.eq(id))
-            .select((notifications::ntfy_id, notifications::subscription_id))
+            .select((
+                notifications::sequence_id,
+                notifications::ntfy_id,
+                notifications::subscription_id,
+            ))
             .first(&mut *conn)
             .optional()?;
 
-        Ok(result)
+        Ok(result.map(|(seq, ntfy_id, sub)| (seq.or(ntfy_id), sub)))
     }
 
     /// Deletes a notification, keeping a hidden tombstone so a replay can't bring it back.
@@ -182,6 +267,7 @@ impl Database {
                 .filter(notifications::subscription_id.eq(subscription_id))
                 .filter(notifications::read.eq(0))
                 .filter(notifications::deleted.eq(0))
+                .filter(notifications::superseded.eq(0))
                 .select(count_star())
                 .first(&mut *conn)?;
 
@@ -192,6 +278,7 @@ impl Database {
             .filter(notifications::subscription_id.eq(subscription_id))
             .filter(notifications::read.eq(0))
             .filter(notifications::deleted.eq(0))
+            .filter(notifications::superseded.eq(0))
             .select(notifications::title)
             .load(&mut *conn)?;
 
@@ -217,6 +304,7 @@ impl Database {
                 .inner_join(subscriptions::table)
                 .filter(notifications::read.eq(0))
                 .filter(notifications::deleted.eq(0))
+                .filter(notifications::superseded.eq(0))
                 .filter(subscriptions::muted.eq(0))
                 .select(count_star())
                 .first(&mut *conn)?;
@@ -228,6 +316,7 @@ impl Database {
             .inner_join(subscriptions::table)
             .filter(notifications::read.eq(0))
             .filter(notifications::deleted.eq(0))
+            .filter(notifications::superseded.eq(0))
             .filter(subscriptions::muted.eq(0))
             .select((notifications::subscription_id, notifications::title))
             .load(&mut *conn)?;
@@ -280,10 +369,10 @@ pub mod tests {
     fn duplicate_ntfy_id_is_ignored() {
         let (db, sub) = db_with_sub();
         assert!(db
-            .insert_notification_with_ntfy_id(&notification(&sub, 1), "m1")
+            .insert_notification_with_ntfy_id(&notification(&sub, 1), "m1", "m1")
             .unwrap());
         assert!(!db
-            .insert_notification_with_ntfy_id(&notification(&sub, 1), "m1")
+            .insert_notification_with_ntfy_id(&notification(&sub, 1), "m1", "m1")
             .unwrap());
         assert_eq!(db.get_notifications_by_subscription(&sub).unwrap().len(), 1);
     }
@@ -292,11 +381,11 @@ pub mod tests {
     fn deleted_message_stays_hidden_after_replay() {
         let (db, sub) = db_with_sub();
         let n = notification(&sub, 1);
-        db.insert_notification_with_ntfy_id(&n, "m1").unwrap();
+        db.insert_notification_with_ntfy_id(&n, "m1", "m1").unwrap();
         db.delete_notification(&n.id).unwrap();
 
         assert!(!db
-            .insert_notification_with_ntfy_id(&notification(&sub, 1), "m1")
+            .insert_notification_with_ntfy_id(&notification(&sub, 1), "m1", "m1")
             .unwrap());
         assert!(db
             .get_notifications_by_subscription(&sub)
@@ -314,5 +403,61 @@ pub mod tests {
         db.advance_message_cursor(&sub, 10).unwrap();
         db.advance_message_cursor(&sub, 5).unwrap();
         assert_eq!(db.get_message_cursor(&sub).unwrap(), Some(10));
+    }
+
+    #[test]
+    fn update_supersedes_and_inherits_favorite() {
+        let (db, sub) = db_with_sub();
+        let first = notification(&sub, 1);
+        db.insert_notification_with_ntfy_id(&first, "m1", "seq")
+            .unwrap();
+        db.set_notification_favorite(&first.id, true).unwrap();
+        db.mark_notification_read(&first.id).unwrap();
+
+        let mut update = notification(&sub, 2);
+        update.message = "updated".to_string();
+        db.insert_notification_with_ntfy_id(&update, "m2", "seq")
+            .unwrap();
+
+        let visible = db.get_notifications_by_subscription(&sub).unwrap();
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].message, "updated");
+        assert!(visible[0].is_favorite);
+        assert!(!visible[0].read);
+        assert_eq!(db.get_unread_count(&sub).unwrap(), 1);
+    }
+
+    #[test]
+    fn older_version_arriving_late_stays_hidden() {
+        let (db, sub) = db_with_sub();
+        db.insert_notification_with_ntfy_id(&notification(&sub, 2), "m2", "seq")
+            .unwrap();
+        db.insert_notification_with_ntfy_id(&notification(&sub, 1), "m1", "seq")
+            .unwrap();
+        let visible = db.get_notifications_by_subscription(&sub).unwrap();
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].timestamp, 2000);
+    }
+
+    #[test]
+    fn server_delete_and_clear_hit_versions_up_to_event_time() {
+        let (db, sub) = db_with_sub();
+        db.insert_notification_with_ntfy_id(&notification(&sub, 1), "m1", "a")
+            .unwrap();
+        db.insert_notification_with_ntfy_id(&notification(&sub, 1), "m2", "b")
+            .unwrap();
+
+        db.clear_sequence(&sub, "b", 1000).unwrap();
+        assert_eq!(db.get_unread_count(&sub).unwrap(), 1);
+
+        db.delete_sequence(&sub, "a", 999).unwrap();
+        assert_eq!(db.get_notifications_by_subscription(&sub).unwrap().len(), 2);
+        db.delete_sequence(&sub, "a", 1000).unwrap();
+        assert_eq!(db.get_notifications_by_subscription(&sub).unwrap().len(), 1);
+
+        // A later message with the same sequence revives it
+        db.insert_notification_with_ntfy_id(&notification(&sub, 3), "m3", "a")
+            .unwrap();
+        assert_eq!(db.get_notifications_by_subscription(&sub).unwrap().len(), 2);
     }
 }

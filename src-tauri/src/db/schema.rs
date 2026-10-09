@@ -36,6 +36,8 @@ diesel::table! {
         is_expanded -> Integer,
         is_favorite -> Integer,
         deleted -> Integer,
+        sequence_id -> Nullable<Text>,
+        superseded -> Integer,
     }
 }
 

@@ -274,6 +274,18 @@ export function useNotifications(subscriptions: Subscription[]) {
 	}, [loadForTopic, byTopic]);
 
 	/**
+	 * Reloads a topic from the backend if it's loaded (after updates, deletes, clears).
+	 */
+	const reloadTopic = useCallback(
+		async (topicId: string) => {
+			if (!loadedTopicsRef.current.has(topicId)) return;
+			loadedTopicsRef.current.delete(topicId);
+			await loadForTopic(topicId);
+		},
+		[loadForTopic],
+	);
+
+	/**
 	 * Clears cached notifications for a topic (used when unsubscribing).
 	 */
 	const clearTopic = useCallback((topicId: string) => {
@@ -389,6 +401,7 @@ export function useNotifications(subscriptions: Subscription[]) {
 		toggleFavorite,
 		setExpanded,
 		reloadLoaded,
+		reloadTopic,
 		clearTopic,
 		getUnreadCount,
 		getTotalUnread,

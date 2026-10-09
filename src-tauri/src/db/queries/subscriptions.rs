@@ -14,8 +14,8 @@ use crate::models::{canonical_url, is_ignored, CreateSubscription, Subscription}
 /// Base SELECT/FROM/JOIN shared by all subscription queries.
 const SUBSCRIPTION_BASE_QUERY: &str = "\
     SELECT s.id, s.topic, srv.url as server_url, s.display_name, s.muted, \
-           (SELECT MAX(n.timestamp) FROM notifications n WHERE n.subscription_id = s.id AND n.deleted = 0) as last_notif, \
-           (SELECT COUNT(*) FROM notifications n WHERE n.subscription_id = s.id AND n.read = 0 AND n.deleted = 0) as unread \
+           (SELECT MAX(n.timestamp) FROM notifications n WHERE n.subscription_id = s.id AND n.deleted = 0 AND n.superseded = 0) as last_notif, \
+           (SELECT COUNT(*) FROM notifications n WHERE n.subscription_id = s.id AND n.read = 0 AND n.deleted = 0 AND n.superseded = 0) as unread \
     FROM subscriptions s \
     JOIN servers srv ON s.server_id = srv.id";
 
@@ -37,6 +37,7 @@ impl Database {
         let unread_rows: Vec<(String, Option<String>)> = notifications::table
             .filter(notifications::read.eq(0))
             .filter(notifications::deleted.eq(0))
+            .filter(notifications::superseded.eq(0))
             .select((notifications::subscription_id, notifications::title))
             .load(&mut *conn)?;
 
