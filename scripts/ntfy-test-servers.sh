@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Starts the ntfy servers the integration tests run against:
 #   current (v2.29, auth enabled) on :8080, old (v2.16, no config) on :8081.
-# Then: NTFY_TEST_URL=http://localhost:8080 NTFY_TEST_OLD_URL=http://localhost:8081 cargo test
+# Then: NTFY_TEST_URL=http://localhost:8080 NTFY_TEST_OLD_URL=http://localhost:8081 cargo test -- --test-threads=1
+# (parallel tests hit races in ntfy's account storage). Each run spends 3 of the server's
+# per-IP auth-failure budget (30, +1/min, not configurable): many quick reruns end in 429.
 # Stop with: scripts/ntfy-test-servers.sh stop
 set -euo pipefail
 
@@ -25,6 +27,8 @@ docker run -d --name ntfier-test-ntfy -p 8080:80 \
 	-e NTFY_ATTACHMENT_CACHE_DIR=/tmp/attachments \
 	-e NTFY_MESSAGE_SIZE_LIMIT=4k \
 	-e NTFY_VISITOR_REQUEST_LIMIT_BURST=10000 \
+	-e NTFY_VISITOR_TOPIC_CREATION_LIMIT_BURST=10000 \
+	-e NTFY_VISITOR_SUBSCRIPTION_LIMIT=1000 \
 	binwiederhier/ntfy:v2.29.0 serve >/dev/null
 
 docker run -d --name ntfier-test-ntfy-old -p 8081:80 binwiederhier/ntfy:v2.16.0 serve >/dev/null

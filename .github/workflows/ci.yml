@@ -118,4 +118,4 @@ jobs:
         env:
           NTFY_TEST_URL: http://localhost:8080
           NTFY_TEST_OLD_URL: http://localhost:8081
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1
