@@ -197,6 +197,27 @@ impl NtfyClient {
         classify_probe(status, &body)
     }
 
+    /// Checks the credential may read the topic (`GET /<topic>/auth`).
+    pub async fn check_topic_access(
+        &self,
+        server_url: &str,
+        topic: &str,
+        auth: Option<&str>,
+    ) -> Result<(), AppError> {
+        let url = format!("{server_url}/{topic}/auth");
+        match Self::send(
+            self.request(Method::GET, &url, auth),
+            "Failed to check the topic",
+        )
+        .await
+        {
+            Err(AppError::Auth(_) | AppError::Forbidden(_)) => Err(AppError::Forbidden(
+                "No read access to this topic".to_string(),
+            )),
+            result => result.map(|_| ()),
+        }
+    }
+
     /// Adds a topic to the account's subscription list. Already there (409) counts as done.
     pub async fn add_account_subscription(
         &self,
@@ -438,6 +459,24 @@ mod tests {
         assert!(!listed(
             client.get_account(&url, Some(&auth)).await.unwrap()
         ));
+    }
+
+    #[tokio::test]
+    async fn topic_access_check() {
+        let Some(url) = test_server::url() else {
+            return;
+        };
+        let client = NtfyClient::new().unwrap();
+        let auth = server(None, None, Some(test_server::TOKEN)).auth_header();
+        client
+            .check_topic_access(&url, "readable", auth.as_deref())
+            .await
+            .unwrap();
+        let err = client
+            .check_topic_access(&url, test_server::LOCKED_TOPIC, auth.as_deref())
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::Forbidden(_)), "{err:?}");
     }
 
     #[tokio::test]

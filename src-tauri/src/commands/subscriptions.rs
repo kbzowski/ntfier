@@ -31,9 +31,17 @@ pub async fn add_subscription(
     conn_manager
         .ensure_supported(&subscription.server_url, auth.as_deref())
         .await?;
+    let client = NtfyClient::new()?;
+    client
+        .check_topic_access(
+            &subscription.server_url,
+            subscription.topic.trim(),
+            auth.as_deref(),
+        )
+        .await?;
     // Account first: if the push fails, nothing changes here
     if let Some(auth) = &auth {
-        NtfyClient::new()?
+        client
             .add_account_subscription(
                 &subscription.server_url,
                 auth,
