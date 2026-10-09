@@ -37,6 +37,18 @@ impl Database {
             .collect())
     }
 
+    /// Replaces a message with the text of its inlined `.txt` attachment and drops the file.
+    pub fn inline_text_attachment(&self, id: &str, text: &str) -> Result<(), AppError> {
+        let mut conn = self.conn()?;
+        diesel::update(notifications::table.filter(notifications::id.eq(id)))
+            .set((
+                notifications::message.eq(text),
+                notifications::attachments.eq(JsonAttachments::new(vec![])),
+            ))
+            .execute(&mut *conn)?;
+        Ok(())
+    }
+
     /// One stored message by id.
     pub fn get_notification(&self, id: &str) -> Result<Option<Notification>, AppError> {
         let mut conn = self.conn()?;
@@ -486,5 +498,26 @@ pub mod tests {
         db.insert_notification_with_ntfy_id(&notification(&sub, 3), "m3", "a")
             .unwrap();
         assert_eq!(db.get_notifications_by_subscription(&sub).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn inlined_text_replaces_message_and_drops_file() {
+        let (db, sub) = db_with_sub();
+        let mut n = notification(&sub, 1);
+        n.attachments = vec![crate::models::Attachment {
+            id: "f".to_string(),
+            name: "attachment.txt".to_string(),
+            attachment_type: "text/plain".to_string(),
+            url: "https://ntfy.sh/file/a.txt".to_string(),
+            size: Some(5000),
+            expires: None,
+            external: false,
+        }];
+        db.insert_notification_with_ntfy_id(&n, "m1", "m1").unwrap();
+        db.inline_text_attachment(&n.id, "long text").unwrap();
+
+        let stored = db.get_notification(&n.id).unwrap().unwrap();
+        assert_eq!(stored.message, "long text");
+        assert!(stored.attachments.is_empty());
     }
 }

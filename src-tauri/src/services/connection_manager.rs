@@ -687,14 +687,19 @@ impl ConnectionManager {
             attachment.external = !attachment.url.starts_with(&own_files);
         }
 
-        // A body the server moved into a .txt file: fetch it once (not on replays)
+        // A body the server moved into a .txt file: fetch it once (not on replays).
+        // Live messages wait for it so the toast shows the text; catch-up fetches in the
+        // background so a replay of many long messages doesn't stall the stream.
         let now = chrono::Utc::now().timestamp();
+        let mut fetch_later = None;
         if let Some(url) =
             text_attachment::inline_candidate(&notification, &subscription.server_url, now)
                 .map(str::to_string)
         {
             if !db.notification_exists(&ntfy_id).unwrap_or(true) {
-                if let Some(text) = text_attachment::fetch(&url).await {
+                if msg_time < opened_at {
+                    fetch_later = Some(url);
+                } else if let Some(text) = text_attachment::fetch(&url).await {
                     notification.message = text;
                     notification.attachments.clear();
                 }
@@ -721,6 +726,23 @@ impl ConnectionManager {
         }
         // Stored with all tags; the UI and toast get emoji tags as emoji
         let notification = notification.with_emojis();
+
+        if let Some(url) = fetch_later {
+            let (app, id, sub_id) = (
+                app_handle.clone(),
+                notification.id.clone(),
+                subscription_id.to_string(),
+            );
+            tokio::spawn(async move {
+                let Some(text) = text_attachment::fetch(&url).await else {
+                    return;
+                };
+                match app.state::<Database>().inline_text_attachment(&id, &text) {
+                    Ok(()) => Self::subscription_changed(&app, &sub_id).await,
+                    Err(e) => log::error!("Failed to store fetched text for {id}: {e}"),
+                }
+            });
+        }
 
         if is_update {
             Self::subscription_changed(app_handle, subscription_id).await;
