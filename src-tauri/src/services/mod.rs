@@ -5,6 +5,7 @@ pub mod ntfy_client;
 mod sync_service;
 #[cfg(test)]
 pub mod test_server;
+mod text_attachment;
 mod tray_manager;
 mod update_service;
 

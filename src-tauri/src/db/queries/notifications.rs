@@ -37,6 +37,15 @@ impl Database {
             .collect())
     }
 
+    /// Whether a message with this `ntfy_id` is stored (tombstones included).
+    pub fn notification_exists(&self, ntfy_id: &str) -> Result<bool, AppError> {
+        let mut conn = self.conn()?;
+        Ok(diesel::select(diesel::dsl::exists(
+            notifications::table.filter(notifications::ntfy_id.eq(ntfy_id)),
+        ))
+        .get_result(&mut *conn)?)
+    }
+
     /// Inserts a notification unless its `ntfy_id` is already stored (tombstones included).
     ///
     /// The new row becomes the visible version of its sequence: it inherits the favorite

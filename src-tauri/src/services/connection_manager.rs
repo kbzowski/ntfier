@@ -28,7 +28,7 @@ use crate::models::{
     ServerStatus, ServerStatusEntry, Subscription, SubscriptionError,
 };
 use crate::services::ntfy_client::{VersionCheck, NO_TOPIC_ACCESS, RATE_LIMITED};
-use crate::services::{NtfyClient, SyncService, TrayManager};
+use crate::services::{text_attachment, NtfyClient, SyncService, TrayManager};
 
 /// Connection entry storing both the shutdown sender and a unique connection ID.
 /// The ID is used to detect stale connections after a race condition.
@@ -655,6 +655,20 @@ impl ConnectionManager {
         let own_files = format!("{}/file/", subscription.server_url);
         for attachment in &mut notification.attachments {
             attachment.external = !attachment.url.starts_with(&own_files);
+        }
+
+        // A body the server moved into a .txt file: fetch it once (not on replays)
+        let now = chrono::Utc::now().timestamp();
+        if let Some(url) =
+            text_attachment::inline_candidate(&notification, &subscription.server_url, now)
+                .map(str::to_string)
+        {
+            if !db.notification_exists(&ntfy_id).unwrap_or(true) {
+                if let Some(text) = text_attachment::fetch(&url).await {
+                    notification.message = text;
+                    notification.attachments.clear();
+                }
+            }
         }
 
         // Auto-mark as read for muted topics
