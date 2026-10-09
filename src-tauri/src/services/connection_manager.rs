@@ -644,15 +644,18 @@ impl ConnectionManager {
         let sequence_id = msg.sequence_id().to_string();
 
         // Read per message so a mute toggled after connect applies right away
-        let is_muted = db
-            .get_subscription_by_id(subscription_id)
-            .ok()
-            .flatten()
-            .is_some_and(|s| s.muted);
+        let Some(subscription) = db.get_subscription_by_id(subscription_id).ok().flatten() else {
+            return;
+        };
+        let is_muted = subscription.muted;
 
         let msg_time = msg.time;
         let ntfy_id = msg.ntfy_id().to_string();
         let mut notification = msg.into_notification(subscription_id.to_string());
+        let own_files = format!("{}/file/", subscription.server_url);
+        for attachment in &mut notification.attachments {
+            attachment.external = !attachment.url.starts_with(&own_files);
+        }
 
         // Auto-mark as read for muted topics
         if is_muted {
@@ -679,6 +682,8 @@ impl ConnectionManager {
             log::debug!("Notification {ntfy_id} already stored, skipping");
             return;
         }
+        // Stored with all tags; the UI and toast get emoji tags as emoji
+        let notification = notification.with_emojis();
 
         if is_update {
             Self::subscription_changed(app_handle, subscription_id).await;
@@ -711,24 +716,39 @@ impl ConnectionManager {
     /// Shows a notification using the configured display method.
     pub async fn show_notification(app_handle: &AppHandle, notification: &Notification) {
         let db: tauri::State<'_, Database> = app_handle.state();
+        let topic_name = db
+            .get_subscription_by_id(&notification.topic_id)
+            .ok()
+            .flatten()
+            .map(|s| s.display_name.unwrap_or(s.topic))
+            .unwrap_or_default();
+        let text = ToastText {
+            title: notification.display_title(&topic_name),
+            body: if notification.markdown {
+                Self::sanitize_for_notification(&notification.message)
+            } else {
+                notification.message.clone()
+            },
+        };
+
         let Ok(settings) = db.get_notification_settings() else {
             // Fallback to native if settings can't be read
-            Self::show_native_notification(app_handle, notification, None);
+            Self::show_native_notification(app_handle, notification, &text, None);
             return;
         };
 
         match settings.notification_method {
             NotificationDisplayMethod::Native => {
-                Self::show_native_notification(app_handle, notification, Some(&settings));
+                Self::show_native_notification(app_handle, notification, &text, Some(&settings));
             }
             #[cfg(windows)]
             NotificationDisplayMethod::WindowsEnhanced => {
-                Self::show_winrt_notification(app_handle, notification, &settings).await;
+                Self::show_winrt_notification(app_handle, notification, &text, &settings).await;
             }
             #[cfg(not(windows))]
             NotificationDisplayMethod::WindowsEnhanced => {
                 // Fallback to native on non-Windows platforms
-                Self::show_native_notification(app_handle, notification, Some(&settings));
+                Self::show_native_notification(app_handle, notification, &text, Some(&settings));
             }
         }
     }
@@ -791,21 +811,16 @@ impl ConnectionManager {
     fn show_native_notification(
         app_handle: &AppHandle,
         notification: &Notification,
+        text: &ToastText,
         settings: Option<&NotificationSettings>,
     ) {
         use tauri_plugin_notification::NotificationExt;
 
-        let title = if notification.title.is_empty() {
-            "New notification".to_string()
-        } else {
-            Self::sanitize_for_notification(&notification.title)
-        };
-
         let mut builder = app_handle
             .notification()
             .builder()
-            .title(&title)
-            .body(&notification.message);
+            .title(&text.title)
+            .body(&text.body);
 
         // Add sound for notifications with priority >= Default (3) to ensure Windows shows them as toast popups
         // Respect notification_sound setting (defaults to true if settings unavailable)
@@ -823,26 +838,33 @@ impl ConnectionManager {
     /// - Force display option (ignores Focus Assist)
     /// - Action buttons from ntfy
     /// - Priority-based duration and sound
-    /// - Hero images from attachments or markdown (landscape images above text)
-    /// - Inline images for portrait orientation (below text, properly centered)
+    /// - Hero image from an image attachment (landscape above text, portrait below)
+    /// - The message's icon as the app logo
     #[cfg(windows)]
     async fn show_winrt_notification(
         app_handle: &AppHandle,
         notification: &Notification,
+        text: &ToastText,
         settings: &NotificationSettings,
     ) {
-        use crate::services::image_cache::{self, CachedImage};
+        use crate::services::image_cache;
 
-        // Download image first (async), before creating Toast (which is not Send)
-        let cached_image: Option<CachedImage> = if settings.notification_show_images {
-            image_cache::get_notification_image(&notification.attachments, &notification.message)
-                .await
+        // Download images first (async), before creating Toast (which is not Send)
+        let (image, icon) = if settings.notification_show_images {
+            let icon = match notification.icon.as_deref() {
+                Some(url) => image_cache::download_and_cache_image(url).await,
+                None => None,
+            };
+            (
+                image_cache::get_notification_image(&notification.attachments).await,
+                icon,
+            )
         } else {
-            None
+            (None, None)
         };
 
         // Now create and show the toast (sync part)
-        Self::show_winrt_notification_sync(app_handle, notification, settings, cached_image);
+        Self::show_winrt_notification_sync(app_handle, notification, text, settings, image, icon);
     }
 
     /// Selects the toast sound, or `None` to silence it.
@@ -872,25 +894,22 @@ impl ConnectionManager {
     fn show_winrt_notification_sync(
         app_handle: &AppHandle,
         notification: &Notification,
+        text: &ToastText,
         settings: &NotificationSettings,
         cached_image: Option<crate::services::image_cache::CachedImage>,
+        icon: Option<crate::services::image_cache::CachedImage>,
     ) {
         use crate::services::image_cache::ImageOrientation;
-        use tauri_winrt_notification::{Duration, Scenario, Toast};
-
-        let title = if notification.title.is_empty() {
-            "New notification"
-        } else {
-            &notification.title
-        };
+        use tauri_winrt_notification::{Duration, IconCrop, Scenario, Toast};
 
         // Get the app's AUMID (Application User Model ID)
         // Tauri apps use the bundle identifier from tauri.conf.json
         let aumid = app_handle.config().identifier.as_str();
 
-        let mut toast = Toast::new(aumid)
-            .title(&Self::sanitize_for_notification(title))
-            .text1(&Self::sanitize_for_notification(&notification.message));
+        let mut toast = Toast::new(aumid).title(&text.title).text1(&text.body);
+        if let Some(ref icon) = icon {
+            toast = toast.icon(&icon.path, IconCrop::Square, "");
+        }
 
         // Force display - ignores Focus Assist using Scenario::Alarm
         if settings.notification_force_display {
@@ -938,9 +957,17 @@ impl ConnectionManager {
         if let Err(e) = toast.show() {
             log::error!("Failed to show WinRT notification: {e}");
             // Fallback to native notification on error
-            Self::show_native_notification(app_handle, notification, Some(settings));
+            Self::show_native_notification(app_handle, notification, text, Some(settings));
         }
     }
+}
+
+/// What a toast says, worked out once for both toast kinds.
+struct ToastText {
+    /// Tag emoji and the title, or the topic name when there's no title.
+    title: String,
+    /// Markdown messages as plain text, everything else as sent.
+    body: String,
 }
 
 #[cfg(test)]

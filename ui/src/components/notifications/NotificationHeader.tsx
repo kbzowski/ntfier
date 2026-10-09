@@ -1,11 +1,20 @@
-import { ChevronRight, Star, Trash2 } from "lucide-react";
-import { type MouseEvent, memo } from "react";
+import { open } from "@tauri-apps/plugin-shell";
+import { ChevronRight, ExternalLink, Star, Trash2 } from "lucide-react";
+import { type MouseEvent, memo, useState } from "react";
+import { useShowImages } from "@/context/ShowImagesContext";
+import { isTauri } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { PriorityBadge } from "./PriorityBadge";
 import { RelativeTime } from "./RelativeTime";
 
+const APP_ICON = "/logo192.png";
+
 interface NotificationHeaderProps {
 	title: string;
+	/** Remote image the publisher set as the message's icon. */
+	icon?: string | null;
+	/** URL the publisher wants opened when the message is clicked. */
+	click?: string | null;
 	timestamp: number;
 	priority: number;
 	read: boolean;
@@ -16,8 +25,23 @@ interface NotificationHeaderProps {
 	onDelete?: () => void;
 }
 
+function MessageIcon({ url }: { url: string }) {
+	const showImages = useShowImages();
+	const [failed, setFailed] = useState(false);
+	return (
+		<img
+			src={showImages && !failed ? url : APP_ICON}
+			alt=""
+			className="h-5 w-5 shrink-0 rounded-sm object-cover"
+			onError={() => setFailed(true)}
+		/>
+	);
+}
+
 export const NotificationHeader = memo(function NotificationHeader({
 	title,
+	icon,
+	click,
 	timestamp,
 	priority,
 	read,
@@ -30,6 +54,16 @@ export const NotificationHeader = memo(function NotificationHeader({
 	const handleDelete = (e: MouseEvent) => {
 		e.stopPropagation();
 		onDelete?.();
+	};
+
+	const handleOpenClick = (e: MouseEvent) => {
+		e.stopPropagation();
+		if (!click) return;
+		if (isTauri()) {
+			open(click).catch((err) => console.error("[Open click URL]", err));
+		} else {
+			window.open(click, "_blank", "noopener,noreferrer");
+		}
 	};
 
 	const handleToggleFavorite = (e: MouseEvent) => {
@@ -48,6 +82,7 @@ export const NotificationHeader = memo(function NotificationHeader({
 						)}
 					/>
 				)}
+				{icon && <MessageIcon url={icon} />}
 				<h3
 					className={cn(
 						"text-lg truncate transition-all",
@@ -58,6 +93,17 @@ export const NotificationHeader = memo(function NotificationHeader({
 				</h3>
 			</div>
 			<div className="flex items-center gap-2 shrink-0">
+				{click && (
+					<button
+						type="button"
+						aria-label="Open link"
+						title={click}
+						onClick={handleOpenClick}
+						className="p-1 rounded-sm text-muted-foreground hover:text-foreground"
+					>
+						<ExternalLink className="h-4 w-4" />
+					</button>
+				)}
 				{onToggleFavorite && (
 					<button
 						type="button"

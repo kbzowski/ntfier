@@ -12,6 +12,7 @@ import {
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useShowImages } from "@/context/ShowImagesContext";
 import { classifyError } from "@/lib/error-classification";
 import { isTauri } from "@/lib/tauri";
 import { formatFileSize } from "@/lib/utils";
@@ -38,27 +39,9 @@ function isImageAttachment(attachment: Attachment): boolean {
 	return false;
 }
 
-function useAttachmentAvailability(attachments: Attachment[]) {
-	const [unavailable, setUnavailable] = useState<Set<string>>(() => new Set());
-	const checkedRef = useRef<Set<string>>(new Set());
-
-	useEffect(() => {
-		for (const attachment of attachments) {
-			if (checkedRef.current.has(attachment.id)) continue;
-			checkedRef.current.add(attachment.id);
-
-			const markUnavailable = () =>
-				setUnavailable((prev) => new Set(prev).add(attachment.id));
-
-			fetch(attachment.url, { method: "HEAD" })
-				.then((res) => {
-					if (!res.ok) markUnavailable();
-				})
-				.catch(markUnavailable);
-		}
-	}, [attachments]);
-
-	return unavailable;
+/** Expired files are gone from the server (404), so don't offer them. */
+function isExpired(attachment: Attachment): boolean {
+	return attachment.expires != null && attachment.expires * 1000 < Date.now();
 }
 
 function UnavailableCard({ name }: { name: string }) {
@@ -67,7 +50,7 @@ function UnavailableCard({ name }: { name: string }) {
 			<AlertTriangle className="h-8 w-8 shrink-0 opacity-50" />
 			<div className="flex-1 min-w-0">
 				<p className="text-sm font-medium truncate">{name}</p>
-				<p className="text-xs">Attachment is not available</p>
+				<p className="text-xs">Attachment expired</p>
 			</div>
 		</div>
 	);
@@ -227,7 +210,7 @@ export const NotificationAttachments = memo(function NotificationAttachments({
 	const [failedImages, setFailedImages] = useState<Set<string>>(
 		() => new Set(),
 	);
-	const unavailable = useAttachmentAvailability(attachments);
+	const showImages = useShowImages();
 
 	const handleDownload = useCallback(async (url: string) => {
 		try {
@@ -444,7 +427,7 @@ export const NotificationAttachments = memo(function NotificationAttachments({
 	return (
 		<div className="mt-4 space-y-3">
 			{attachments.map((attachment) => {
-				if (unavailable.has(attachment.id)) {
+				if (isExpired(attachment)) {
 					return <UnavailableCard key={attachment.id} name={attachment.name} />;
 				}
 
@@ -461,7 +444,12 @@ export const NotificationAttachments = memo(function NotificationAttachments({
 					);
 				}
 
-				if (isImageAttachment(attachment) && !failedImages.has(attachment.id)) {
+				// Images hosted elsewhere load only with the "show images" setting
+				if (
+					isImageAttachment(attachment) &&
+					!failedImages.has(attachment.id) &&
+					(showImages || !attachment.external)
+				) {
 					return (
 						<ImageCard
 							key={attachment.id}

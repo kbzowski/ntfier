@@ -7,6 +7,10 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use specta::Type;
 
+use base64::{engine::general_purpose::STANDARD, Engine};
+
+use super::emoji::emoji_for_tag;
+
 /// Notification priority levels matching ntfy's 1-5 scale.
 ///
 /// Serialized as numbers 1-5 via `serde_repr`.
@@ -59,6 +63,44 @@ pub struct Notification {
     /// Whether an ignore rule currently hides this notification.
     /// Computed on read, never stored.
     pub ignored: bool,
+    /// Render the message as markdown (the publisher sent `text/markdown`).
+    pub markdown: bool,
+    /// URL to open when the notification is clicked.
+    pub click: Option<String>,
+    /// Remote image to show as the notification's icon.
+    pub icon: Option<String>,
+    /// Emoji for the tags that are emoji shortcodes, shown before the title.
+    /// Computed on read; those tags are left out of `tags`.
+    pub emojis: Vec<String>,
+}
+
+impl Notification {
+    /// Moves tags that are emoji shortcodes from `tags` to `emojis`.
+    pub fn with_emojis(mut self) -> Self {
+        let (emojis, tags): (Vec<_>, Vec<_>) = std::mem::take(&mut self.tags)
+            .into_iter()
+            .partition(|t| emoji_for_tag(t).is_some());
+        self.emojis = emojis
+            .iter()
+            .filter_map(|t| emoji_for_tag(t).map(str::to_string))
+            .collect();
+        self.tags = tags;
+        self
+    }
+
+    /// The title as shown in a toast: tag emoji, then the title, or the topic without one.
+    pub fn display_title(&self, topic_name: &str) -> String {
+        let title = if self.title.is_empty() {
+            topic_name
+        } else {
+            &self.title
+        };
+        if self.emojis.is_empty() {
+            title.to_string()
+        } else {
+            format!("{} {title}", self.emojis.concat())
+        }
+    }
 }
 
 /// An action button attached to a notification.
@@ -83,6 +125,13 @@ pub struct Attachment {
     pub url: String,
     #[specta(type = Option<specta_typescript::Number>)]
     pub size: Option<i64>,
+    /// When the server deletes the file (unix seconds); after that it's gone (404).
+    #[serde(default)]
+    #[specta(type = Option<specta_typescript::Number>)]
+    pub expires: Option<i64>,
+    /// Hosted elsewhere (`attach=` URL), not on the topic's server.
+    #[serde(default)]
+    pub external: bool,
 }
 
 /// Raw message from ntfy WebSocket or HTTP API.
@@ -105,6 +154,10 @@ pub struct NtfyMessage {
     pub attachment: Option<NtfyAttachment>,
     /// Shared by all versions of a message; missing means it equals `id`.
     pub sequence_id: Option<String>,
+    pub content_type: Option<String>,
+    /// `base64` when the message body is base64-encoded.
+    pub encoding: Option<String>,
+    pub icon: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -125,6 +178,7 @@ pub struct NtfyAttachment {
     pub mime_type: Option<String>,
     pub url: String,
     pub size: Option<i64>,
+    pub expires: Option<i64>,
 }
 
 // ===== Conversions from ntfy format to internal format =====
@@ -151,6 +205,8 @@ impl From<NtfyAttachment> for Attachment {
                 .unwrap_or_else(|| "application/octet-stream".to_string()),
             url: attachment.url,
             size: attachment.size,
+            expires: attachment.expires,
+            external: false,
         }
     }
 }
@@ -173,11 +229,20 @@ impl NtfyMessage {
             .map(|a| vec![Attachment::from(a)])
             .unwrap_or_default();
 
+        let message = self.message.unwrap_or_default();
+        let message = if self.encoding.as_deref() == Some("base64") {
+            STANDARD.decode(message.trim()).map_or(message, |bytes| {
+                String::from_utf8_lossy(&bytes).into_owned()
+            })
+        } else {
+            message
+        };
+
         Notification {
             id: uuid::Uuid::new_v4().to_string(),
             topic_id,
             title: self.title.unwrap_or_default(),
-            message: self.message.unwrap_or_default(),
+            message,
             priority: Priority::from(self.priority.unwrap_or(3)),
             tags: self.tags.unwrap_or_default(),
             timestamp: self.time * 1000, // Convert to milliseconds
@@ -187,6 +252,12 @@ impl NtfyMessage {
             is_expanded: false,
             is_favorite: false,
             ignored: false,
+            markdown: self
+                .content_type
+                .is_some_and(|t| t.starts_with("text/markdown")),
+            click: self.click,
+            icon: self.icon,
+            emojis: Vec::new(),
         }
     }
 
@@ -198,5 +269,41 @@ impl NtfyMessage {
     /// The sequence this message (or delete/clear event) belongs to.
     pub fn sequence_id(&self) -> &str {
         self.sequence_id.as_deref().unwrap_or(&self.id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn message(json: &str) -> Notification {
+        serde_json::from_str::<NtfyMessage>(json)
+            .unwrap()
+            .into_notification("sub".to_string())
+    }
+
+    #[test]
+    fn decodes_base64_and_flags_markdown() {
+        let n = message(
+            r#"{"id":"a","time":1,"event":"message","topic":"t","message":"aGVsbG8=","encoding":"base64","content_type":"text/markdown"}"#,
+        );
+        assert_eq!(n.message, "hello");
+        assert!(n.markdown);
+        assert!(
+            !message(r#"{"id":"a","time":1,"event":"message","topic":"t","message":"x"}"#).markdown
+        );
+    }
+
+    #[test]
+    fn emoji_tags_go_before_the_title() {
+        let n = message(
+            r#"{"id":"a","time":1,"event":"message","topic":"t","title":"Disk","tags":["warning","backup"]}"#,
+        )
+        .with_emojis();
+        assert_eq!(n.tags, ["backup"]);
+        assert_eq!(n.display_title("topic"), "\u{26a0}\u{fe0f} Disk");
+
+        let untitled = message(r#"{"id":"a","time":1,"event":"message","topic":"t"}"#);
+        assert_eq!(untitled.display_title("alerts"), "alerts");
     }
 }

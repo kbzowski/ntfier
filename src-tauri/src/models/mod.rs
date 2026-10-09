@@ -1,3 +1,4 @@
+mod emoji;
 mod ignore_rule;
 mod notification;
 mod server_status;

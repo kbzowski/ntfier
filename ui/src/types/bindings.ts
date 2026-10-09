@@ -138,6 +138,10 @@ export type Attachment = {
 	type: string,
 	url: string,
 	size: number | null,
+	/**  When the server deletes the file (unix seconds); after that it's gone (404). */
+	expires?: number | null,
+	/**  Hosted elsewhere (`attach=` URL), not on the topic's server. */
+	external?: boolean,
 };
 
 /**  Data required to create a new subscription. */
@@ -186,6 +190,17 @@ export type Notification = {
 	 *  Computed on read, never stored.
 	 */
 	ignored: boolean,
+	/**  Render the message as markdown (the publisher sent `text/markdown`). */
+	markdown: boolean,
+	/**  URL to open when the notification is clicked. */
+	click: string | null,
+	/**  Remote image to show as the notification's icon. */
+	icon: string | null,
+	/**
+	 *  Emoji for the tags that are emoji shortcodes, shown before the title.
+	 *  Computed on read; those tags are left out of `tags`.
+	 */
+	emojis: string[],
 };
 
 /**  An action button attached to a notification. */

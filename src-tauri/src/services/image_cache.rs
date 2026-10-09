@@ -3,7 +3,6 @@
 //! Downloads images from URLs and caches them locally for use in Windows
 //! toast notifications, which require local file paths.
 
-use pulldown_cmark::{Event, Parser, Tag};
 use std::path::PathBuf;
 use tokio::fs;
 
@@ -38,24 +37,6 @@ fn get_image_orientation(path: &std::path::Path) -> ImageOrientation {
     }
     // Default to landscape if we can't determine
     ImageOrientation::Landscape
-}
-
-/// Extracts the first image URL from markdown text.
-///
-/// Parses the markdown and returns the URL of the first image found.
-pub fn extract_first_image_from_markdown(text: &str) -> Option<String> {
-    let parser = Parser::new(text);
-
-    for event in parser {
-        if let Event::Start(Tag::Image { dest_url, .. }) = event {
-            let url = dest_url.to_string();
-            if !url.is_empty() {
-                return Some(url);
-            }
-        }
-    }
-
-    None
 }
 
 /// Returns the cache directory for notification images.
@@ -199,27 +180,11 @@ pub async fn download_and_cache_image(url: &str) -> Option<CachedImage> {
 /// Returns `None` if no image is available or download fails.
 pub async fn get_notification_image(
     attachments: &[crate::models::Attachment],
-    message: &str,
 ) -> Option<CachedImage> {
-    // First, try to get an image from attachments
-    let image_attachment = attachments
+    let attachment = attachments
         .iter()
-        .find(|a| a.attachment_type.starts_with("image/"));
-
-    if let Some(attachment) = image_attachment {
-        if let Some(cached) = download_and_cache_image(&attachment.url).await {
-            return Some(cached);
-        }
-    }
-
-    // Fallback: extract image URL from markdown message
-    if let Some(image_url) = extract_first_image_from_markdown(message) {
-        if let Some(cached) = download_and_cache_image(&image_url).await {
-            return Some(cached);
-        }
-    }
-
-    None
+        .find(|a| a.attachment_type.starts_with("image/"))?;
+    download_and_cache_image(&attachment.url).await
 }
 
 /// Cleans up old cached images.
@@ -256,27 +221,6 @@ pub async fn cleanup_old_images(max_age_secs: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_extract_image_from_markdown() {
-        let markdown = "Hello ![alt text](https://example.com/image.png) world";
-        let url = extract_first_image_from_markdown(markdown);
-        assert_eq!(url, Some("https://example.com/image.png".to_string()));
-    }
-
-    #[test]
-    fn test_extract_image_no_image() {
-        let markdown = "Hello world, no images here";
-        let url = extract_first_image_from_markdown(markdown);
-        assert_eq!(url, None);
-    }
-
-    #[test]
-    fn test_extract_first_image_multiple() {
-        let markdown = "![first](https://a.com/1.png) and ![second](https://b.com/2.png)";
-        let url = extract_first_image_from_markdown(markdown);
-        assert_eq!(url, Some("https://a.com/1.png".to_string()));
-    }
 
     #[test]
     fn test_cache_filename() {

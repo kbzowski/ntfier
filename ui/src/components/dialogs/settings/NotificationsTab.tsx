@@ -116,6 +116,14 @@ export function NotificationsTab({
 				/>
 			</div>
 
+			<SettingCheckbox
+				id="show-images"
+				checked={notificationShowImages}
+				onCheckedChange={onNotificationShowImagesChange}
+				label="Show images"
+				description="Load remote images in messages and notifications: markdown images, attachments from other sites and message icons. Off shows them as links."
+			/>
+
 			{isWindowsEnhanced && (
 				<>
 					<Separator />
@@ -137,15 +145,6 @@ export function NotificationsTab({
 							onCheckedChange={onNotificationShowActionsChange}
 							label="Show action buttons"
 							description="Display action buttons from ntfy notifications (up to 3 buttons)"
-							className="pt-2"
-						/>
-
-						<SettingCheckbox
-							id="show-images"
-							checked={notificationShowImages}
-							onCheckedChange={onNotificationShowImagesChange}
-							label="Show images"
-							description="Display images from attachments or message content"
 							className="pt-2"
 						/>
 					</div>

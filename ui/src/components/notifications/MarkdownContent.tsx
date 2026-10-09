@@ -5,16 +5,32 @@ import rehypeSanitize from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { LazyImageWithFallback } from "@/components/ui/lazy-image";
+import { useShowImages } from "@/context/ShowImagesContext";
 import { preprocessMarkdown } from "@/lib/markdownPreprocessor";
 import { cn } from "@/lib/utils";
 
 const REMARK_PLUGINS = [remarkGfm, remarkBreaks];
 const REHYPE_PLUGINS = [rehypeRaw, rehypeSanitize];
+function MarkdownImage({ src, alt }: { src?: string; alt?: string }) {
+	const showImages = useShowImages();
+	if (!src) return null;
+	if (!showImages) {
+		return (
+			<a
+				href={src}
+				target="_blank"
+				rel="noopener noreferrer"
+				className="text-primary hover:underline"
+			>
+				{alt || src}
+			</a>
+		);
+	}
+	return <LazyImageWithFallback src={src} alt={alt} />;
+}
+
 const MARKDOWN_COMPONENTS = {
-	img: ({ src, alt }: { src?: string; alt?: string }) => {
-		if (!src) return null;
-		return <LazyImageWithFallback src={src} alt={alt} />;
-	},
+	img: MarkdownImage,
 	a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
 		<a
 			href={href}

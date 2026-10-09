@@ -39,6 +39,9 @@ diesel::table! {
         deleted -> Integer,
         sequence_id -> Nullable<Text>,
         superseded -> Integer,
+        markdown -> Integer,
+        click -> Nullable<Text>,
+        icon -> Nullable<Text>,
     }
 }
 

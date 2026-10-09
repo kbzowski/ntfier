@@ -88,6 +88,9 @@ pub struct NotificationRow {
     pub sequence_id: Option<String>,
     #[allow(dead_code)]
     pub superseded: i32,
+    pub markdown: i32,
+    pub click: Option<String>,
+    pub icon: Option<String>,
 }
 
 impl NotificationRow {
@@ -107,7 +110,12 @@ impl NotificationRow {
             is_expanded: self.is_expanded == 1,
             is_favorite: self.is_favorite == 1,
             ignored: false,
+            markdown: self.markdown == 1,
+            click: self.click,
+            icon: self.icon,
+            emojis: Vec::new(),
         }
+        .with_emojis()
     }
 }
 
@@ -129,6 +137,9 @@ pub struct NewNotification<'a> {
     pub attachments: JsonAttachments,
     pub is_expanded: i32,
     pub is_favorite: i32,
+    pub markdown: i32,
+    pub click: Option<&'a str>,
+    pub icon: Option<&'a str>,
 }
 
 // ===== Setting =====

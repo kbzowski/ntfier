@@ -1,56 +1,28 @@
 /**
  * @module lib/markdownPreprocessor
  *
- * Preprocesses notification content to enhance URL handling.
- * Converts plain URLs to markdown links and image URLs to embedded images.
+ * Makes plain URLs in notification content clickable. A plain URL never becomes an
+ * image, even when it points to one: loading it would be a tracking pixel.
  */
 
-// Regex to detect image URLs - matches URLs ending with image extensions (with optional query string)
-const IMAGE_URL_REGEX =
-	/(https?:\/\/[^\s<>"']+\.(?:jpg|jpeg|png|gif|webp|svg|bmp|ico)(?:\?[^\s<>"']*)?)/gi;
-
-// Regex to detect standalone URLs that should be converted to links
+// Standalone URLs, without trailing punctuation
 const URL_REGEX = /(https?:\/\/[^\s<>"']+[^\s<>"'.,:;)\]])/g;
 
-// Regex to detect if content already has markdown formatting
-const MARKDOWN_LINK_REGEX = /\[.*?\]\(.*?\)/;
-const MARKDOWN_IMAGE_REGEX = /!\[.*?\]\(.*?\)/;
+// Content that already has markdown links/images is left as written
+const MARKDOWN_LINK_REGEX = /!?\[.*?\]\(.*?\)/;
 
-/**
- * Checks if a URL points to an image file.
- */
-function isImageUrl(url: string): boolean {
-	return /\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?|$)/i.test(url);
-}
-
-/**
- * Preprocesses plain text content to convert URLs to markdown format.
- *
- * - Converts image URLs to markdown images: ![](url)
- * - Converts other URLs to markdown links: [url](url)
- * - Skips content that already contains markdown formatting
- */
+/** Turns plain URLs in markdown content into markdown links. */
 export function preprocessMarkdown(content: string): string {
-	// If content already contains markdown links/images, don't preprocess URLs
-	// This prevents double-processing of already formatted content
-	if (MARKDOWN_LINK_REGEX.test(content) || MARKDOWN_IMAGE_REGEX.test(content)) {
+	if (MARKDOWN_LINK_REGEX.test(content)) {
 		return content;
 	}
+	return content.replace(URL_REGEX, (url) => `[${url}](${url})`);
+}
 
-	let processed = content;
-
-	// Convert plain image URLs to markdown images
-	processed = processed.replace(IMAGE_URL_REGEX, (url) => {
-		return `![](${url})`;
-	});
-
-	// Convert remaining plain URLs to links (skip images)
-	processed = processed.replace(URL_REGEX, (url) => {
-		if (isImageUrl(url)) {
-			return url;
-		}
-		return `[${url}](${url})`;
-	});
-
-	return processed;
+/** Splits plain text into text and URL parts, for rendering links. */
+export function splitUrls(content: string): { text: string; url: boolean }[] {
+	return content
+		.split(URL_REGEX)
+		.filter(Boolean)
+		.map((text) => ({ text, url: /^https?:\/\//.test(text) }));
 }

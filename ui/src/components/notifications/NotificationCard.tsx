@@ -34,6 +34,7 @@ const MarkdownContent = lazy(() =>
 import { NotificationAttachments } from "./NotificationAttachments";
 import { NotificationHeader } from "./NotificationHeader";
 import { NotificationTags } from "./NotificationTags";
+import { PlainContent } from "./PlainContent";
 
 interface NotificationCardProps {
 	notification: NotificationType;
@@ -128,7 +129,11 @@ export const NotificationCard = memo(function NotificationCard({
 
 	const header = (
 		<NotificationHeader
-			title={notification.title}
+			title={[notification.emojis.join(""), notification.title]
+				.filter(Boolean)
+				.join(" ")}
+			icon={notification.icon}
+			click={notification.click}
 			timestamp={notification.timestamp}
 			priority={notification.priority}
 			read={notification.read}
@@ -146,9 +151,13 @@ export const NotificationCard = memo(function NotificationCard({
 		<>
 			{notification.message && (
 				<div className="mt-2 text-sm text-muted-foreground selectable">
-					<Suspense fallback={<span>{notification.message}</span>}>
-						<MarkdownContent content={notification.message} />
-					</Suspense>
+					{notification.markdown ? (
+						<Suspense fallback={<span>{notification.message}</span>}>
+							<MarkdownContent content={notification.message} />
+						</Suspense>
+					) : (
+						<PlainContent content={notification.message} />
+					)}
 				</div>
 			)}
 			<NotificationTags tags={notification.tags} />

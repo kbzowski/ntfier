@@ -71,6 +71,9 @@ impl Database {
             attachments: JsonAttachments::new(notification.attachments.clone()),
             is_expanded: i32::from(notification.is_expanded),
             is_favorite: i32::from(notification.is_favorite),
+            markdown: i32::from(notification.markdown),
+            click: notification.click.as_deref(),
+            icon: notification.icon.as_deref(),
         };
 
         let in_sequence = notifications::subscription_id
@@ -362,6 +365,10 @@ pub mod tests {
             is_expanded: false,
             is_favorite: false,
             ignored: false,
+            markdown: false,
+            click: None,
+            icon: None,
+            emojis: vec![],
         }
     }
 

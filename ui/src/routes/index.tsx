@@ -23,6 +23,7 @@ const SettingsDialog = lazy(() =>
 
 import { NotificationList } from "@/components/notifications/NotificationList";
 import { useApp } from "@/context/AppContext";
+import { ShowImagesProvider } from "@/context/ShowImagesContext";
 
 const noop = () => {};
 
@@ -184,24 +185,26 @@ function App() {
 						onRetry={retryLoad}
 					/>
 				) : (
-					<NotificationList
-						subscription={
-							currentView === "favorites"
-								? null
-								: (selectedSubscription ?? null)
-						}
-						subscriptions={subscriptionsWithUnread}
-						notifications={currentNotifications}
-						onMarkAsRead={markAsRead}
-						onMarkAllAsRead={handleMarkAllAsRead}
-						onDelete={deleteNotification}
-						onToggleFavorite={
-							settings.favoritesEnabled ? toggleFavorite : undefined
-						}
-						onExpandedChange={setNotificationExpanded}
-						compactView={settings.compactView ?? false}
-						isFavoritesView={currentView === "favorites"}
-					/>
+					<ShowImagesProvider value={settings.notificationShowImages ?? true}>
+						<NotificationList
+							subscription={
+								currentView === "favorites"
+									? null
+									: (selectedSubscription ?? null)
+							}
+							subscriptions={subscriptionsWithUnread}
+							notifications={currentNotifications}
+							onMarkAsRead={markAsRead}
+							onMarkAllAsRead={handleMarkAllAsRead}
+							onDelete={deleteNotification}
+							onToggleFavorite={
+								settings.favoritesEnabled ? toggleFavorite : undefined
+							}
+							onExpandedChange={setNotificationExpanded}
+							compactView={settings.compactView ?? false}
+							isFavoritesView={currentView === "favorites"}
+						/>
+					</ShowImagesProvider>
 				)}
 			</AppLayout>
 
