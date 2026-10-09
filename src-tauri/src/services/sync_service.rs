@@ -76,6 +76,9 @@ impl SyncService {
             .filter(|s| s.server_url == server_url)
             .collect();
         let first_sync = !db.is_server_synced(server_url)?;
+        // Until every local topic is on the account, a later sync must merge again:
+        // letting the account win would delete the topic that didn't make it up
+        let mut all_pushed = true;
 
         for sub in local
             .iter()
@@ -92,6 +95,7 @@ impl SyncService {
                     .await
                 {
                     log::warn!("Couldn't push {} to the account: {e}", sub.topic);
+                    all_pushed = false;
                 }
             } else {
                 log::info!(
@@ -128,7 +132,7 @@ impl SyncService {
             }
         }
 
-        if first_sync {
+        if first_sync && all_pushed {
             db.set_server_synced(server_url)?;
         }
         if let Some(sync_topic) = account.sync_topic.as_deref() {
