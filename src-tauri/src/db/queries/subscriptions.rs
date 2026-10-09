@@ -156,6 +156,19 @@ impl Database {
         Ok(())
     }
 
+    /// Sets the name shown instead of the topic (account sync: the account's name wins).
+    pub fn set_subscription_display_name(
+        &self,
+        id: &str,
+        display_name: Option<&str>,
+    ) -> Result<(), AppError> {
+        let mut conn = self.conn()?;
+        diesel::update(subscriptions::table.filter(subscriptions::id.eq(id)))
+            .set(subscriptions::display_name.eq(display_name))
+            .execute(&mut *conn)?;
+        Ok(())
+    }
+
     /// Toggles the mute state of a subscription.
     pub fn toggle_subscription_mute(&self, id: &str) -> Result<Subscription, AppError> {
         // Get current state to determine if we're muting or unmuting

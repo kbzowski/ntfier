@@ -3,7 +3,7 @@ use serde::Deserialize;
 use std::time::Duration;
 
 use crate::error::AppError;
-use crate::models::NtfyMessage;
+use crate::models::{canonical_url, NtfyMessage};
 
 /// REST timeouts: a dead server fails fast instead of hanging the UI.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -21,6 +21,9 @@ pub struct NtfyAccount {
     pub username: Option<String>,
     #[serde(default)]
     pub subscriptions: Vec<NtfySubscription>,
+    /// Private topic where the server announces account changes.
+    #[serde(default)]
+    pub sync_topic: Option<String>,
 }
 
 impl NtfyAccount {
@@ -194,6 +197,57 @@ impl NtfyClient {
         classify_probe(status, &body)
     }
 
+    /// Adds a topic to the account's subscription list. Already there (409) counts as done.
+    pub async fn add_account_subscription(
+        &self,
+        server_url: &str,
+        auth: &str,
+        topic: &str,
+        display_name: Option<&str>,
+    ) -> Result<(), AppError> {
+        let url = format!("{server_url}/v1/account/subscription");
+        let request = self
+            .request(Method::POST, &url, Some(auth))
+            .json(&serde_json::json!({
+                "base_url": server_url,
+                "topic": topic,
+                "display_name": display_name,
+            }));
+        let context = "Failed to add the topic to your ntfy account";
+        let response = request
+            .send()
+            .await
+            .map_err(|e| AppError::Connection(format!("{context}: {e}")))?;
+        let status = response.status();
+        if status.is_success() || status == StatusCode::CONFLICT {
+            Ok(())
+        } else {
+            Err(status_error(status, context))
+        }
+    }
+
+    /// Removes a topic from the account. The account may store the server URL in any
+    /// form, so every entry whose canonical URL matches goes.
+    pub async fn remove_account_subscription(
+        &self,
+        server_url: &str,
+        auth: &str,
+        topic: &str,
+    ) -> Result<(), AppError> {
+        let account = self.get_account(server_url, Some(auth)).await?;
+        let url = format!("{server_url}/v1/account/subscription");
+        for entry in account.subscriptions.iter().filter(|s| {
+            s.topic == topic && canonical_url(&s.base_url).ok().as_deref() == Some(server_url)
+        }) {
+            let request = self
+                .request(Method::DELETE, &url, Some(auth))
+                .header("X-BaseURL", &entry.base_url)
+                .header("X-Topic", &entry.topic);
+            Self::send(request, "Failed to remove the topic from your ntfy account").await?;
+        }
+        Ok(())
+    }
+
     /// Deletes a message (all versions of its sequence) on the server.
     pub async fn delete_message(
         &self,
@@ -354,6 +408,36 @@ mod tests {
             client.check_server_version(&old, None).await.unwrap(),
             VersionCheck::TooOld
         );
+    }
+
+    #[tokio::test]
+    async fn account_subscription_push() {
+        let Some(url) = test_server::url() else {
+            return;
+        };
+        let client = NtfyClient::new().unwrap();
+        let auth = server(None, None, Some(test_server::TOKEN))
+            .auth_header()
+            .unwrap();
+        let topic = test_server::unique_topic("acct");
+        let listed = |account: NtfyAccount| account.subscriptions.iter().any(|s| s.topic == topic);
+
+        // Adding twice is fine (409 counts as done)
+        for _ in 0..2 {
+            client
+                .add_account_subscription(&url, &auth, &topic, Some("Name"))
+                .await
+                .unwrap();
+        }
+        assert!(listed(client.get_account(&url, Some(&auth)).await.unwrap()));
+
+        client
+            .remove_account_subscription(&url, &auth, &topic)
+            .await
+            .unwrap();
+        assert!(!listed(
+            client.get_account(&url, Some(&auth)).await.unwrap()
+        ));
     }
 
     #[tokio::test]

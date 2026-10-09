@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { mockSettings, mockSubscriptions } from "@/data/mock-data";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTauriEvent } from "@/hooks/useTauriEvent";
-import { classifyError } from "@/lib/error-classification";
+import { BackendError, classifyError } from "@/lib/error-classification";
 import {
 	autostartApi,
 	ignoreRulesApi,
@@ -76,7 +76,7 @@ interface AppActions {
 		serverUrl: string;
 		displayName?: string;
 	}) => Promise<Subscription>;
-	removeSubscription: (id: string) => Promise<void>;
+	removeSubscription: (id: string, localOnly?: boolean) => Promise<void>;
 	toggleMute: (id: string) => Promise<void>;
 	refreshSubscriptions: () => Promise<void>;
 
@@ -299,10 +299,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	useTauriEvent<void>(
 		"subscriptions:synced",
 		useCallback(async () => {
-			console.log("Subscriptions synced, refreshing...");
 			const subs = await subscriptionsApi.getAll();
+			// Account sync can remove topics: drop their cached messages and selection
+			const ids = new Set(subs.map((s) => s.id));
+			for (const old of subscriptionsRef.current) {
+				if (!ids.has(old.id)) notifications.clearTopic(old.id);
+			}
+			setCurrentTopicId((current) =>
+				current && !ids.has(current) ? null : current,
+			);
 			setSubscriptions(subs);
-		}, []),
+		}, [notifications.clearTopic]),
 	);
 
 	// Stored messages of a subscription changed in place (update, server delete or clear)
@@ -382,14 +389,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	);
 
 	const removeSubscription = useCallback(
-		async (id: string) => {
+		async function remove(id: string, localOnly = false) {
 			if (isTauri()) {
 				try {
-					await subscriptionsApi.remove(id);
+					await subscriptionsApi.remove(id, localOnly);
 					setSubscriptions((prev) => prev.filter((sub) => sub.id !== id));
 					notifications.clearTopic(id);
 					toast.success("Subscription removed");
 				} catch (err) {
+					if (err instanceof BackendError && err.kind === "AccountSync") {
+						toast.error(err.message, {
+							description:
+								"Removing it only here means it comes back on the next sync.",
+							action: {
+								label: "Remove locally anyway",
+								onClick: () => remove(id, true),
+							},
+						});
+						return;
+					}
 					const classified = classifyError(err);
 					toast.error(classified.userMessage, {
 						description: "Failed to remove subscription",

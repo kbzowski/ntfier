@@ -28,13 +28,29 @@ use crate::models::{
     ServerStatus, ServerStatusEntry, Subscription, SubscriptionError,
 };
 use crate::services::ntfy_client::{VersionCheck, NO_TOPIC_ACCESS, RATE_LIMITED};
-use crate::services::{NtfyClient, TrayManager};
+use crate::services::{NtfyClient, SyncService, TrayManager};
 
 /// Connection entry storing both the shutdown sender and a unique connection ID.
 /// The ID is used to detect stale connections after a race condition.
 struct ConnectionEntry {
     id: u64,
     shutdown_tx: mpsc::Sender<()>,
+}
+
+/// Key of a server's sync topic connection in the connection map, next to subscription ids.
+fn sync_topic_key(server_url: &str) -> String {
+    format!("sync-topic:{server_url}")
+}
+
+/// Whether a sync topic message is the server's "account changed" announcement:
+/// a regular message whose body is `{"event":"sync"}`.
+fn is_sync_announcement(text: &str) -> bool {
+    serde_json::from_str::<NtfyMessage>(text)
+        .ok()
+        .filter(|m| m.event == "message")
+        .and_then(|m| m.message)
+        .and_then(|body| serde_json::from_str::<serde_json::Value>(&body).ok())
+        .is_some_and(|body| body["event"] == "sync")
 }
 
 /// Servers that may not be connected to, keyed by canonical URL. Absent means ok.
@@ -174,6 +190,8 @@ impl ConnectionManager {
     /// a changed credential. Each keeps its cursor.
     pub async fn reconnect_server(&self, url: &str) {
         self.version_gate.forget(url).await;
+        // A new login may belong to another account; the next account sync re-watches
+        self.disconnect(&sync_topic_key(url)).await;
         Self::set_server_status(
             &self.app_handle,
             &self.server_statuses,
@@ -428,6 +446,100 @@ impl ConnectionManager {
         Ok(())
     }
 
+    /// Listens on the account's sync topic and runs an account sync whenever the server
+    /// announces a change. A hidden connection, not a subscription: no messages are stored.
+    /// Does nothing if the server is already being watched.
+    pub fn watch_sync_topic(&self, server_url: &str, sync_topic: &str) {
+        let key = sync_topic_key(server_url);
+        let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
+        let connection_id = self.generate_connection_id();
+        let app_handle = self.app_handle.clone();
+        let connections = Arc::clone(&self.connections);
+        let statuses = Arc::clone(&self.server_statuses);
+        let server_url = server_url.to_string();
+        let sync_topic = sync_topic.to_string();
+
+        // Not an async fn: account sync calls this and this task calls account sync,
+        // and an async cycle like that can't be proven `Send`
+        tokio::spawn(async move {
+            {
+                let mut conns = connections.write().await;
+                if conns.contains_key(&key) {
+                    return;
+                }
+                conns.insert(
+                    key.clone(),
+                    ConnectionEntry {
+                        id: connection_id,
+                        shutdown_tx,
+                    },
+                );
+            }
+
+            let mut attempt: usize = 0;
+            loop {
+                let is_current = connections
+                    .read()
+                    .await
+                    .get(&key)
+                    .is_some_and(|entry| entry.id == connection_id);
+                if !is_current || statuses.read().await.contains_key(&server_url) {
+                    return;
+                }
+
+                // Only announcements from now on matter, not old ones
+                let since = chrono::Utc::now().timestamp();
+                let Ok(ws_url) = Self::build_ws_url(&server_url, &sync_topic, Some(since)) else {
+                    return;
+                };
+                let Ok(ws_uri) = ws_url.parse::<Uri>() else {
+                    return;
+                };
+                let mut request = ClientRequestBuilder::new(ws_uri);
+                if let Some(auth) = Self::auth_header(&app_handle, &server_url) {
+                    request = request.with_header("Authorization", auth);
+                }
+
+                match connect_async(request).await {
+                    Ok((ws_stream, _)) => {
+                        attempt = 0;
+                        let (_write, mut read) = ws_stream.split();
+                        loop {
+                            tokio::select! {
+                                msg = tokio::time::timeout(Duration::from_secs(READ_TIMEOUT_SECS), read.next()) => {
+                                    match msg {
+                                        Ok(Some(Ok(Message::Text(text)))) => {
+                                            if is_sync_announcement(&text) {
+                                                let handle = app_handle.clone();
+                                                let url = server_url.clone();
+                                                tokio::spawn(async move {
+                                                    if let Err(e) = SyncService::sync_account(&handle, &url).await {
+                                                        log::error!("Account sync for {url} failed: {e}");
+                                                    }
+                                                });
+                                            }
+                                        }
+                                        Ok(Some(Ok(_))) => {}
+                                        _ => break,
+                                    }
+                                }
+                                _ = shutdown_rx.recv() => return,
+                            }
+                        }
+                    }
+                    Err(e) => log::warn!("Can't watch the sync topic of {server_url}: {e}"),
+                }
+
+                let delay = RETRY_BACKOFF_SECS[attempt.min(RETRY_BACKOFF_SECS.len() - 1)];
+                attempt += 1;
+                tokio::select! {
+                    () = tokio::time::sleep(Duration::from_secs(delay)) => {}
+                    _ = shutdown_rx.recv() => return,
+                }
+            }
+        });
+    }
+
     /// Closes the WebSocket connection for a subscription.
     pub async fn disconnect(&self, subscription_id: &str) {
         let mut conns = self.connections.write().await;
@@ -446,6 +558,7 @@ impl ConnectionManager {
                 }
             }
         }
+        self.disconnect(&sync_topic_key(server_url)).await;
         // Removed or edited: its old status no longer applies
         self.server_statuses.write().await.remove(server_url);
         self.version_gate.forget(server_url).await;
@@ -847,6 +960,14 @@ pub mod tests {
             ConnectionManager::build_ws_url("http://host:8080/ntfy", "a", None).unwrap(),
             "ws://host:8080/ntfy/a/ws?since=all"
         );
+    }
+
+    #[test]
+    fn recognizes_sync_announcement() {
+        let sync = r#"{"id":"a","time":1,"event":"message","topic":"st_x","message":"{\"event\":\"sync\"}"}"#;
+        let other = r#"{"id":"b","time":1,"event":"message","topic":"st_x","message":"hello"}"#;
+        assert!(is_sync_announcement(sync));
+        assert!(!is_sync_announcement(other));
     }
 
     #[test]

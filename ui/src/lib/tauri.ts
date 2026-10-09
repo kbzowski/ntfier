@@ -90,7 +90,10 @@ function unwrap<T>(result: Result<T, AppError>): T {
 	if (result.status === "ok") {
 		return result.data;
 	}
-	throw new BackendError(getErrorMessage(result.error));
+	throw new BackendError(
+		getErrorMessage(result.error),
+		Object.keys(result.error)[0] ?? "",
+	);
 }
 
 // ===== Subscriptions API =====
@@ -111,8 +114,9 @@ export const subscriptionsApi = {
 			}),
 		),
 
-	remove: async (id: string) => {
-		unwrap(await commands.removeSubscription(id));
+	/** `localOnly` skips removing it from the ntfy account. */
+	remove: async (id: string, localOnly = false) => {
+		unwrap(await commands.removeSubscription(id, localOnly));
 	},
 
 	toggleMute: async (id: string) => unwrap(await commands.toggleMute(id)),

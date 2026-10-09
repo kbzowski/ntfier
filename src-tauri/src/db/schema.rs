@@ -6,6 +6,7 @@ diesel::table! {
         url -> Text,
         username -> Nullable<Text>,
         is_default -> Integer,
+        synced -> Integer,
     }
 }
 

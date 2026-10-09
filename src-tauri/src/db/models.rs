@@ -20,6 +20,8 @@ pub struct ServerRow {
     pub url: String,
     pub username: Option<String>,
     pub is_default: i32,
+    #[allow(dead_code)]
+    pub synced: i32,
 }
 
 /// A new server to insert.

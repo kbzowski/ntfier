@@ -11,7 +11,7 @@ use crate::models::{
     canonical_url, AppSettings, NotificationDisplayMethod, ServerConfig, ServerStatusEntry,
     ThemeMode,
 };
-use crate::services::{ConnectionManager, NtfyClient};
+use crate::services::{ConnectionManager, NtfyClient, SyncService};
 
 #[tauri::command]
 #[specta::specta]
@@ -82,6 +82,7 @@ pub async fn add_server(
 #[tauri::command]
 #[specta::specta]
 pub async fn update_server(
+    app_handle: AppHandle,
     db: State<'_, Database>,
     conn_manager: State<'_, ConnectionManager>,
     server: ServerConfig,
@@ -89,6 +90,13 @@ pub async fn update_server(
     let (server, warning) = check_credential(server).await?;
     db.update_server_credential(&server)?;
     conn_manager.reconnect_server(&server.url).await;
+    // The (possibly new) account's topics come in with an account sync
+    let url = server.url.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = SyncService::sync_account(&app_handle, &url).await {
+            log::error!("Account sync for {url} failed: {e}");
+        }
+    });
     Ok(SavedServer {
         url: server.url,
         warning,

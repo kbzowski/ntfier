@@ -266,8 +266,8 @@ pub fn run() {
                     log::warn!("Failed to load tray icons: {e}");
                 }
 
-                // 1. Sync subscriptions from all servers (creates new subscriptions)
-                SyncService::sync_subscriptions(&handle).await;
+                // 1. Account sync for every server with a login (adds and removes topics)
+                SyncService::sync_all_accounts(&handle).await;
 
                 // Notify frontend that subscriptions are synced
                 log::info!("Emitting subscriptions:synced event");

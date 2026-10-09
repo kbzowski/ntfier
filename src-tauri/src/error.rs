@@ -48,6 +48,10 @@ pub enum AppError {
     #[error("{0}")]
     RateLimited(String),
 
+    /// Pushing a change to the user's ntfy account failed.
+    #[error("{0}")]
+    AccountSync(String),
+
     /// The server runs ntfy older than 2.17 (or its version is unknown).
     #[error("{0}")]
     UnsupportedServer(String),

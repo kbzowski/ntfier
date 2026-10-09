@@ -78,19 +78,47 @@ impl Database {
     }
 
     /// Replaces a server's credential. The URL identifies the server and can't change.
+    ///
+    /// A different account (username or token) needs a fresh first sync, which merges
+    /// local topics up instead of letting the account win.
     pub fn update_server_credential(&self, server: &ServerConfig) -> Result<(), AppError> {
+        let old = self
+            .get_servers_with_credentials()?
+            .into_iter()
+            .find(|s| s.url == server.url)
+            .ok_or_else(|| AppError::NotFound(format!("Server {} not found", server.url)))?;
         let username = Self::store_credential(server)?;
+        let token = server.token.clone().filter(|_| username.is_none());
+        let same_account = old.username == username && (username.is_some() || old.token == token);
 
         let mut conn = self.conn()?;
-        let updated = diesel::update(servers::table.filter(servers::url.eq(&server.url)))
+        diesel::update(servers::table.filter(servers::url.eq(&server.url)))
             .set(servers::username.eq(username))
             .execute(&mut *conn)?;
-        if updated == 0 {
-            return Err(AppError::NotFound(format!(
-                "Server {} not found",
-                server.url
-            )));
+        if !same_account {
+            diesel::update(servers::table.filter(servers::url.eq(&server.url)))
+                .set(servers::synced.eq(0))
+                .execute(&mut *conn)?;
         }
+        Ok(())
+    }
+
+    /// Whether the server's first account sync (the merge) has happened.
+    pub fn is_server_synced(&self, url: &str) -> Result<bool, AppError> {
+        let mut conn = self.conn()?;
+        let synced: Option<i32> = servers::table
+            .filter(servers::url.eq(url))
+            .select(servers::synced)
+            .first(&mut *conn)
+            .optional()?;
+        Ok(synced == Some(1))
+    }
+
+    pub fn set_server_synced(&self, url: &str) -> Result<(), AppError> {
+        let mut conn = self.conn()?;
+        diesel::update(servers::table.filter(servers::url.eq(url)))
+            .set(servers::synced.eq(1))
+            .execute(&mut *conn)?;
         Ok(())
     }
 

@@ -1,106 +1,143 @@
-//! Synchronization service for subscriptions and notifications.
+//! Account sync and the manual message poll.
 //!
-//! Handles syncing subscriptions from ntfy accounts and the manual message poll.
+//! Account sync keeps a server's subscriptions in step with the subscription list on the
+//! user's ntfy account. The account is the source of truth, except on the first sync,
+//! which merges local topics up.
 
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::db::Database;
 use crate::error::AppError;
-use crate::models::{canonical_url, CreateSubscription, ServerStatus};
-use crate::services::{ConnectionManager, NtfyClient};
+use crate::models::{canonical_url, CreateSubscription, ServerStatus, Subscription};
+use crate::services::{ConnectionManager, NtfyClient, TrayManager};
 
-/// Synchronization service for subscriptions and notifications.
 pub struct SyncService;
 
 impl SyncService {
-    /// Syncs subscriptions from all configured servers that have credentials.
-    ///
-    /// For each server with valid credentials, fetches the account's subscriptions
-    /// and creates any that don't exist locally. Also starts WebSocket connections
-    /// for newly created subscriptions.
-    pub async fn sync_subscriptions(handle: &AppHandle) {
-        let db: tauri::State<Database> = handle.state();
-        let conn_manager: tauri::State<ConnectionManager> = handle.state();
-
-        let settings = match db.get_settings() {
-            Ok(s) => s,
+    /// Account sync for every server with a credential (at startup).
+    pub async fn sync_all_accounts(handle: &AppHandle) {
+        let servers = match handle.state::<Database>().get_servers_with_credentials() {
+            Ok(servers) => servers,
             Err(e) => {
-                log::error!("Failed to get settings for subscription sync: {e}");
+                log::error!("Failed to load servers for account sync: {e}");
                 return;
             }
         };
+        for server in servers.iter().filter(|s| s.auth_header().is_some()) {
+            if let Err(e) = Self::sync_account(handle, &server.url).await {
+                log::error!("Account sync for {} failed: {e}", server.url);
+            }
+        }
+    }
 
-        for server in &settings.servers {
-            let Some(auth) = server.auth_header() else {
-                continue;
-            };
+    /// Pulls the account's subscription list for one server and mirrors it locally.
+    ///
+    /// First sync (or after the login changed): local-only topics are pushed up and
+    /// nothing is deleted. After that the account wins: missing topics are removed
+    /// locally, new ones added, and the account's display names replace ours.
+    /// Also starts listening on the account's sync topic.
+    pub async fn sync_account(handle: &AppHandle, server_url: &str) -> Result<(), AppError> {
+        let db: tauri::State<Database> = handle.state();
+        let conn_manager: tauri::State<ConnectionManager> = handle.state();
 
-            log::info!("Syncing subscriptions from: {}", server.url);
+        let Some(auth) = db
+            .get_servers_with_credentials()?
+            .into_iter()
+            .find(|s| s.url == server_url)
+            .and_then(|s| s.auth_header())
+        else {
+            return Ok(());
+        };
 
-            let client = match NtfyClient::new() {
-                Ok(c) => c,
-                Err(e) => {
-                    log::error!("Failed to create ntfy client: {e}");
-                    continue;
+        let client = NtfyClient::new()?;
+        let account = match client.get_account(server_url, Some(&auth)).await {
+            Err(e @ AppError::Auth(_)) => {
+                conn_manager
+                    .block_server(server_url, ServerStatus::NeedsCredentials)
+                    .await;
+                return Err(e);
+            }
+            result => result?,
+        };
+        if !account.is_signed_in() {
+            // Login disabled or account gone: an empty list here must not delete anything
+            log::warn!("{server_url} answered without an account, skipping account sync");
+            return Ok(());
+        }
+
+        let remote: Vec<_> = account
+            .subscriptions
+            .iter()
+            .filter(|s| canonical_url(&s.base_url).ok().as_deref() == Some(server_url))
+            .collect();
+        let local: Vec<Subscription> = db
+            .get_all_subscriptions()?
+            .into_iter()
+            .filter(|s| s.server_url == server_url)
+            .collect();
+        let first_sync = !db.is_server_synced(server_url)?;
+
+        for sub in local
+            .iter()
+            .filter(|sub| !remote.iter().any(|r| r.topic == sub.topic))
+        {
+            if first_sync {
+                if let Err(e) = client
+                    .add_account_subscription(
+                        server_url,
+                        &auth,
+                        &sub.topic,
+                        sub.display_name.as_deref(),
+                    )
+                    .await
+                {
+                    log::warn!("Couldn't push {} to the account: {e}", sub.topic);
                 }
-            };
+            } else {
+                log::info!(
+                    "{} was removed from the account, removing it here",
+                    sub.topic
+                );
+                conn_manager.disconnect(&sub.id).await;
+                db.delete_subscription(&sub.id)?;
+            }
+        }
 
-            let account = match client.get_account(&server.url, Some(&auth)).await {
-                Ok(a) => a,
-                Err(AppError::Auth(_)) => {
-                    conn_manager
-                        .block_server(&server.url, ServerStatus::NeedsCredentials)
-                        .await;
-                    continue;
+        for entry in remote {
+            match local.iter().find(|s| s.topic == entry.topic) {
+                // On the first sync a local name survives an account entry without one
+                Some(sub)
+                    if sub.display_name != entry.display_name
+                        && (entry.display_name.is_some() || !first_sync) =>
+                {
+                    db.set_subscription_display_name(&sub.id, entry.display_name.as_deref())?;
                 }
-                Err(e) => {
-                    log::error!("Failed to sync from {}: {}", server.url, e);
-                    continue;
-                }
-            };
-
-            log::info!(
-                "Got {} subscriptions from {}",
-                account.subscriptions.len(),
-                server.url
-            );
-
-            let existing = match db.get_all_subscriptions() {
-                Ok(s) => s,
-                Err(e) => {
-                    log::error!("Failed to get existing subscriptions: {e}");
-                    continue;
-                }
-            };
-
-            let our_url = &server.url;
-            for ntfy_sub in account.subscriptions {
-                if canonical_url(&ntfy_sub.base_url).ok().as_ref() != Some(our_url) {
-                    continue;
-                }
-
-                let already_exists = existing
-                    .iter()
-                    .any(|s| s.topic == ntfy_sub.topic && s.server_url == *our_url);
-
-                if already_exists {
-                    continue;
-                }
-
-                log::info!("Creating subscription: {}", ntfy_sub.topic);
-                if let Ok(new_sub) = db.create_subscription(CreateSubscription {
-                    topic: ntfy_sub.topic,
-                    server_url: server.url.clone(),
-                    display_name: ntfy_sub.display_name,
-                }) {
-                    if let Err(e) = conn_manager.connect(&new_sub).await {
-                        log::error!("Failed to connect to {}: {}", new_sub.id, e);
+                Some(_) => {}
+                None => {
+                    let created = db.create_subscription(CreateSubscription {
+                        topic: entry.topic.clone(),
+                        server_url: server_url.to_string(),
+                        display_name: entry.display_name.clone(),
+                    });
+                    match created {
+                        Ok(sub) => conn_manager.connect(&sub).await?,
+                        // A sync running at the same time may have added it already
+                        Err(e) => log::warn!("Couldn't add {} from the account: {e}", entry.topic),
                     }
                 }
             }
         }
 
-        log::info!("Subscription sync completed");
+        if first_sync {
+            db.set_server_synced(server_url)?;
+        }
+        if let Some(sync_topic) = account.sync_topic.as_deref() {
+            conn_manager.watch_sync_topic(server_url, sync_topic);
+        }
+
+        handle.state::<TrayManager>().refresh_from_db(handle).await;
+        let _ = handle.emit("subscriptions:synced", ());
+        Ok(())
     }
 
     /// Polls one subscription from its cursor (the manual sync).
@@ -110,7 +147,7 @@ impl SyncService {
     pub async fn poll_subscription(
         handle: &AppHandle,
         client: &NtfyClient,
-        sub: &crate::models::Subscription,
+        sub: &Subscription,
         auth: Option<&str>,
     ) {
         let db: tauri::State<Database> = handle.state();

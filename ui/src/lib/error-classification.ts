@@ -152,7 +152,15 @@ function extractErrorMessage(error: unknown): string {
 }
 
 /** An error from a backend command, whose message is already meant for the user. */
-export class BackendError extends Error {}
+export class BackendError extends Error {
+	/** The AppError variant, e.g. "AccountSync". */
+	constructor(
+		message: string,
+		readonly kind: string,
+	) {
+		super(message);
+	}
+}
 
 /**
  * Classifies an error and generates user-friendly message
