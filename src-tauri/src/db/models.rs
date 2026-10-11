@@ -2,6 +2,9 @@
 //!
 //! Separates Queryable (read) and Insertable (write) structs following Diesel idioms.
 
+// Clippy 1.99 flags diesel's QueryableByName expansion, not code written here
+#![allow(clippy::redundant_field_names)]
+
 use diesel::prelude::*;
 
 use super::schema::{ignore_rules, notifications, servers, settings, subscriptions};

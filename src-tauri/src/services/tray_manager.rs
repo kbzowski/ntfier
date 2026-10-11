@@ -163,10 +163,7 @@ impl TrayManager {
     /// Refresh tray icon based on current unread count from database
     pub async fn refresh_from_db(&self, app_handle: &AppHandle) {
         let db: tauri::State<Database> = app_handle.state();
-        let has_unread = db
-            .get_total_unread_count()
-            .map(|count| count > 0)
-            .unwrap_or(false);
+        let has_unread = db.get_total_unread_count().is_ok_and(|count| count > 0);
 
         self.update_icon(has_unread).await;
     }
@@ -174,10 +171,7 @@ impl TrayManager {
     /// Initial refresh - forces icon update even if state matches
     pub async fn initial_refresh(&self, app_handle: &AppHandle) {
         let db: tauri::State<Database> = app_handle.state();
-        let has_unread = db
-            .get_total_unread_count()
-            .map(|count| count > 0)
-            .unwrap_or(false);
+        let has_unread = db.get_total_unread_count().is_ok_and(|count| count > 0);
 
         log::info!("Initial tray refresh, has_unread: {has_unread}");
         self.force_update_icon(has_unread).await;

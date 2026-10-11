@@ -244,12 +244,12 @@ pub fn run() {
                             }
                             // If minimize_to_tray is false, allow normal close
                         }
-                        tauri::WindowEvent::Resized(_) => {
-                            if minimize_to_tray && win.is_minimized().unwrap_or(false) {
-                                // Unminimize and hide to tray instead
-                                let _ = win.unminimize();
-                                let _ = win.hide();
-                            }
+                        tauri::WindowEvent::Resized(_)
+                            if minimize_to_tray && win.is_minimized().unwrap_or(false) =>
+                        {
+                            // Unminimize and hide to tray instead
+                            let _ = win.unminimize();
+                            let _ = win.hide();
                         }
                         _ => {}
                     }

@@ -855,10 +855,8 @@ impl ConnectionManager {
                 // Add space after blocks
                 Event::End(
                     TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::Item | TagEnd::BlockQuote(_),
-                ) => {
-                    if !result.is_empty() && !result.ends_with(' ') {
-                        result.push(' ');
-                    }
+                ) if !result.is_empty() && !result.ends_with(' ') => {
+                    result.push(' ');
                 }
                 _ => {}
             }

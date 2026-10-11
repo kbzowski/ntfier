@@ -235,6 +235,6 @@ mod tests {
         let url2 = "https://example.com/image.png?query=1";
         let filename2 = get_cache_filename(url2);
         // Should still work, though extension might not be perfect
-        assert!(!filename2.is_empty());
+        assert_ne!(filename2, "");
     }
 }

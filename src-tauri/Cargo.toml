@@ -69,17 +69,17 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 keyring = "4"
 tauri-plugin-window-state = "2"
 
-# Windows-specific enhanced notifications
-[target.'cfg(windows)'.dependencies]
-# Own toasts (Tag/Group for replace and remove). 0.61 is the copy notify-rust already
-# pulls in via tauri-winrt-notification, so this adds no new windows crate.
-windows = { version = "0.61", features = ["Data_Xml_Dom", "Foundation", "UI_Notifications"] }
-
 # Type-safe bindings between Rust and TypeScript.
 # These three hard-pin each other and must move as a unit.
 specta = "=2.0.0-rc.25"
 tauri-specta = { version = "=2.0.0-rc.25", features = ["typescript"] }
 specta-typescript = "0.0.12"
+
+# Windows-specific enhanced notifications
+[target.'cfg(windows)'.dependencies]
+# Own toasts (Tag/Group for replace and remove). 0.61 is the copy notify-rust already
+# pulls in via tauri-winrt-notification, so this adds no new windows crate.
+windows = { version = "0.61", features = ["Data_Xml_Dom", "Foundation", "UI_Notifications"] }
 
 # Workspace lints configuration
 [lints.rust]
