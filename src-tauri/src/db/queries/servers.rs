@@ -134,7 +134,12 @@ impl Database {
 
         match secret {
             Some(secret) => credential_manager::store_secret(&server.url, secret)?,
-            None => credential_manager::delete_secret(&server.url)?,
+            // No login: an old secret, if any, goes. Without a keychain there's none to remove
+            None => {
+                if let Err(e) = credential_manager::delete_secret(&server.url) {
+                    log::warn!("Couldn't remove the stored login for {}: {e}", server.url);
+                }
+            }
         }
         Ok(username.filter(|_| secret.is_some()).map(str::to_string))
     }
