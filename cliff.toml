@@ -3,14 +3,13 @@
 
 [changelog]
 body = """
-{% for group, commits in commits | group_by(attribute="group") %}\
-  ### {{ group | striptags | trim | upper_first }}
-  {% for commit in commits %}\
-    - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
-      {{ commit.message | split(pat="\n") | first | upper_first | trim }}\
-      {% if commit.breaking %} **[breaking]**{% endif %} \
-      ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/kbzowski/ntfier/commit/{{ commit.id }}))\
-  {% endfor %}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+
+{% for commit in commits -%}
+- {% if commit.scope %}*({{ commit.scope }})* {% endif %}{{ commit.message | split(pat="
+") | first | upper_first | trim }}{% if commit.breaking %} **[breaking]**{% endif %} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/kbzowski/ntfier/commit/{{ commit.id }}))
+{% endfor %}
 {% endfor %}
 """
 trim = true
@@ -36,6 +35,7 @@ commit_parsers = [
   { message = "^chore: bump version", skip = true },
   { message = "^chore", group = "<!-- 5 -->Miscellaneous" },
   { message = "^ci", group = "<!-- 5 -->Miscellaneous" },
+  { message = "^test", group = "<!-- 8 -->Tests" },
 ]
 filter_commits = false
 sort_commits = "newest"
