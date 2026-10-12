@@ -25,7 +25,11 @@
 
 ## Screenshots
 
-*Coming soon*
+| Dark theme | Light theme |
+|---|---|
+| ![Notifications, dark theme](docs/screenshots/notifications-dark.png) | ![Notifications, light theme](docs/screenshots/notifications-light.png) |
+| **Subscriptions** | **Settings** |
+| ![Subscriptions sidebar](docs/screenshots/subscriptions.png) | ![Settings, appearance tab](docs/screenshots/settings.png) |
 
 ## Installation
 
