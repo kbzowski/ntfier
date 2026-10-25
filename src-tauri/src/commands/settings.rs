@@ -228,16 +228,7 @@ pub fn set_retention_max_age_days(
     db: State<'_, Database>,
     days: Option<u32>,
 ) -> Result<(), AppError> {
-    if days == Some(0) {
-        return Err(AppError::Validation(
-            "Retention days must be positive".into(),
-        ));
-    }
-    db.set_setting(
-        "retention_max_age_days",
-        &days.map(|d| d.to_string()).unwrap_or_default(),
-    )?;
-    run_retention(&app_handle)
+    set_retention_limit(&app_handle, &db, "retention_max_age_days", days, "days")
 }
 
 /// Sets the retention count limit per subscription (`None` = off) and applies retention right away.
@@ -248,16 +239,30 @@ pub fn set_retention_max_per_subscription(
     db: State<'_, Database>,
     max: Option<u32>,
 ) -> Result<(), AppError> {
-    if max == Some(0) {
-        return Err(AppError::Validation(
-            "Retention count must be positive".into(),
-        ));
-    }
-    db.set_setting(
+    set_retention_limit(
+        &app_handle,
+        &db,
         "retention_max_per_subscription",
-        &max.map(|m| m.to_string()).unwrap_or_default(),
-    )?;
-    run_retention(&app_handle)
+        max,
+        "count",
+    )
+}
+
+/// Stores a retention limit (empty = off) and applies retention right away.
+fn set_retention_limit(
+    app_handle: &AppHandle,
+    db: &Database,
+    key: &str,
+    limit: Option<u32>,
+    what: &str,
+) -> Result<(), AppError> {
+    if limit == Some(0) {
+        return Err(AppError::Validation(format!(
+            "Retention {what} must be positive"
+        )));
+    }
+    db.set_setting(key, &limit.map(|l| l.to_string()).unwrap_or_default())?;
+    run_retention(app_handle)
 }
 
 /// Applies retention with the stored limits; tells the UI to reload when anything was removed.
@@ -269,7 +274,7 @@ pub fn run_retention(app_handle: &AppHandle) -> Result<(), AppError> {
     )?;
     if removed > 0 {
         log::info!("Retention removed {removed} notifications");
-        let _ = app_handle.emit("notifications:retained", ());
+        let _ = app_handle.emit("notifications:retention-applied", ());
         refresh_tray(app_handle.clone());
     }
     Ok(())

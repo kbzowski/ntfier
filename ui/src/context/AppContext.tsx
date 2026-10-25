@@ -178,6 +178,25 @@ function makeBooleanSettingSetter(
 	};
 }
 
+/** Creates a setter for an optional limit setting (`null` = off). */
+function makeLimitSettingSetter(
+	setSettings: SetSettings,
+	key: keyof AppSettings,
+	apiCall: (limit: number | null) => Promise<unknown>,
+): (limit: number | null) => Promise<void> {
+	return async (limit: number | null) => {
+		if (!isTauri()) return;
+		try {
+			await apiCall(limit);
+			setSettings((prev) => ({ ...prev, [key]: limit }));
+		} catch (err) {
+			const classified = classifyError(err);
+			toast.error(classified.userMessage);
+			console.error("[Settings Error]", err);
+		}
+	};
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
 	// State
 	const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -317,7 +336,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 	// Retention removed notifications: reload loaded lists and unread counts
 	useTauriEvent<void>(
-		"notifications:retained",
+		"notifications:retention-applied",
 		useCallback(async () => {
 			await notifications.reloadLoaded();
 			setSubscriptions(await subscriptionsApi.getAll());
@@ -779,30 +798,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		[],
 	);
 
-	const setRetentionMaxAgeDays = useCallback(async (days: number | null) => {
-		if (!isTauri()) return;
-		try {
-			await settingsApi.setRetentionMaxAgeDays(days);
-			setSettings((prev) => ({ ...prev, retentionMaxAgeDays: days }));
-		} catch (err) {
-			const classified = classifyError(err);
-			toast.error(classified.userMessage);
-			console.error("[Settings Error]", err);
-		}
-	}, []);
-
-	const setRetentionMaxPerSubscription = useCallback(
-		async (max: number | null) => {
-			if (!isTauri()) return;
-			try {
-				await settingsApi.setRetentionMaxPerSubscription(max);
-				setSettings((prev) => ({ ...prev, retentionMaxPerSubscription: max }));
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage);
-				console.error("[Settings Error]", err);
-			}
-		},
+	const { setRetentionMaxAgeDays, setRetentionMaxPerSubscription } = useMemo(
+		() => ({
+			setRetentionMaxAgeDays: makeLimitSettingSetter(
+				setSettings,
+				"retentionMaxAgeDays",
+				settingsApi.setRetentionMaxAgeDays,
+			),
+			setRetentionMaxPerSubscription: makeLimitSettingSetter(
+				setSettings,
+				"retentionMaxPerSubscription",
+				settingsApi.setRetentionMaxPerSubscription,
+			),
+		}),
 		[],
 	);
 
