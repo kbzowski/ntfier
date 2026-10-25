@@ -23,17 +23,13 @@ import type {
 	AppSettings,
 	NotificationDisplayMethod,
 	ServerConfig,
-	Subscription,
 	UpdateInfo,
 } from "@/types/ntfy";
 
-/** What the window hosting the settings does after a settings save. */
+/** What the window hosting the settings does on a save from any window. */
 export interface SettingsHooks {
 	onIgnoreRulesChanged?: () => Promise<void>;
-	onServerSynced?: () => Promise<void>;
-	/** Runs before the settings are refetched. */
 	onServerRemoved?: (url: string) => void;
-	onFavoritesDisabled?: () => void;
 }
 
 export interface SettingsState {
@@ -57,9 +53,7 @@ export interface SettingsState {
 	deleteIgnoreRule: (id: string) => Promise<void>;
 
 	// Servers
-	addServer: (
-		server: Omit<ServerConfig, "isDefault">,
-	) => Promise<Subscription[]>;
+	addServer: (server: Omit<ServerConfig, "isDefault">) => Promise<void>;
 	updateServer: (server: Omit<ServerConfig, "isDefault">) => Promise<void>;
 	syncServer: (url: string) => Promise<void>;
 	removeServer: (url: string) => Promise<void>;
@@ -106,7 +100,6 @@ function makeBooleanSettingSetter(
 	key: keyof AppSettings,
 	apiCall: (enabled: boolean) => Promise<unknown>,
 	label?: string,
-	onSuccess?: (enabled: boolean) => void,
 ): (enabled: boolean) => Promise<void> {
 	return async (enabled: boolean) => {
 		if (!isTauri()) return;
@@ -114,7 +107,6 @@ function makeBooleanSettingSetter(
 			await apiCall(enabled);
 			setSettings((prev) => ({ ...prev, [key]: enabled }));
 			if (label) toast.success(`${label} ${enabled ? "enabled" : "disabled"}`);
-			onSuccess?.(enabled);
 		} catch (err) {
 			const classified = classifyError(err);
 			toast.error(classified.userMessage);
@@ -144,8 +136,8 @@ function makeLimitSettingSetter(
 
 /**
  * Settings state of one window: loads it, saves changes with toasts and
- * listens for `server:status` and `update:available`. Works without
- * `AppProvider`; `hooks` lets the main window react to saves.
+ * listens for `settings:*`, `server:status` and `update:available`, so a
+ * save in one window reaches the others. Works without `AppProvider`.
  */
 export function useSettings(hooks: SettingsHooks = {}): SettingsState {
 	const [settings, setSettings] = useState<AppSettings>(() =>
@@ -214,6 +206,32 @@ export function useSettings(hooks: SettingsHooks = {}): SettingsState {
 		}, []),
 	);
 
+	useTauriEvent<void>(
+		"settings:changed",
+		useCallback(async () => {
+			try {
+				setSettings(await settingsApi.get());
+			} catch (err) {
+				console.error("Failed to refetch settings:", err);
+			}
+		}, []),
+	);
+
+	useTauriEvent<void>(
+		"settings:ignore-rules-changed",
+		useCallback(async () => {
+			await refreshIgnoreRules();
+			await hooksRef.current.onIgnoreRulesChanged?.();
+		}, [refreshIgnoreRules]),
+	);
+
+	useTauriEvent<{ url: string }>(
+		"settings:server-removed",
+		useCallback(({ url }: { url: string }) => {
+			hooksRef.current.onServerRemoved?.(url);
+		}, []),
+	);
+
 	// Listen for update:available event (from startup update check)
 	useTauriEvent<UpdateInfo>(
 		"update:available",
@@ -229,7 +247,6 @@ export function useSettings(hooks: SettingsHooks = {}): SettingsState {
 				try {
 					await ignoreRulesApi.add(pattern, subscriptionId);
 					await refreshIgnoreRules();
-					await hooksRef.current.onIgnoreRulesChanged?.();
 				} catch (err) {
 					const classified = classifyError(err);
 					toast.error(classified.userMessage, {
@@ -248,7 +265,6 @@ export function useSettings(hooks: SettingsHooks = {}): SettingsState {
 				try {
 					await ignoreRulesApi.delete(id);
 					await refreshIgnoreRules();
-					await hooksRef.current.onIgnoreRulesChanged?.();
 				} catch (err) {
 					const classified = classifyError(err);
 					toast.error(classified.userMessage, {
@@ -262,9 +278,7 @@ export function useSettings(hooks: SettingsHooks = {}): SettingsState {
 	);
 
 	const addServer = useCallback(
-		async (
-			server: Omit<ServerConfig, "isDefault">,
-		): Promise<Subscription[]> => {
+		async (server: Omit<ServerConfig, "isDefault">) => {
 			if (isTauri()) {
 				const saved = await settingsApi.addServer(server);
 				if (saved.warning) toast.warning(saved.warning);
@@ -272,27 +286,25 @@ export function useSettings(hooks: SettingsHooks = {}): SettingsState {
 				setSettings(loaded);
 				const added = loaded.servers.find((s) => s.url === saved.url);
 
-				// With a login, bring in the account's topics. The server stays saved
-				// if that fails; the sync button retries it.
+				// With a login, bring in the account's topics (every window refreshes on
+				// `subscriptions:synced`). The server stays saved if that fails; the
+				// sync button retries it.
 				if (added && (added.username || added.token)) {
 					try {
-						const synced = await syncApi.syncSubscriptions(saved.url);
-						await hooksRef.current.onServerSynced?.();
-						return synced;
+						await syncApi.syncSubscriptions(saved.url);
 					} catch (err) {
 						toast.error("Server added, but syncing its topics failed", {
 							description: classifyError(err).userMessage,
 						});
 					}
 				}
-				return [];
+				return;
 			}
 			const newServer: ServerConfig = { ...server, isDefault: false };
 			setSettings((prev) => ({
 				...prev,
 				servers: [...prev.servers, newServer],
 			}));
-			return [];
 		},
 		[],
 	);
@@ -326,7 +338,6 @@ export function useSettings(hooks: SettingsHooks = {}): SettingsState {
 		if (isTauri()) {
 			try {
 				await settingsApi.removeServer(url);
-				hooksRef.current.onServerRemoved?.(url);
 				// The default may have moved to another server
 				setSettings(await settingsApi.get());
 				toast.success("Server removed");
@@ -451,10 +462,6 @@ export function useSettings(hooks: SettingsHooks = {}): SettingsState {
 				setSettings,
 				"favoritesEnabled",
 				settingsApi.setFavoritesEnabled,
-				undefined,
-				(enabled) => {
-					if (!enabled) hooksRef.current.onFavoritesDisabled?.();
-				},
 			),
 			setRetentionMaxAgeDays: makeLimitSettingSetter(
 				setSettings,

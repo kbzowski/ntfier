@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTheme } from "@/components/common/ThemeProvider";
 import { SettingsContent } from "@/components/dialogs/SettingsContent";
 import { mockSubscriptions } from "@/data/mock-data";
 import { useSettings } from "@/hooks/useSettings";
+import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { isTauri, subscriptionsApi } from "@/lib/tauri";
 import type { Subscription } from "@/types/bindings";
 
@@ -15,21 +16,29 @@ export const Route = createFileRoute("/settings")({
 function SettingsWindow() {
 	const { themeId, setThemeId, isSystemMode, setSystemMode, availableThemes } =
 		useTheme();
-	const s = useSettings();
-	const { settings } = s;
-
 	// Read-only, for the topic count in the server removal confirmation
 	const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-	useEffect(() => {
+	const refreshSubscriptions = useCallback(async () => {
 		if (!isTauri()) {
 			setSubscriptions(mockSubscriptions);
 			return;
 		}
-		subscriptionsApi
-			.getAll()
-			.then(setSubscriptions)
-			.catch((err) => console.error("Failed to load subscriptions:", err));
+		try {
+			setSubscriptions(await subscriptionsApi.getAll());
+		} catch (err) {
+			console.error("Failed to load subscriptions:", err);
+		}
 	}, []);
+	useEffect(() => {
+		refreshSubscriptions();
+	}, [refreshSubscriptions]);
+	useTauriEvent<void>("subscriptions:synced", refreshSubscriptions);
+
+	const s = useSettings({
+		onIgnoreRulesChanged: refreshSubscriptions,
+		onServerRemoved: refreshSubscriptions,
+	});
+	const { settings } = s;
 
 	return (
 		<div className="flex h-screen flex-col p-4">
