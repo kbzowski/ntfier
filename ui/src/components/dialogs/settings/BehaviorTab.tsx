@@ -171,7 +171,9 @@ function RetentionField({
 
 	const commit = () => {
 		const text = draft.trim();
-		const next = /^\d+$/.test(text) && Number(text) > 0 ? Number(text) : null;
+		// 9 digits keeps the value inside the backend's u32
+		const next =
+			/^\d{1,9}$/.test(text) && Number(text) > 0 ? Number(text) : null;
 		if ((text !== "" && next === null) || next === value) {
 			setDraft(value?.toString() ?? "");
 		} else if (value === null) {
