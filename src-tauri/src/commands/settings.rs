@@ -12,6 +12,13 @@ use crate::models::{
 };
 use crate::services::{ConnectionManager, NtfyClient, SyncService};
 
+/// Tells every window to refetch the settings once a save went through.
+fn changed(app_handle: &AppHandle, saved: Result<(), AppError>) -> Result<(), AppError> {
+    saved?;
+    let _ = app_handle.emit("settings:changed", ());
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_settings(db: State<'_, Database>) -> Result<AppSettings, AppError> {
@@ -53,6 +60,7 @@ async fn check_credential(
 #[tauri::command]
 #[specta::specta]
 pub async fn add_server(
+    app_handle: AppHandle,
     db: State<'_, Database>,
     conn_manager: State<'_, ConnectionManager>,
     mut server: ServerConfig,
@@ -63,6 +71,7 @@ pub async fn add_server(
         .await?;
     let (server, warning) = check_credential(server).await?;
     let url = db.add_server(server)?;
+    let _ = app_handle.emit("settings:changed", ());
     Ok(SavedServer { url, warning })
 }
 
@@ -77,6 +86,7 @@ pub async fn update_server(
 ) -> Result<SavedServer, AppError> {
     let (server, warning) = check_credential(server).await?;
     db.update_server_credential(&server)?;
+    let _ = app_handle.emit("settings:changed", ());
     conn_manager.reconnect_server(&server.url).await;
     // The (possibly new) account's topics come in with an account sync
     let url = server.url.clone();
@@ -100,6 +110,11 @@ pub async fn get_server_statuses(
     Ok(conn_manager.server_statuses().await)
 }
 
+#[derive(Clone, Serialize)]
+struct ServerRemoved {
+    url: String,
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn remove_server(
@@ -110,31 +125,52 @@ pub async fn remove_server(
 ) -> Result<(), AppError> {
     conn_manager.disconnect_server(&url).await;
     db.remove_server(&url)?;
+    let _ = app_handle.emit("settings:server-removed", ServerRemoved { url });
+    let _ = app_handle.emit("settings:changed", ());
     refresh_tray(app_handle);
     Ok(())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_default_server(db: State<'_, Database>, url: String) -> Result<(), AppError> {
-    db.set_default_server(&url)
+pub fn set_default_server(
+    app_handle: AppHandle,
+    db: State<'_, Database>,
+    url: String,
+) -> Result<(), AppError> {
+    changed(&app_handle, db.set_default_server(&url))
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_minimize_to_tray(db: State<'_, Database>, enabled: bool) -> Result<(), AppError> {
-    db.set_setting("minimize_to_tray", if enabled { "true" } else { "false" })
+pub fn set_minimize_to_tray(
+    app_handle: AppHandle,
+    db: State<'_, Database>,
+    enabled: bool,
+) -> Result<(), AppError> {
+    changed(
+        &app_handle,
+        db.set_setting("minimize_to_tray", if enabled { "true" } else { "false" }),
+    )
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_start_minimized(db: State<'_, Database>, enabled: bool) -> Result<(), AppError> {
-    db.set_setting("start_minimized", if enabled { "true" } else { "false" })
+pub fn set_start_minimized(
+    app_handle: AppHandle,
+    db: State<'_, Database>,
+    enabled: bool,
+) -> Result<(), AppError> {
+    changed(
+        &app_handle,
+        db.set_setting("start_minimized", if enabled { "true" } else { "false" }),
+    )
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn set_notification_method(
+    app_handle: AppHandle,
     db: State<'_, Database>,
     method: NotificationDisplayMethod,
 ) -> Result<(), AppError> {
@@ -142,70 +178,113 @@ pub fn set_notification_method(
         NotificationDisplayMethod::Native => "native",
         NotificationDisplayMethod::WindowsEnhanced => "windows_enhanced",
     };
-    db.set_setting("notification_method", method_str)
+    changed(
+        &app_handle,
+        db.set_setting("notification_method", method_str),
+    )
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn set_notification_force_display(
+    app_handle: AppHandle,
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    db.set_setting(
-        "notification_force_display",
-        if enabled { "true" } else { "false" },
+    changed(
+        &app_handle,
+        db.set_setting(
+            "notification_force_display",
+            if enabled { "true" } else { "false" },
+        ),
     )
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn set_notification_show_actions(
+    app_handle: AppHandle,
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    db.set_setting(
-        "notification_show_actions",
-        if enabled { "true" } else { "false" },
+    changed(
+        &app_handle,
+        db.set_setting(
+            "notification_show_actions",
+            if enabled { "true" } else { "false" },
+        ),
     )
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn set_notification_show_images(
+    app_handle: AppHandle,
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    db.set_setting(
-        "notification_show_images",
-        if enabled { "true" } else { "false" },
+    changed(
+        &app_handle,
+        db.set_setting(
+            "notification_show_images",
+            if enabled { "true" } else { "false" },
+        ),
     )
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_notification_sound(db: State<'_, Database>, enabled: bool) -> Result<(), AppError> {
-    db.set_setting("notification_sound", if enabled { "true" } else { "false" })
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn set_compact_view(db: State<'_, Database>, enabled: bool) -> Result<(), AppError> {
-    db.set_setting("compact_view", if enabled { "true" } else { "false" })
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn set_expand_new_messages(db: State<'_, Database>, enabled: bool) -> Result<(), AppError> {
-    db.set_setting(
-        "expand_new_messages",
-        if enabled { "true" } else { "false" },
+pub fn set_notification_sound(
+    app_handle: AppHandle,
+    db: State<'_, Database>,
+    enabled: bool,
+) -> Result<(), AppError> {
+    changed(
+        &app_handle,
+        db.set_setting("notification_sound", if enabled { "true" } else { "false" }),
     )
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_delete_local_only(db: State<'_, Database>, enabled: bool) -> Result<(), AppError> {
-    db.set_setting("delete_local_only", if enabled { "true" } else { "false" })
+pub fn set_compact_view(
+    app_handle: AppHandle,
+    db: State<'_, Database>,
+    enabled: bool,
+) -> Result<(), AppError> {
+    changed(
+        &app_handle,
+        db.set_setting("compact_view", if enabled { "true" } else { "false" }),
+    )
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_expand_new_messages(
+    app_handle: AppHandle,
+    db: State<'_, Database>,
+    enabled: bool,
+) -> Result<(), AppError> {
+    changed(
+        &app_handle,
+        db.set_setting(
+            "expand_new_messages",
+            if enabled { "true" } else { "false" },
+        ),
+    )
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_delete_local_only(
+    app_handle: AppHandle,
+    db: State<'_, Database>,
+    enabled: bool,
+) -> Result<(), AppError> {
+    changed(
+        &app_handle,
+        db.set_setting("delete_local_only", if enabled { "true" } else { "false" }),
+    )
 }
 
 /// Sets the retention age limit (`None` = off) and applies retention right away.
@@ -250,6 +329,7 @@ fn set_retention_limit(
         )));
     }
     db.set_setting(key, &limit.map(|l| l.to_string()).unwrap_or_default())?;
+    let _ = app_handle.emit("settings:changed", ());
     run_retention(app_handle)
 }
 
@@ -270,6 +350,13 @@ pub fn run_retention(app_handle: &AppHandle) -> Result<(), AppError> {
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_favorites_enabled(db: State<'_, Database>, enabled: bool) -> Result<(), AppError> {
-    db.set_setting("favorites_enabled", if enabled { "true" } else { "false" })
+pub fn set_favorites_enabled(
+    app_handle: AppHandle,
+    db: State<'_, Database>,
+    enabled: bool,
+) -> Result<(), AppError> {
+    changed(
+        &app_handle,
+        db.set_setting("favorites_enabled", if enabled { "true" } else { "false" }),
+    )
 }
