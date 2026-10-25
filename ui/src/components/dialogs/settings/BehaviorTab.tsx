@@ -8,7 +8,7 @@ import {
 	RefreshCw,
 	Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/dialogs/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -165,6 +165,7 @@ function RetentionField({
 }: RetentionFieldProps) {
 	const [draft, setDraft] = useState(value?.toString() ?? "");
 	const [pending, setPending] = useState<number | null>(null);
+	const confirmed = useRef(false);
 
 	useEffect(() => setDraft(value?.toString() ?? ""), [value]);
 
@@ -207,14 +208,19 @@ function RetentionField({
 				onOpenChange={(open) => {
 					if (!open) {
 						setPending(null);
-						setDraft(value?.toString() ?? "");
+						if (!confirmed.current) setDraft(value?.toString() ?? "");
+						confirmed.current = false;
 					}
 				}}
 				title="Turn on retention?"
 				description="Notifications past this limit will be removed for good. Favorites are kept."
 				confirmLabel="Turn on"
 				variant="destructive"
-				onConfirm={() => onChange(pending)}
+				onConfirm={() => {
+					// Closing follows confirm; keep the entered value instead of reverting
+					confirmed.current = true;
+					onChange(pending);
+				}}
 			/>
 		</div>
 	);
