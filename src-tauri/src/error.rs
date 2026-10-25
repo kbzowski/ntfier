@@ -58,6 +58,15 @@ pub enum AppError {
 
     #[error("Updater error: {0}")]
     Updater(String),
+
+    #[error("Window error: {0}")]
+    Window(String),
+}
+
+impl From<tauri::Error> for AppError {
+    fn from(err: tauri::Error) -> Self {
+        Self::Window(err.to_string())
+    }
 }
 
 // Conversion from Diesel errors — log full detail, return generic message to frontend

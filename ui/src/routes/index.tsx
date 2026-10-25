@@ -7,6 +7,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { toast } from "sonner";
 import { useTheme } from "@/components/common/ThemeProvider";
 import { UpdateToast } from "@/components/common/UpdateToast";
 import { AddSubscriptionDialog } from "@/components/dialogs/AddSubscriptionDialog";
@@ -24,8 +25,18 @@ const SettingsDialog = lazy(() =>
 import { NotificationList } from "@/components/notifications/NotificationList";
 import { AppProvider, useApp } from "@/context/AppContext";
 import { ShowImagesProvider } from "@/context/ShowImagesContext";
+import { classifyError } from "@/lib/error-classification";
+import { isTauri, settingsApi } from "@/lib/tauri";
 
 const noop = () => {};
+
+function openSettingsWindow(editServerUrl?: string) {
+	settingsApi.openWindow(editServerUrl).catch((err) => {
+		toast.error(classifyError(err).userMessage, {
+			description: "Couldn't open settings",
+		});
+	});
+}
 
 export const Route = createFileRoute("/")({ component: MainWindow });
 
@@ -143,12 +154,19 @@ function App() {
 		[addSubscription, setCurrentTopicId],
 	);
 
-	const handleOpenSettings = useCallback(() => setSettingsOpen(true), []);
+	const handleOpenSettings = useCallback(() => {
+		if (isTauri()) openSettingsWindow();
+		else setSettingsOpen(true);
+	}, []);
 	const handleSettingsOpenChange = useCallback((open: boolean) => {
 		setSettingsOpen(open);
 		if (!open) setEditServerUrl(null);
 	}, []);
 	const handleEditServer = useCallback((url: string) => {
+		if (isTauri()) {
+			openSettingsWindow(url);
+			return;
+		}
 		setEditServerUrl(url);
 		setSettingsOpen(true);
 	}, []);
@@ -217,60 +235,64 @@ function App() {
 				)}
 			</AppLayout>
 
-			<Suspense fallback={null}>
-				<SettingsDialog
-					open={settingsOpen}
-					onOpenChange={handleSettingsOpenChange}
-					themeId={themeId}
-					onThemeChange={setThemeId}
-					isSystemMode={isSystemMode}
-					onSystemModeChange={setSystemMode}
-					availableThemes={availableThemes}
-					servers={settings.servers}
-					onAddServer={handleAddServer}
-					onUpdateServer={updateServer}
-					editServerUrl={editServerUrl}
-					onRemoveServer={removeServer}
-					onSyncServer={syncServer}
-					onSetDefaultServer={setDefaultServer}
-					autostart={autostart}
-					onAutostartChange={setAutostart}
-					minimizeToTray={settings.minimizeToTray ?? true}
-					onMinimizeToTrayChange={setMinimizeToTray}
-					startMinimized={settings.startMinimized ?? false}
-					onStartMinimizedChange={setStartMinimized}
-					updateInfo={updateInfo}
-					onUpdateInfoChange={setUpdateInfo}
-					notificationMethod={settings.notificationMethod ?? "native"}
-					onNotificationMethodChange={setNotificationMethod}
-					notificationForceDisplay={settings.notificationForceDisplay ?? false}
-					onNotificationForceDisplayChange={setNotificationForceDisplay}
-					notificationShowActions={settings.notificationShowActions ?? true}
-					onNotificationShowActionsChange={setNotificationShowActions}
-					notificationShowImages={settings.notificationShowImages ?? true}
-					onNotificationShowImagesChange={setNotificationShowImages}
-					notificationSound={settings.notificationSound ?? true}
-					onNotificationSoundChange={setNotificationSound}
-					compactView={settings.compactView ?? false}
-					onCompactViewChange={setCompactView}
-					expandNewMessages={settings.expandNewMessages ?? true}
-					onExpandNewMessagesChange={setExpandNewMessages}
-					deleteLocalOnly={settings.deleteLocalOnly ?? true}
-					onDeleteLocalOnlyChange={setDeleteLocalOnly}
-					retentionMaxAgeDays={settings.retentionMaxAgeDays ?? null}
-					onRetentionMaxAgeDaysChange={setRetentionMaxAgeDays}
-					retentionMaxPerSubscription={
-						settings.retentionMaxPerSubscription ?? null
-					}
-					onRetentionMaxPerSubscriptionChange={setRetentionMaxPerSubscription}
-					favoritesEnabled={settings.favoritesEnabled ?? false}
-					onFavoritesEnabledChange={setFavoritesEnabled}
-					subscriptions={subscriptionsWithUnread}
-					ignoreRules={ignoreRules}
-					onAddIgnoreRule={addIgnoreRule}
-					onDeleteIgnoreRule={deleteIgnoreRule}
-				/>
-			</Suspense>
+			{isTauri() ? null : (
+				<Suspense fallback={null}>
+					<SettingsDialog
+						open={settingsOpen}
+						onOpenChange={handleSettingsOpenChange}
+						themeId={themeId}
+						onThemeChange={setThemeId}
+						isSystemMode={isSystemMode}
+						onSystemModeChange={setSystemMode}
+						availableThemes={availableThemes}
+						servers={settings.servers}
+						onAddServer={handleAddServer}
+						onUpdateServer={updateServer}
+						editServerUrl={editServerUrl}
+						onRemoveServer={removeServer}
+						onSyncServer={syncServer}
+						onSetDefaultServer={setDefaultServer}
+						autostart={autostart}
+						onAutostartChange={setAutostart}
+						minimizeToTray={settings.minimizeToTray ?? true}
+						onMinimizeToTrayChange={setMinimizeToTray}
+						startMinimized={settings.startMinimized ?? false}
+						onStartMinimizedChange={setStartMinimized}
+						updateInfo={updateInfo}
+						onUpdateInfoChange={setUpdateInfo}
+						notificationMethod={settings.notificationMethod ?? "native"}
+						onNotificationMethodChange={setNotificationMethod}
+						notificationForceDisplay={
+							settings.notificationForceDisplay ?? false
+						}
+						onNotificationForceDisplayChange={setNotificationForceDisplay}
+						notificationShowActions={settings.notificationShowActions ?? true}
+						onNotificationShowActionsChange={setNotificationShowActions}
+						notificationShowImages={settings.notificationShowImages ?? true}
+						onNotificationShowImagesChange={setNotificationShowImages}
+						notificationSound={settings.notificationSound ?? true}
+						onNotificationSoundChange={setNotificationSound}
+						compactView={settings.compactView ?? false}
+						onCompactViewChange={setCompactView}
+						expandNewMessages={settings.expandNewMessages ?? true}
+						onExpandNewMessagesChange={setExpandNewMessages}
+						deleteLocalOnly={settings.deleteLocalOnly ?? true}
+						onDeleteLocalOnlyChange={setDeleteLocalOnly}
+						retentionMaxAgeDays={settings.retentionMaxAgeDays ?? null}
+						onRetentionMaxAgeDaysChange={setRetentionMaxAgeDays}
+						retentionMaxPerSubscription={
+							settings.retentionMaxPerSubscription ?? null
+						}
+						onRetentionMaxPerSubscriptionChange={setRetentionMaxPerSubscription}
+						favoritesEnabled={settings.favoritesEnabled ?? false}
+						onFavoritesEnabledChange={setFavoritesEnabled}
+						subscriptions={subscriptionsWithUnread}
+						ignoreRules={ignoreRules}
+						onAddIgnoreRule={addIgnoreRule}
+						onDeleteIgnoreRule={deleteIgnoreRule}
+					/>
+				</Suspense>
+			)}
 
 			<AddSubscriptionDialog
 				open={addSubscriptionOpen}

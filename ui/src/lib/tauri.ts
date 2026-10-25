@@ -250,6 +250,10 @@ export const settingsApi = {
 	setFavoritesEnabled: async (enabled: boolean) => {
 		unwrap(await commands.setFavoritesEnabled(enabled));
 	},
+
+	openWindow: async (editServerUrl: string | null = null) => {
+		unwrap(await commands.openSettingsWindow(editServerUrl));
+	},
 };
 
 // ===== Sync API =====

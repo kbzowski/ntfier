@@ -83,6 +83,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::install_update,
         commands::get_app_version,
         commands::get_app_version_display,
+        // Windows
+        commands::open_settings_window,
     ])
 }
 
@@ -245,6 +247,8 @@ pub fn run() {
                             }
                             // If minimize_to_tray is false, allow normal close
                         }
+                        // Don't leave a process running with only the settings window
+                        tauri::WindowEvent::Destroyed => app_handle.exit(0),
                         tauri::WindowEvent::Resized(_)
                             if minimize_to_tray && win.is_minimized().unwrap_or(false) =>
                         {
