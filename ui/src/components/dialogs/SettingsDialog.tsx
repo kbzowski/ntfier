@@ -68,6 +68,8 @@ interface SettingsDialogProps {
 	onExpandNewMessagesChange: (enabled: boolean) => void;
 	deleteLocalOnly: boolean;
 	onDeleteLocalOnlyChange: (enabled: boolean) => void;
+	retentionMaxAgeDays: number | null;
+	onRetentionMaxAgeDaysChange: (days: number | null) => void;
 	favoritesEnabled: boolean;
 	onFavoritesEnabledChange: (enabled: boolean) => void;
 }
@@ -111,6 +113,8 @@ export function SettingsDialog({
 	onExpandNewMessagesChange,
 	deleteLocalOnly,
 	onDeleteLocalOnlyChange,
+	retentionMaxAgeDays,
+	onRetentionMaxAgeDaysChange,
 	favoritesEnabled,
 	onFavoritesEnabledChange,
 }: SettingsDialogProps) {
@@ -186,6 +190,8 @@ export function SettingsDialog({
 							onStartMinimizedChange={onStartMinimizedChange}
 							deleteLocalOnly={deleteLocalOnly}
 							onDeleteLocalOnlyChange={onDeleteLocalOnlyChange}
+							retentionMaxAgeDays={retentionMaxAgeDays}
+							onRetentionMaxAgeDaysChange={onRetentionMaxAgeDaysChange}
 							updateInfo={updateInfo}
 							onUpdateInfoChange={onUpdateInfoChange}
 						/>

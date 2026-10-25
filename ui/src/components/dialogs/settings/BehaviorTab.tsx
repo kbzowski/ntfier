@@ -8,8 +8,10 @@ import {
 	RefreshCw,
 	Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ConfirmDialog } from "@/components/dialogs/ConfirmDialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { SettingCheckbox } from "@/components/ui/setting-checkbox";
 import { isTauri, type UpdateInfo, updateApi } from "@/lib/tauri";
@@ -145,6 +147,79 @@ function UpdateSection({ updateInfo, onUpdateInfoChange }: UpdateSectionProps) {
 	);
 }
 
+interface RetentionFieldProps {
+	id: string;
+	label: string;
+	unit: string;
+	value: number | null;
+	onChange: (value: number | null) => void;
+}
+
+/** A retention limit: empty = off, only positive integers; turning it on asks for confirmation. */
+function RetentionField({
+	id,
+	label,
+	unit,
+	value,
+	onChange,
+}: RetentionFieldProps) {
+	const [draft, setDraft] = useState(value?.toString() ?? "");
+	const [pending, setPending] = useState<number | null>(null);
+
+	useEffect(() => setDraft(value?.toString() ?? ""), [value]);
+
+	const commit = () => {
+		const text = draft.trim();
+		const next = /^\d+$/.test(text) && Number(text) > 0 ? Number(text) : null;
+		if ((text !== "" && next === null) || next === value) {
+			setDraft(value?.toString() ?? "");
+		} else if (value === null) {
+			setPending(next);
+		} else {
+			onChange(next);
+		}
+	};
+
+	return (
+		<div className="pt-2">
+			<div className="flex items-center gap-2 pl-6 text-sm">
+				<label htmlFor={id} className="font-medium">
+					{label}
+				</label>
+				<Input
+					id={id}
+					inputMode="numeric"
+					placeholder="off"
+					value={draft}
+					onChange={(e) => setDraft(e.target.value)}
+					onBlur={commit}
+					onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+					className="h-8 w-20"
+				/>
+				<span className="text-muted-foreground">{unit}</span>
+			</div>
+			<p className="text-xs text-muted-foreground pl-6 mt-1">
+				Removed only from this device; favorites are kept. Leave empty to turn
+				off
+			</p>
+			<ConfirmDialog
+				open={pending !== null}
+				onOpenChange={(open) => {
+					if (!open) {
+						setPending(null);
+						setDraft(value?.toString() ?? "");
+					}
+				}}
+				title="Turn on retention?"
+				description="Notifications past this limit will be removed for good. Favorites are kept."
+				confirmLabel="Turn on"
+				variant="destructive"
+				onConfirm={() => onChange(pending)}
+			/>
+		</div>
+	);
+}
+
 interface BehaviorTabProps {
 	autostart: boolean;
 	onAutostartChange: (enabled: boolean) => void;
@@ -154,6 +229,8 @@ interface BehaviorTabProps {
 	onStartMinimizedChange: (enabled: boolean) => void;
 	deleteLocalOnly: boolean;
 	onDeleteLocalOnlyChange: (enabled: boolean) => void;
+	retentionMaxAgeDays: number | null;
+	onRetentionMaxAgeDaysChange: (days: number | null) => void;
 	updateInfo: UpdateInfo | null;
 	onUpdateInfoChange: (info: UpdateInfo | null) => void;
 }
@@ -167,6 +244,8 @@ export function BehaviorTab({
 	onStartMinimizedChange,
 	deleteLocalOnly,
 	onDeleteLocalOnlyChange,
+	retentionMaxAgeDays,
+	onRetentionMaxAgeDaysChange,
 	updateInfo,
 	onUpdateInfoChange,
 }: BehaviorTabProps) {
@@ -209,6 +288,14 @@ export function BehaviorTab({
 				icon={<Trash2 className="h-4 w-4 text-muted-foreground" />}
 				description="When disabled, deleting a notification also removes it from the ntfy server"
 				className="pt-2"
+			/>
+
+			<RetentionField
+				id="retention-max-age-days"
+				label="Remove notifications older than"
+				unit="days"
+				value={retentionMaxAgeDays}
+				onChange={onRetentionMaxAgeDaysChange}
 			/>
 
 			<Separator className="my-4" />

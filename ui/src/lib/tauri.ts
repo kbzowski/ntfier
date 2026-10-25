@@ -245,6 +245,10 @@ export const settingsApi = {
 		unwrap(await commands.setDeleteLocalOnly(enabled));
 	},
 
+	setRetentionMaxAgeDays: async (days: number | null) => {
+		unwrap(await commands.setRetentionMaxAgeDays(days));
+	},
+
 	setFavoritesEnabled: async (enabled: boolean) => {
 		unwrap(await commands.setFavoritesEnabled(enabled));
 	},

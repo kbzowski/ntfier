@@ -75,6 +75,7 @@ function App() {
 		setCompactView,
 		setExpandNewMessages,
 		setDeleteLocalOnly,
+		setRetentionMaxAgeDays,
 		updateInfo,
 		setUpdateInfo,
 		loadError,
@@ -248,6 +249,8 @@ function App() {
 					onExpandNewMessagesChange={setExpandNewMessages}
 					deleteLocalOnly={settings.deleteLocalOnly ?? true}
 					onDeleteLocalOnlyChange={setDeleteLocalOnly}
+					retentionMaxAgeDays={settings.retentionMaxAgeDays ?? null}
+					onRetentionMaxAgeDaysChange={setRetentionMaxAgeDays}
 					favoritesEnabled={settings.favoritesEnabled ?? false}
 					onFavoritesEnabledChange={setFavoritesEnabled}
 				/>

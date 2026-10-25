@@ -129,6 +129,7 @@ interface AppActions {
 
 	// Deletion settings
 	setDeleteLocalOnly: (enabled: boolean) => Promise<void>;
+	setRetentionMaxAgeDays: (days: number | null) => Promise<void>;
 
 	// Favorites settings
 	setFavoritesEnabled: (enabled: boolean) => Promise<void>;
@@ -311,6 +312,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			);
 			setSubscriptions(subs);
 		}, [notifications.clearTopic]),
+	);
+
+	// Retention removed notifications: reload loaded lists and unread counts
+	useTauriEvent<void>(
+		"notifications:retained",
+		useCallback(async () => {
+			await notifications.reloadLoaded();
+			setSubscriptions(await subscriptionsApi.getAll());
+		}, [notifications.reloadLoaded]),
 	);
 
 	// Stored messages of a subscription changed in place (update, server delete or clear)
@@ -768,6 +778,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		[],
 	);
 
+	const setRetentionMaxAgeDays = useCallback(async (days: number | null) => {
+		if (!isTauri()) return;
+		try {
+			await settingsApi.setRetentionMaxAgeDays(days);
+			setSettings((prev) => ({ ...prev, retentionMaxAgeDays: days }));
+		} catch (err) {
+			const classified = classifyError(err);
+			toast.error(classified.userMessage);
+			console.error("[Settings Error]", err);
+		}
+	}, []);
+
 	// Derived data
 	const currentNotifications = useMemo(() => {
 		if (currentView === "favorites") {
@@ -862,6 +884,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			setCompactView,
 			setExpandNewMessages,
 			setDeleteLocalOnly,
+			setRetentionMaxAgeDays,
 			setFavoritesEnabled,
 			setUpdateInfo,
 
@@ -915,6 +938,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			setCompactView,
 			setExpandNewMessages,
 			setDeleteLocalOnly,
+			setRetentionMaxAgeDays,
 			setFavoritesEnabled,
 			currentNotifications,
 			subscriptionsWithUnread,
