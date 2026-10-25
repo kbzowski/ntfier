@@ -482,3 +482,21 @@ export const mockSettings: AppSettings = {
 	deleteLocalOnly: true,
 	favoritesEnabled: false,
 };
+
+// Dev-only: `?n=<count>` fills the first subscription with <count> notifications to test long lists
+const inflateTo =
+	import.meta.env.DEV && typeof window !== "undefined"
+		? Number(new URLSearchParams(window.location.search).get("n") ?? 0)
+		: 0;
+if (inflateTo > 0) {
+	const base = [...mockNotifications];
+	mockNotifications.length = 0;
+	for (let i = 0; i < inflateTo; i++) {
+		mockNotifications.push({
+			...base[i % base.length],
+			id: `n-${i}`,
+			topicId: mockSubscriptions[0].id,
+			timestamp: Date.now() - i * 60_000,
+		});
+	}
+}
