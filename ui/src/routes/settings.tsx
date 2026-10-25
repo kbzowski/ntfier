@@ -4,11 +4,14 @@ import { useTheme } from "@/components/common/ThemeProvider";
 import { SettingsContent } from "@/components/dialogs/SettingsContent";
 import { mockSubscriptions } from "@/data/mock-data";
 import { useSettings } from "@/hooks/useSettings";
+import { useTauriEvent } from "@/hooks/useTauriEvent";
+import { validateSettingsSearch } from "@/lib/settingsSearch";
 import { isTauri, subscriptionsApi } from "@/lib/tauri";
 import type { Subscription } from "@/types/bindings";
 
 export const Route = createFileRoute("/settings")({
 	head: () => ({ meta: [{ title: "Ntfier – Settings" }] }),
+	validateSearch: validateSettingsSearch,
 	component: SettingsWindow,
 });
 
@@ -17,6 +20,13 @@ function SettingsWindow() {
 		useTheme();
 	const s = useSettings();
 	const { settings } = s;
+
+	// `n` remounts the content so an open window's tab and form re-init
+	const { editServer } = Route.useSearch();
+	const [edit, setEdit] = useState({ url: editServer, n: 0 });
+	useTauriEvent<string>("settings:edit-server", (url) =>
+		setEdit((e) => ({ url, n: e.n + 1 })),
+	);
 
 	// Read-only, for the topic count in the server removal confirmation
 	const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -34,6 +44,9 @@ function SettingsWindow() {
 	return (
 		<div className="flex h-screen flex-col p-4">
 			<SettingsContent
+				// The server form reads its server once, so mount it after settings load
+				key={s.settingsLoading ? "loading" : edit.n}
+				editServerUrl={edit.url}
 				themeId={themeId}
 				onThemeChange={setThemeId}
 				isSystemMode={isSystemMode}
