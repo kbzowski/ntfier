@@ -117,16 +117,6 @@ function App() {
 		(sub) => sub.id === currentTopicId,
 	);
 
-	const handleAddServer = useCallback(
-		async (server: Parameters<typeof addServer>[0]) => {
-			const syncedSubs = await addServer(server);
-			if (syncedSubs.length > 0) {
-				setCurrentTopicId(syncedSubs[0].id);
-			}
-		},
-		[addServer, setCurrentTopicId],
-	);
-
 	const handleRemoveSubscription = useCallback((id: string) => {
 		setConfirmDialog({ open: true, topicId: id });
 	}, []);
@@ -246,7 +236,7 @@ function App() {
 						onSystemModeChange={setSystemMode}
 						availableThemes={availableThemes}
 						servers={settings.servers}
-						onAddServer={handleAddServer}
+						onAddServer={addServer}
 						onUpdateServer={updateServer}
 						editServerUrl={editServerUrl}
 						onRemoveServer={removeServer}

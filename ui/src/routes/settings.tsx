@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTheme } from "@/components/common/ThemeProvider";
 import { SettingsContent } from "@/components/dialogs/SettingsContent";
 import { mockSubscriptions } from "@/data/mock-data";
@@ -18,7 +18,35 @@ export const Route = createFileRoute("/settings")({
 function SettingsWindow() {
 	const { themeId, setThemeId, isSystemMode, setSystemMode, availableThemes } =
 		useTheme();
-	const s = useSettings();
+	// `n` remounts the content so an open window's tab and form re-init
+	const { editServer } = Route.useSearch();
+	const [edit, setEdit] = useState({ url: editServer, n: 0 });
+	useTauriEvent<string>("settings:edit-server", (url) =>
+		setEdit((e) => ({ url, n: e.n + 1 })),
+	);
+
+	// Read-only, for the topic count in the server removal confirmation
+	const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+	const refreshSubscriptions = useCallback(async () => {
+		if (!isTauri()) {
+			setSubscriptions(mockSubscriptions);
+			return;
+		}
+		try {
+			setSubscriptions(await subscriptionsApi.getAll());
+		} catch (err) {
+			console.error("Failed to load subscriptions:", err);
+		}
+	}, []);
+	useEffect(() => {
+		refreshSubscriptions();
+	}, [refreshSubscriptions]);
+	useTauriEvent<void>("subscriptions:synced", refreshSubscriptions);
+
+	const s = useSettings({
+		onIgnoreRulesChanged: refreshSubscriptions,
+		onServerRemoved: refreshSubscriptions,
+	});
 	const { settings, setUpdateInfo } = s;
 
 	// The startup check ran before this window existed, so read its stored result
@@ -29,26 +57,6 @@ function SettingsWindow() {
 			.then(setUpdateInfo)
 			.catch((err) => console.error("Failed to load update result:", err));
 	}, [setUpdateInfo]);
-
-	// `n` remounts the content so an open window's tab and form re-init
-	const { editServer } = Route.useSearch();
-	const [edit, setEdit] = useState({ url: editServer, n: 0 });
-	useTauriEvent<string>("settings:edit-server", (url) =>
-		setEdit((e) => ({ url, n: e.n + 1 })),
-	);
-
-	// Read-only, for the topic count in the server removal confirmation
-	const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-	useEffect(() => {
-		if (!isTauri()) {
-			setSubscriptions(mockSubscriptions);
-			return;
-		}
-		subscriptionsApi
-			.getAll()
-			.then(setSubscriptions)
-			.catch((err) => console.error("Failed to load subscriptions:", err));
-	}, []);
 
 	return (
 		<div className="flex h-screen flex-col p-4">

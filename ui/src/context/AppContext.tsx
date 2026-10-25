@@ -14,6 +14,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { type SettingsState, useSettings } from "@/hooks/useSettings";
 import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { BackendError, classifyError } from "@/lib/error-classification";
+import { applyServerRemoved } from "@/lib/serverTopics";
 import { isTauri, notificationsApi, subscriptionsApi } from "@/lib/tauri";
 
 /** Payload of the backend's `subscription:error` event. */
@@ -93,24 +94,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			await refreshSubscriptions();
 			await notifications.reloadLoaded();
 		},
-		onServerSynced: async () => {
-			setSubscriptions(await subscriptionsApi.getAll());
-		},
 		onServerRemoved: (url) => {
 			// Its topics are gone too (local only; the account keeps them)
-			const removed = subscriptionsRef.current.filter(
-				(s) => s.serverUrl === url,
+			const next = applyServerRemoved(
+				subscriptionsRef.current,
+				currentTopicId,
+				url,
 			);
-			for (const sub of removed) notifications.clearTopic(sub.id);
-			const removedIds = new Set(removed.map((s) => s.id));
-			setSubscriptions((prev) => prev.filter((s) => s.serverUrl !== url));
-			setCurrentTopicId((current) =>
-				current && removedIds.has(current) ? null : current,
-			);
+			for (const id of next.removedIds) notifications.clearTopic(id);
+			setSubscriptions(next.subscriptions);
+			setCurrentTopicId(next.currentTopicId);
 		},
-		onFavoritesDisabled: () => setCurrentView("all"),
 	});
 	const { settings, settingsLoadError, reloadSettings } = settingsState;
+
+	// Also when favorites are turned off in the settings window
+	useEffect(() => {
+		if (!settings.favoritesEnabled) setCurrentView("all");
+	}, [settings.favoritesEnabled]);
 
 	// Load initial data
 	const loadData = useCallback(async () => {
