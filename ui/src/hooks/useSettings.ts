@@ -27,7 +27,7 @@ import type {
 } from "@/types/ntfy";
 
 /** What the window hosting the settings does on a save from any window. */
-export interface SettingsHooks {
+export interface SettingsCallbacks {
 	onIgnoreRulesChanged?: () => Promise<void>;
 	onServerRemoved?: (url: string) => void;
 }
@@ -139,7 +139,7 @@ function makeLimitSettingSetter(
  * listens for `settings:*`, `server:status` and `update:available`, so a
  * save in one window reaches the others. Works without `AppProvider`.
  */
-export function useSettings(hooks: SettingsHooks = {}): SettingsState {
+export function useSettings(callbacks: SettingsCallbacks = {}): SettingsState {
 	const [settings, setSettings] = useState<AppSettings>(() =>
 		isTauri() ? emptySettings : mockSettings,
 	);
@@ -152,10 +152,10 @@ export function useSettings(hooks: SettingsHooks = {}): SettingsState {
 	const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
 	const [serverStatuses, setServerStatuses] = useState<ServerStatusEntry[]>([]);
 
-	// Latest hooks without making every action depend on them
-	const hooksRef = useRef(hooks);
+	// Latest callbacks without making every action depend on them
+	const callbacksRef = useRef(callbacks);
 	useEffect(() => {
-		hooksRef.current = hooks;
+		callbacksRef.current = callbacks;
 	});
 
 	const refreshIgnoreRules = useCallback(async () => {
@@ -221,14 +221,14 @@ export function useSettings(hooks: SettingsHooks = {}): SettingsState {
 		"settings:ignore-rules-changed",
 		useCallback(async () => {
 			await refreshIgnoreRules();
-			await hooksRef.current.onIgnoreRulesChanged?.();
+			await callbacksRef.current.onIgnoreRulesChanged?.();
 		}, [refreshIgnoreRules]),
 	);
 
 	useTauriEvent<{ url: string }>(
 		"settings:server-removed",
 		useCallback(({ url }: { url: string }) => {
-			hooksRef.current.onServerRemoved?.(url);
+			callbacksRef.current.onServerRemoved?.(url);
 		}, []),
 	);
 
