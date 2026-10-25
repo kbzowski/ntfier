@@ -24,7 +24,7 @@ mod services;
 use db::Database;
 use services::{ConnectionManager, SyncService, TrayManager};
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     Emitter, Manager,
 };
@@ -177,8 +177,10 @@ pub fn run() {
 
             // Tray icon setup
             let show = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
+            let separator = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &quit])?;
+            let menu = Menu::with_items(app, &[&show, &settings, &separator, &quit])?;
 
             let default_icon = app
                 .default_window_icon()
@@ -194,6 +196,15 @@ pub fn run() {
                             let _ = window.show();
                             let _ = window.set_focus();
                         }
+                    }
+                    "settings" => {
+                        // Building a window inside the menu handler deadlocks on Windows
+                        let app = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Err(e) = commands::show_settings_window(&app, None) {
+                                log::error!("Failed to open settings window: {e}");
+                            }
+                        });
                     }
                     "quit" => app.exit(0),
                     _ => {}
