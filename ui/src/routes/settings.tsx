@@ -6,7 +6,7 @@ import { mockSubscriptions } from "@/data/mock-data";
 import { useSettings } from "@/hooks/useSettings";
 import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { validateSettingsSearch } from "@/lib/settingsSearch";
-import { isTauri, subscriptionsApi } from "@/lib/tauri";
+import { isTauri, subscriptionsApi, updateApi } from "@/lib/tauri";
 import type { Subscription } from "@/types/bindings";
 
 export const Route = createFileRoute("/settings")({
@@ -19,7 +19,16 @@ function SettingsWindow() {
 	const { themeId, setThemeId, isSystemMode, setSystemMode, availableThemes } =
 		useTheme();
 	const s = useSettings();
-	const { settings } = s;
+	const { settings, setUpdateInfo } = s;
+
+	// The startup check ran before this window existed, so read its stored result
+	useEffect(() => {
+		if (!isTauri()) return;
+		updateApi
+			.getLastCheck()
+			.then(setUpdateInfo)
+			.catch((err) => console.error("Failed to load update result:", err));
+	}, [setUpdateInfo]);
 
 	// `n` remounts the content so an open window's tab and form re-init
 	const { editServer } = Route.useSearch();

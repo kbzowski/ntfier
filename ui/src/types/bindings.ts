@@ -69,6 +69,21 @@ export const commands = {
 	date: string | null,
 } | null, AppError>(__TAURI_INVOKE("check_for_update")),
 	/**
+	 *  Get the result of the latest update check (startup or `check_for_update`).
+	 * 
+	 *  Returns null if no check has run yet or the latest found no update.
+	 */
+	getLastUpdateCheck: () => __TAURI_INVOKE<{
+	/**  The new version available. */
+	version: string,
+	/**  The current installed version. */
+	current_version: string,
+	/**  Release notes for the update. */
+	body: string | null,
+	/**  Release date. */
+	date: string | null,
+} | null>("get_last_update_check"),
+	/**
 	 *  Download and install an available update.
 	 * 
 	 *  This will download the update and may restart the application.
