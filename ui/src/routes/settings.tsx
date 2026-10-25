@@ -21,9 +21,10 @@ function SettingsWindow() {
 	// `n` remounts the content so an open window's tab and form re-init
 	const { editServer } = Route.useSearch();
 	const [edit, setEdit] = useState({ url: editServer, n: 0 });
-	useTauriEvent<string>("settings:edit-server", (url) =>
-		setEdit((e) => ({ url, n: e.n + 1 })),
-	);
+	useTauriEvent<unknown>("settings:edit-server", (payload) => {
+		const { editServer: url } = validateSettingsSearch({ editServer: payload });
+		if (url) setEdit((e) => ({ url, n: e.n + 1 }));
+	});
 
 	// Read-only, for the subscription count in the server removal confirmation
 	const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
