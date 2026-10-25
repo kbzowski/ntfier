@@ -1,249 +1,28 @@
-import { Bell, EyeOff, Palette, Server, Settings2 } from "lucide-react";
-import { useEffect, useState } from "react";
 import {
 	Dialog,
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { isTauri } from "@/lib/tauri";
-import { cn } from "@/lib/utils";
-import type { ThemeDefinition } from "@/themes";
-import {
-	commands,
-	type NotificationDisplayMethod,
-	type UpdateInfo,
-} from "@/types/bindings";
-import type { ServerConfig } from "@/types/ntfy";
-import { ServerConfigForm } from "./ServerConfigForm";
-import {
-	AppearanceTab,
-	BehaviorTab,
-	IgnoredTab,
-	NotificationsTab,
-} from "./settings";
+import { SettingsContent, type SettingsContentProps } from "./SettingsContent";
 
-interface SettingsDialogProps {
+interface SettingsDialogProps extends SettingsContentProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	themeId: string;
-	onThemeChange: (themeId: string) => void;
-	isSystemMode: boolean;
-	onSystemModeChange: (enabled: boolean) => void;
-	availableThemes: ThemeDefinition[];
-	servers: ServerConfig[];
-	onAddServer: (
-		server: Omit<ServerConfig, "isDefault">,
-	) => Promise<unknown> | undefined;
-	onUpdateServer: (
-		server: Omit<ServerConfig, "isDefault">,
-	) => Promise<unknown> | undefined;
-	/** Opens straight on this server's login (Servers tab). */
-	editServerUrl?: string | null;
-	onRemoveServer: (url: string) => void;
-	onSyncServer: (url: string) => Promise<void>;
-	onSetDefaultServer: (url: string) => void;
-	autostart: boolean;
-	onAutostartChange: (enabled: boolean) => void;
-	minimizeToTray: boolean;
-	onMinimizeToTrayChange: (enabled: boolean) => void;
-	startMinimized: boolean;
-	onStartMinimizedChange: (enabled: boolean) => void;
-	updateInfo: UpdateInfo | null;
-	onUpdateInfoChange: (info: UpdateInfo | null) => void;
-	notificationMethod: NotificationDisplayMethod;
-	onNotificationMethodChange: (method: NotificationDisplayMethod) => void;
-	notificationForceDisplay: boolean;
-	onNotificationForceDisplayChange: (enabled: boolean) => void;
-	notificationShowActions: boolean;
-	onNotificationShowActionsChange: (enabled: boolean) => void;
-	notificationShowImages: boolean;
-	onNotificationShowImagesChange: (enabled: boolean) => void;
-	notificationSound: boolean;
-	onNotificationSoundChange: (enabled: boolean) => void;
-	compactView: boolean;
-	onCompactViewChange: (enabled: boolean) => void;
-	expandNewMessages: boolean;
-	onExpandNewMessagesChange: (enabled: boolean) => void;
-	deleteLocalOnly: boolean;
-	onDeleteLocalOnlyChange: (enabled: boolean) => void;
-	retentionMaxAgeDays: number | null;
-	onRetentionMaxAgeDaysChange: (days: number | null) => void;
-	retentionMaxPerSubscription: number | null;
-	onRetentionMaxPerSubscriptionChange: (max: number | null) => void;
-	favoritesEnabled: boolean;
-	onFavoritesEnabledChange: (enabled: boolean) => void;
 }
 
 export function SettingsDialog({
 	open,
 	onOpenChange,
-	themeId,
-	onThemeChange,
-	isSystemMode,
-	onSystemModeChange,
-	availableThemes,
-	servers,
-	onAddServer,
-	onUpdateServer,
-	editServerUrl,
-	onRemoveServer,
-	onSyncServer,
-	onSetDefaultServer,
-	autostart,
-	onAutostartChange,
-	minimizeToTray,
-	onMinimizeToTrayChange,
-	startMinimized,
-	onStartMinimizedChange,
-	updateInfo,
-	onUpdateInfoChange,
-	notificationMethod,
-	onNotificationMethodChange,
-	notificationForceDisplay,
-	onNotificationForceDisplayChange,
-	notificationShowActions,
-	onNotificationShowActionsChange,
-	notificationShowImages,
-	onNotificationShowImagesChange,
-	notificationSound,
-	onNotificationSoundChange,
-	compactView,
-	onCompactViewChange,
-	expandNewMessages,
-	onExpandNewMessagesChange,
-	deleteLocalOnly,
-	onDeleteLocalOnlyChange,
-	retentionMaxAgeDays,
-	onRetentionMaxAgeDaysChange,
-	retentionMaxPerSubscription,
-	onRetentionMaxPerSubscriptionChange,
-	favoritesEnabled,
-	onFavoritesEnabledChange,
+	...contentProps
 }: SettingsDialogProps) {
-	const [version, setVersion] = useState<string>("");
-
-	useEffect(() => {
-		if (open) {
-			commands.getAppVersionDisplay().then(setVersion);
-		}
-	}, [open]);
-
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-2xl">
-				<DialogHeader>
+			<DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
+				<DialogHeader className="shrink-0">
 					<DialogTitle>Settings</DialogTitle>
 				</DialogHeader>
-
-				<Tabs defaultValue={editServerUrl ? "servers" : "appearance"}>
-					<TabsList
-						className={cn(
-							"grid w-full",
-							isTauri() ? "grid-cols-5" : "grid-cols-4",
-						)}
-					>
-						<TabsTrigger value="appearance">
-							<Palette className="h-4 w-4 mr-1.5" />
-							Appearance
-						</TabsTrigger>
-						<TabsTrigger value="behavior">
-							<Settings2 className="h-4 w-4 mr-1.5" />
-							Behavior
-						</TabsTrigger>
-						<TabsTrigger value="notifications">
-							<Bell className="h-4 w-4 mr-1.5" />
-							Notifications
-						</TabsTrigger>
-						{isTauri() ? (
-							<TabsTrigger value="ignored">
-								<EyeOff className="h-4 w-4 mr-1.5" />
-								Ignored
-							</TabsTrigger>
-						) : null}
-						<TabsTrigger value="servers">
-							<Server className="h-4 w-4 mr-1.5" />
-							Servers
-						</TabsTrigger>
-					</TabsList>
-
-					<TabsContent value="appearance" className="mt-4">
-						<AppearanceTab
-							themeId={themeId}
-							onThemeChange={onThemeChange}
-							isSystemMode={isSystemMode}
-							onSystemModeChange={onSystemModeChange}
-							availableThemes={availableThemes}
-							compactView={compactView}
-							onCompactViewChange={onCompactViewChange}
-							expandNewMessages={expandNewMessages}
-							onExpandNewMessagesChange={onExpandNewMessagesChange}
-							favoritesEnabled={favoritesEnabled}
-							onFavoritesEnabledChange={onFavoritesEnabledChange}
-						/>
-					</TabsContent>
-
-					<TabsContent value="behavior" className="mt-4">
-						<BehaviorTab
-							autostart={autostart}
-							onAutostartChange={onAutostartChange}
-							minimizeToTray={minimizeToTray}
-							onMinimizeToTrayChange={onMinimizeToTrayChange}
-							startMinimized={startMinimized}
-							onStartMinimizedChange={onStartMinimizedChange}
-							deleteLocalOnly={deleteLocalOnly}
-							onDeleteLocalOnlyChange={onDeleteLocalOnlyChange}
-							retentionMaxAgeDays={retentionMaxAgeDays}
-							onRetentionMaxAgeDaysChange={onRetentionMaxAgeDaysChange}
-							retentionMaxPerSubscription={retentionMaxPerSubscription}
-							onRetentionMaxPerSubscriptionChange={
-								onRetentionMaxPerSubscriptionChange
-							}
-							updateInfo={updateInfo}
-							onUpdateInfoChange={onUpdateInfoChange}
-						/>
-					</TabsContent>
-
-					<TabsContent value="notifications" className="mt-4">
-						<NotificationsTab
-							notificationMethod={notificationMethod}
-							onNotificationMethodChange={onNotificationMethodChange}
-							notificationForceDisplay={notificationForceDisplay}
-							onNotificationForceDisplayChange={
-								onNotificationForceDisplayChange
-							}
-							notificationShowActions={notificationShowActions}
-							onNotificationShowActionsChange={onNotificationShowActionsChange}
-							notificationShowImages={notificationShowImages}
-							onNotificationShowImagesChange={onNotificationShowImagesChange}
-							notificationSound={notificationSound}
-							onNotificationSoundChange={onNotificationSoundChange}
-						/>
-					</TabsContent>
-
-					{isTauri() ? (
-						<TabsContent value="ignored" className="mt-4">
-							<IgnoredTab />
-						</TabsContent>
-					) : null}
-
-					<TabsContent value="servers" className="mt-4">
-						<ServerConfigForm
-							servers={servers}
-							onAddServer={onAddServer}
-							onUpdateServer={onUpdateServer}
-							editUrl={editServerUrl}
-							onRemoveServer={onRemoveServer}
-							onSyncServer={onSyncServer}
-							onSetDefault={onSetDefaultServer}
-						/>
-					</TabsContent>
-				</Tabs>
-
-				<div className="mt-4 pt-3 border-t text-center text-xs text-muted-foreground">
-					Ntfier {version}
-				</div>
+				<SettingsContent {...contentProps} />
 			</DialogContent>
 		</Dialog>
 	);

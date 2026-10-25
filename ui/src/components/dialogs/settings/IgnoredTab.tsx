@@ -3,11 +3,21 @@ import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useApp } from "@/context/AppContext";
+import type { IgnoreRule, Subscription } from "@/types/bindings";
 
-export function IgnoredTab() {
-	const { ignoreRules, addIgnoreRule, deleteIgnoreRule, subscriptions } =
-		useApp();
+interface IgnoredTabProps {
+	rules: IgnoreRule[];
+	subscriptions: Subscription[];
+	onAdd: (pattern: string, subscriptionId: string | null) => Promise<void>;
+	onDelete: (id: string) => Promise<void>;
+}
+
+export function IgnoredTab({
+	rules,
+	subscriptions,
+	onAdd,
+	onDelete,
+}: IgnoredTabProps) {
 	const [pattern, setPattern] = useState("");
 
 	const topicNames = useMemo(() => {
@@ -21,7 +31,7 @@ export function IgnoredTab() {
 	const handleAdd = async () => {
 		const trimmed = pattern.trim();
 		if (!trimmed) return;
-		await addIgnoreRule(trimmed, null);
+		await onAdd(trimmed, null);
 		setPattern("");
 	};
 
@@ -48,11 +58,11 @@ export function IgnoredTab() {
 				</Button>
 			</div>
 
-			{ignoreRules.length === 0 ? (
+			{rules.length === 0 ? (
 				<p className="text-sm text-muted-foreground">No ignore rules yet.</p>
 			) : (
 				<ul className="space-y-1">
-					{ignoreRules.map((rule) => (
+					{rules.map((rule) => (
 						<li
 							key={rule.id}
 							className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
@@ -68,7 +78,7 @@ export function IgnoredTab() {
 							<Button
 								variant="ghost"
 								size="icon"
-								onClick={() => deleteIgnoreRule(rule.id)}
+								onClick={() => onDelete(rule.id)}
 								aria-label={`Delete rule ${rule.pattern}`}
 							>
 								<Trash2 className="h-4 w-4" />
