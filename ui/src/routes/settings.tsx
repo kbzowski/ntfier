@@ -4,7 +4,7 @@ import { useTheme } from "@/components/common/ThemeProvider";
 import { SettingsContent } from "@/components/dialogs/SettingsContent";
 import { mockSubscriptions } from "@/data/mock-data";
 import { useSettings } from "@/hooks/useSettings";
-import { isTauri, subscriptionsApi } from "@/lib/tauri";
+import { isTauri, subscriptionsApi, updateApi } from "@/lib/tauri";
 import type { Subscription } from "@/types/bindings";
 
 export const Route = createFileRoute("/settings")({
@@ -16,7 +16,16 @@ function SettingsWindow() {
 	const { themeId, setThemeId, isSystemMode, setSystemMode, availableThemes } =
 		useTheme();
 	const s = useSettings();
-	const { settings } = s;
+	const { settings, setUpdateInfo } = s;
+
+	// The startup check ran before this window existed, so read its stored result
+	useEffect(() => {
+		if (!isTauri()) return;
+		updateApi
+			.getLastCheck()
+			.then(setUpdateInfo)
+			.catch((err) => console.error("Failed to load update result:", err));
+	}, [setUpdateInfo]);
 
 	// Read-only, for the topic count in the server removal confirmation
 	const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);

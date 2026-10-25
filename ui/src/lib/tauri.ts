@@ -281,6 +281,9 @@ export const updateApi = {
 		return unwrap(result);
 	},
 
+	/** Result of the latest update check, null if none ran or it found no update */
+	getLastCheck: (): Promise<UpdateInfo | null> => commands.getLastUpdateCheck(),
+
 	/** Install the available update */
 	installUpdate: async (): Promise<void> => {
 		unwrap(await commands.installUpdate());
