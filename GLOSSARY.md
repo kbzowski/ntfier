@@ -27,6 +27,10 @@ The catch-up of a newly added subscription, covering everything the server still
 A notification deleted by the user or by a server `message_delete`, kept hidden so a replay cannot bring it back.
 _Avoid_: Soft-deleted row
 
+**Retention**:
+Automatic local removal of notifications older than a set age or beyond a set count per subscription. Unlike a tombstone, nothing is kept; favorites are never removed.
+_Avoid_: Cleanup, auto-delete
+
 **Sequence**:
 All versions of one message on a topic, sharing a `sequence_id` (equal to the message id when the publisher sets none). Updates, server deletes and clears target a sequence.
 
