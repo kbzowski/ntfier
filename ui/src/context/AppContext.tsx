@@ -1,8 +1,6 @@
 import {
 	createContext,
-	type Dispatch,
 	type ReactNode,
-	type SetStateAction,
 	useCallback,
 	useContext,
 	useEffect,
@@ -11,59 +9,30 @@ import {
 	useState,
 } from "react";
 import { toast } from "sonner";
-import { mockSettings, mockSubscriptions } from "@/data/mock-data";
+import { mockSubscriptions } from "@/data/mock-data";
 import { useNotifications } from "@/hooks/useNotifications";
+import { type SettingsState, useSettings } from "@/hooks/useSettings";
 import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { BackendError, classifyError } from "@/lib/error-classification";
-import {
-	autostartApi,
-	ignoreRulesApi,
-	isTauri,
-	notificationsApi,
-	settingsApi,
-	subscriptionsApi,
-	syncApi,
-} from "@/lib/tauri";
-import type { IgnoreRule, ServerStatusEntry } from "@/types/bindings";
+import { isTauri, notificationsApi, subscriptionsApi } from "@/lib/tauri";
 
 /** Payload of the backend's `subscription:error` event. */
 type SubscriptionError = { id: string; message: string | null };
 
-import type {
-	AppSettings,
-	Notification,
-	NotificationDisplayMethod,
-	ServerConfig,
-	Subscription,
-	UpdateInfo,
-} from "@/types/ntfy";
+import type { Notification, Subscription } from "@/types/ntfy";
 
 interface AppState {
 	// Subscriptions
 	subscriptions: Subscription[];
 	subscriptionsLoading: boolean;
 
-	// Ignore rules
-	ignoreRules: IgnoreRule[];
-
 	// Notifications (keyed by subscription ID)
 	notificationsByTopic: Map<string, Notification[]>;
 	currentTopicId: string | null;
 	currentView: "all" | "favorites";
 
-	// Settings
-	settings: AppSettings;
-	settingsLoading: boolean;
-	autostart: boolean;
-
-	// Updates
-	updateInfo: UpdateInfo | null;
-
 	// Startup load failure, shown instead of the list
 	loadError: string | null;
-
-	// Servers blocked from connecting, and per-subscription connection errors
-	serverStatuses: ServerStatusEntry[];
 }
 
 interface AppActions {
@@ -78,13 +47,6 @@ interface AppActions {
 	removeSubscription: (id: string, localOnly?: boolean) => Promise<void>;
 	toggleMute: (id: string) => Promise<void>;
 	refreshSubscriptions: () => Promise<void>;
-
-	// Ignore rules
-	addIgnoreRule: (
-		pattern: string,
-		subscriptionId: string | null,
-	) => Promise<void>;
-	deleteIgnoreRule: (id: string) => Promise<void>;
 
 	// Topic selection
 	setCurrentTopicId: (id: string | null) => void;
@@ -101,43 +63,9 @@ interface AppActions {
 	setNotificationExpanded: (id: string, expanded: boolean) => void;
 	getUnreadCount: (subscriptionId: string) => number;
 	getTotalUnread: () => number;
-
-	// Settings
-	addServer: (
-		server: Omit<ServerConfig, "isDefault">,
-	) => Promise<Subscription[]>;
-	updateServer: (server: Omit<ServerConfig, "isDefault">) => Promise<void>;
-	syncServer: (url: string) => Promise<void>;
-	removeServer: (url: string) => Promise<void>;
-	setDefaultServer: (url: string) => Promise<void>;
-	setAutostart: (enabled: boolean) => Promise<void>;
-	setMinimizeToTray: (enabled: boolean) => Promise<void>;
-	setStartMinimized: (enabled: boolean) => Promise<void>;
-
-	// Notification settings
-	setNotificationMethod: (method: NotificationDisplayMethod) => Promise<void>;
-	setNotificationForceDisplay: (enabled: boolean) => Promise<void>;
-	setNotificationShowActions: (enabled: boolean) => Promise<void>;
-	setNotificationShowImages: (enabled: boolean) => Promise<void>;
-	setNotificationSound: (enabled: boolean) => Promise<void>;
-
-	// Message display settings
-	setCompactView: (enabled: boolean) => Promise<void>;
-	setExpandNewMessages: (enabled: boolean) => Promise<void>;
-
-	// Deletion settings
-	setDeleteLocalOnly: (enabled: boolean) => Promise<void>;
-	setRetentionMaxAgeDays: (days: number | null) => Promise<void>;
-	setRetentionMaxPerSubscription: (max: number | null) => Promise<void>;
-
-	// Favorites settings
-	setFavoritesEnabled: (enabled: boolean) => Promise<void>;
-
-	// Updates
-	setUpdateInfo: (info: UpdateInfo | null) => void;
 }
 
-interface AppContextValue extends AppState, AppActions {
+interface AppContextValue extends AppState, AppActions, SettingsState {
 	// Derived data
 	currentNotifications: Notification[];
 	subscriptionsWithUnread: Subscription[];
@@ -146,122 +74,68 @@ interface AppContextValue extends AppState, AppActions {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-const emptySettings: AppSettings = { ...mockSettings, servers: [] };
-
-type SetSettings = Dispatch<SetStateAction<AppSettings>>;
-
-/**
- * Factory for boolean setting setters that follow the same pattern:
- * call API → update local state → show toast → handle errors.
- */
-function makeBooleanSettingSetter(
-	setSettings: SetSettings,
-	key: keyof AppSettings,
-	apiCall: (enabled: boolean) => Promise<unknown>,
-	label?: string,
-	onSuccess?: (enabled: boolean) => void,
-): (enabled: boolean) => Promise<void> {
-	return async (enabled: boolean) => {
-		if (!isTauri()) return;
-		try {
-			await apiCall(enabled);
-			setSettings((prev) => ({ ...prev, [key]: enabled }));
-			if (label) toast.success(`${label} ${enabled ? "enabled" : "disabled"}`);
-			onSuccess?.(enabled);
-		} catch (err) {
-			const classified = classifyError(err);
-			toast.error(classified.userMessage);
-			console.error("[Settings Error]", err);
-		}
-	};
-}
-
-/** Creates a setter for an optional limit setting (`null` = off). */
-function makeLimitSettingSetter(
-	setSettings: SetSettings,
-	key: keyof AppSettings,
-	apiCall: (limit: number | null) => Promise<unknown>,
-): (limit: number | null) => Promise<void> {
-	return async (limit: number | null) => {
-		if (!isTauri()) return;
-		try {
-			await apiCall(limit);
-			setSettings((prev) => ({ ...prev, [key]: limit }));
-		} catch (err) {
-			const classified = classifyError(err);
-			toast.error(classified.userMessage);
-			console.error("[Settings Error]", err);
-		}
-	};
-}
-
 export function AppProvider({ children }: { children: ReactNode }) {
 	// State
 	const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
 	const [subscriptionsLoading, setSubscriptionsLoading] = useState(true);
-	const [ignoreRules, setIgnoreRules] = useState<IgnoreRule[]>([]);
 	const [currentTopicId, setCurrentTopicId] = useState<string | null>(null);
 	const [currentView, setCurrentView] = useState<"all" | "favorites">("all");
-	const [settings, setSettings] = useState<AppSettings>(() =>
-		isTauri() ? emptySettings : mockSettings,
-	);
-	const [settingsLoading, setSettingsLoading] = useState(true);
-	const [autostart, setAutostartState] = useState(false);
-	const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
 	const [loadError, setLoadError] = useState<string | null>(null);
-	const [serverStatuses, setServerStatuses] = useState<ServerStatusEntry[]>([]);
 	const [subscriptionErrors, setSubscriptionErrors] = useState<
 		Record<string, string>
 	>({});
 
-	const refreshIgnoreRules = useCallback(async () => {
-		try {
-			if (isTauri()) {
-				setIgnoreRules(await ignoreRulesApi.getAll());
-			}
-		} catch (err) {
-			console.error("Failed to refresh ignore rules:", err);
-		}
-	}, []);
-
 	// Notification management via custom hook
 	const notifications = useNotifications(subscriptions);
+
+	const settingsState = useSettings({
+		onIgnoreRulesChanged: async () => {
+			await refreshSubscriptions();
+			await notifications.reloadLoaded();
+		},
+		onServerSynced: async () => {
+			setSubscriptions(await subscriptionsApi.getAll());
+		},
+		onServerRemoved: (url) => {
+			// Its topics are gone too (local only; the account keeps them)
+			const removed = subscriptionsRef.current.filter(
+				(s) => s.serverUrl === url,
+			);
+			for (const sub of removed) notifications.clearTopic(sub.id);
+			const removedIds = new Set(removed.map((s) => s.id));
+			setSubscriptions((prev) => prev.filter((s) => s.serverUrl !== url));
+			setCurrentTopicId((current) =>
+				current && removedIds.has(current) ? null : current,
+			);
+		},
+		onFavoritesDisabled: () => setCurrentView("all"),
+	});
+	const { settings, settingsLoadError, reloadSettings } = settingsState;
 
 	// Load initial data
 	const loadData = useCallback(async () => {
 		setLoadError(null);
 		try {
 			if (isTauri()) {
-				// Load all data in parallel to avoid waterfall
-				const [subs, loadedSettings, autostartEnabled, statuses] =
-					await Promise.all([
-						subscriptionsApi.getAll(),
-						settingsApi.get(),
-						autostartApi.isEnabled(),
-						settingsApi.getServerStatuses(),
-					]);
-
-				setSubscriptions(subs);
-				setSettings(loadedSettings);
-				setAutostartState(autostartEnabled);
-				setServerStatuses(statuses);
+				setSubscriptions(await subscriptionsApi.getAll());
 			} else {
 				setSubscriptions(mockSubscriptions);
-				setSettings(mockSettings);
 			}
 		} catch (err) {
 			console.error("Failed to load initial data:", err);
 			setLoadError(classifyError(err).userMessage);
 		} finally {
 			setSubscriptionsLoading(false);
-			setSettingsLoading(false);
 		}
 	}, []);
 
 	useEffect(() => {
 		loadData();
-		refreshIgnoreRules();
-	}, [loadData, refreshIgnoreRules]);
+	}, [loadData]);
+
+	const retryLoad = useCallback(async () => {
+		await Promise.all([loadData(), reloadSettings()]);
+	}, [loadData, reloadSettings]);
 
 	// Stable key that only changes when subscription IDs change
 	const subscriptionIds = useMemo(
@@ -353,16 +227,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		),
 	);
 
-	useTauriEvent<ServerStatusEntry>(
-		"server:status",
-		useCallback((entry: ServerStatusEntry) => {
-			setServerStatuses((prev) => [
-				...prev.filter((s) => s.url !== entry.url),
-				...(entry.status.kind === "ok" ? [] : [entry]),
-			]);
-		}, []),
-	);
-
 	useTauriEvent<SubscriptionError>(
 		"subscription:error",
 		useCallback(({ id, message }: SubscriptionError) => {
@@ -379,15 +243,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		useCallback((subscriptionId: string) => {
 			console.log("Navigating to subscription:", subscriptionId);
 			setCurrentTopicId(subscriptionId);
-		}, []),
-	);
-
-	// Listen for update:available event (from startup update check)
-	useTauriEvent<UpdateInfo>(
-		"update:available",
-		useCallback((info: UpdateInfo) => {
-			console.log("Update available:", info.version);
-			setUpdateInfo(info);
 		}, []),
 	);
 
@@ -499,302 +354,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		}
 	}, []);
 
-	const addIgnoreRule = useCallback(
-		async (pattern: string, subscriptionId: string | null) => {
-			if (isTauri()) {
-				try {
-					await ignoreRulesApi.add(pattern, subscriptionId);
-					await refreshIgnoreRules();
-					await refreshSubscriptions();
-					await notifications.reloadLoaded();
-				} catch (err) {
-					const classified = classifyError(err);
-					toast.error(classified.userMessage, {
-						description: "Failed to add ignore rule",
-					});
-					console.error("[Add ignore rule error]", err);
-				}
-			}
-		},
-		[refreshIgnoreRules, refreshSubscriptions, notifications.reloadLoaded],
-	);
-
-	const deleteIgnoreRule = useCallback(
-		async (id: string) => {
-			if (isTauri()) {
-				try {
-					await ignoreRulesApi.delete(id);
-					await refreshIgnoreRules();
-					await refreshSubscriptions();
-					await notifications.reloadLoaded();
-				} catch (err) {
-					const classified = classifyError(err);
-					toast.error(classified.userMessage, {
-						description: "Failed to delete ignore rule",
-					});
-					console.error("[Delete ignore rule error]", err);
-				}
-			}
-		},
-		[refreshIgnoreRules, refreshSubscriptions, notifications.reloadLoaded],
-	);
-
-	// Settings actions
-	const addServer = useCallback(
-		async (
-			server: Omit<ServerConfig, "isDefault">,
-		): Promise<Subscription[]> => {
-			if (isTauri()) {
-				const saved = await settingsApi.addServer(server);
-				if (saved.warning) toast.warning(saved.warning);
-				const loaded = await settingsApi.get();
-				setSettings(loaded);
-				const added = loaded.servers.find((s) => s.url === saved.url);
-
-				// With a login, bring in the account's topics. The server stays saved
-				// if that fails; the sync button retries it.
-				if (added && (added.username || added.token)) {
-					try {
-						const synced = await syncApi.syncSubscriptions(saved.url);
-						setSubscriptions(await subscriptionsApi.getAll());
-						return synced;
-					} catch (err) {
-						toast.error("Server added, but syncing its topics failed", {
-							description: classifyError(err).userMessage,
-						});
-					}
-				}
-				return [];
-			}
-			const newServer: ServerConfig = { ...server, isDefault: false };
-			setSettings((prev) => ({
-				...prev,
-				servers: [...prev.servers, newServer],
-			}));
-			return [];
-		},
-		[],
-	);
-
-	const updateServer = useCallback(
-		async (server: Omit<ServerConfig, "isDefault">) => {
-			if (!isTauri()) return;
-			const saved = await settingsApi.updateServer(server);
-			if (saved.warning) toast.warning(saved.warning);
-			else toast.success("Login updated");
-			setSettings(await settingsApi.get());
-		},
-		[],
-	);
-
-	const syncServer = useCallback(async (url: string) => {
-		if (!isTauri()) return;
-		try {
-			const subs = await syncApi.syncSubscriptions(url);
-			toast.success(
-				`Synced ${subs.length} topic${subs.length === 1 ? "" : "s"}`,
-			);
-		} catch (err) {
-			toast.error(classifyError(err).userMessage, {
-				description: "Sync failed",
-			});
-		}
-	}, []);
-
-	const removeServer = useCallback(
-		async (url: string) => {
-			if (isTauri()) {
-				try {
-					await settingsApi.removeServer(url);
-					// Its topics are gone too (local only; the account keeps them)
-					const removed = subscriptionsRef.current.filter(
-						(s) => s.serverUrl === url,
-					);
-					for (const sub of removed) notifications.clearTopic(sub.id);
-					const removedIds = new Set(removed.map((s) => s.id));
-					setSubscriptions((prev) => prev.filter((s) => s.serverUrl !== url));
-					setCurrentTopicId((current) =>
-						current && removedIds.has(current) ? null : current,
-					);
-					// The default may have moved to another server
-					setSettings(await settingsApi.get());
-					toast.success("Server removed");
-				} catch (err) {
-					const classified = classifyError(err);
-					toast.error(classified.userMessage);
-					console.error("[Settings Error]", err);
-				}
-			} else {
-				setSettings((prev) => ({
-					...prev,
-					servers: prev.servers.filter((s) => s.url !== url),
-				}));
-			}
-		},
-		[notifications.clearTopic],
-	);
-
-	const setDefaultServer = useCallback(async (url: string) => {
-		if (isTauri()) {
-			try {
-				await settingsApi.setDefaultServer(url);
-				setSettings((prev) => ({
-					...prev,
-					defaultServer: url,
-					servers: prev.servers.map((s) => ({
-						...s,
-						isDefault: s.url === url,
-					})),
-				}));
-				toast.success("Default server updated");
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage);
-				console.error("[Settings Error]", err);
-			}
-		} else {
-			setSettings((prev) => ({
-				...prev,
-				defaultServer: url,
-				servers: prev.servers.map((s) => ({ ...s, isDefault: s.url === url })),
-			}));
-		}
-	}, []);
-
-	const setAutostart = useCallback(async (enabled: boolean) => {
-		if (isTauri()) {
-			try {
-				if (enabled) {
-					await autostartApi.enable();
-				} else {
-					await autostartApi.disable();
-				}
-				setAutostartState(enabled);
-				toast.success(`Autostart ${enabled ? "enabled" : "disabled"}`);
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage, {
-					description: "Check system permissions and try again",
-				});
-				console.error("[Autostart Error]", err);
-			}
-		}
-	}, []);
-
-	// Boolean settings setters - all follow the same pattern via factory
-	const {
-		setMinimizeToTray,
-		setStartMinimized,
-		setNotificationForceDisplay,
-		setNotificationShowActions,
-		setNotificationShowImages,
-		setNotificationSound,
-		setCompactView,
-		setExpandNewMessages,
-		setDeleteLocalOnly,
-		setFavoritesEnabled,
-	} = useMemo(
-		() => ({
-			setMinimizeToTray: makeBooleanSettingSetter(
-				setSettings,
-				"minimizeToTray",
-				settingsApi.setMinimizeToTray,
-				"Minimize to tray",
-			),
-			setStartMinimized: makeBooleanSettingSetter(
-				setSettings,
-				"startMinimized",
-				settingsApi.setStartMinimized,
-				"Start minimized",
-			),
-			setNotificationForceDisplay: makeBooleanSettingSetter(
-				setSettings,
-				"notificationForceDisplay",
-				settingsApi.setNotificationForceDisplay,
-				"Force display",
-			),
-			setNotificationShowActions: makeBooleanSettingSetter(
-				setSettings,
-				"notificationShowActions",
-				settingsApi.setNotificationShowActions,
-				"Show actions",
-			),
-			setNotificationShowImages: makeBooleanSettingSetter(
-				setSettings,
-				"notificationShowImages",
-				settingsApi.setNotificationShowImages,
-				"Show images",
-			),
-			setNotificationSound: makeBooleanSettingSetter(
-				setSettings,
-				"notificationSound",
-				settingsApi.setNotificationSound,
-				"Notification sound",
-			),
-			setCompactView: makeBooleanSettingSetter(
-				setSettings,
-				"compactView",
-				settingsApi.setCompactView,
-				"Compact view",
-			),
-			setExpandNewMessages: makeBooleanSettingSetter(
-				setSettings,
-				"expandNewMessages",
-				settingsApi.setExpandNewMessages,
-				"Expand new messages",
-			),
-			setDeleteLocalOnly: makeBooleanSettingSetter(
-				setSettings,
-				"deleteLocalOnly",
-				settingsApi.setDeleteLocalOnly,
-				"Delete only locally",
-			),
-			setFavoritesEnabled: makeBooleanSettingSetter(
-				setSettings,
-				"favoritesEnabled",
-				settingsApi.setFavoritesEnabled,
-				undefined,
-				(enabled) => {
-					if (!enabled) setCurrentView("all");
-				},
-			),
-		}),
-		[],
-	);
-
-	// Notification method uses a different type signature
-	const setNotificationMethod = useCallback(
-		async (method: NotificationDisplayMethod) => {
-			if (!isTauri()) return;
-			try {
-				await settingsApi.setNotificationMethod(method);
-				setSettings((prev) => ({ ...prev, notificationMethod: method }));
-				toast.success("Notification method updated");
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage);
-				console.error("[Settings Error]", err);
-			}
-		},
-		[],
-	);
-
-	const { setRetentionMaxAgeDays, setRetentionMaxPerSubscription } = useMemo(
-		() => ({
-			setRetentionMaxAgeDays: makeLimitSettingSetter(
-				setSettings,
-				"retentionMaxAgeDays",
-				settingsApi.setRetentionMaxAgeDays,
-			),
-			setRetentionMaxPerSubscription: makeLimitSettingSetter(
-				setSettings,
-				"retentionMaxPerSubscription",
-				settingsApi.setRetentionMaxPerSubscription,
-			),
-		}),
-		[],
-	);
-
 	// Derived data
 	const currentNotifications = useMemo(() => {
 		if (currentView === "favorites") {
@@ -840,28 +399,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 	const value = useMemo<AppContextValue>(
 		() => ({
+			...settingsState,
+
 			// State
 			subscriptions,
 			subscriptionsLoading,
-			ignoreRules,
 			notificationsByTopic: notifications.byTopic,
 			currentTopicId,
 			currentView,
-			settings,
-			settingsLoading,
-			autostart,
-			updateInfo,
-			loadError,
-			serverStatuses,
+			loadError: loadError ?? settingsLoadError,
 
 			// Actions
-			retryLoad: loadData,
+			retryLoad,
 			addSubscription,
 			removeSubscription,
 			toggleMute,
 			refreshSubscriptions,
-			addIgnoreRule,
-			deleteIgnoreRule,
 			setCurrentTopicId,
 			setCurrentView,
 			markAsRead: notifications.markAsRead,
@@ -872,26 +425,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			setNotificationExpanded: notifications.setExpanded,
 			getUnreadCount: notifications.getUnreadCount,
 			getTotalUnread: notifications.getTotalUnread,
-			addServer,
-			updateServer,
-			syncServer,
-			removeServer,
-			setDefaultServer,
-			setAutostart,
-			setMinimizeToTray,
-			setStartMinimized,
-			setNotificationMethod,
-			setNotificationForceDisplay,
-			setNotificationShowActions,
-			setNotificationShowImages,
-			setNotificationSound,
-			setCompactView,
-			setExpandNewMessages,
-			setDeleteLocalOnly,
-			setRetentionMaxAgeDays,
-			setRetentionMaxPerSubscription,
-			setFavoritesEnabled,
-			setUpdateInfo,
 
 			// Derived
 			currentNotifications,
@@ -899,25 +432,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			favoritesCount,
 		}),
 		[
+			settingsState,
 			subscriptions,
 			subscriptionsLoading,
-			ignoreRules,
 			notifications.byTopic,
 			currentTopicId,
 			currentView,
-			settings,
-			settingsLoading,
-			autostart,
-			updateInfo,
 			loadError,
-			serverStatuses,
-			loadData,
+			settingsLoadError,
+			retryLoad,
 			addSubscription,
 			removeSubscription,
 			toggleMute,
 			refreshSubscriptions,
-			addIgnoreRule,
-			deleteIgnoreRule,
 			notifications.markAsRead,
 			notifications.markAllAsRead,
 			notifications.markAllAsReadGlobally,
@@ -926,25 +453,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			notifications.setExpanded,
 			notifications.getUnreadCount,
 			notifications.getTotalUnread,
-			addServer,
-			updateServer,
-			syncServer,
-			removeServer,
-			setDefaultServer,
-			setAutostart,
-			setMinimizeToTray,
-			setStartMinimized,
-			setNotificationMethod,
-			setNotificationForceDisplay,
-			setNotificationShowActions,
-			setNotificationShowImages,
-			setNotificationSound,
-			setCompactView,
-			setExpandNewMessages,
-			setDeleteLocalOnly,
-			setRetentionMaxAgeDays,
-			setRetentionMaxPerSubscription,
-			setFavoritesEnabled,
 			currentNotifications,
 			subscriptionsWithUnread,
 			favoritesCount,

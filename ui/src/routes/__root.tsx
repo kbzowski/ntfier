@@ -2,7 +2,6 @@ import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { Toaster } from "sonner";
 import { AppErrorBoundary } from "@/components/common/ErrorBoundary";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
-import { AppProvider } from "@/context/AppContext";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
@@ -39,7 +38,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 			<body className="overflow-hidden">
 				<AppErrorBoundary>
 					<ThemeProvider>
-						<AppProvider>{children}</AppProvider>
+						{children}
 						<Toaster position="top-right" richColors />
 					</ThemeProvider>
 				</AppErrorBoundary>

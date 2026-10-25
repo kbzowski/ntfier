@@ -22,12 +22,20 @@ const SettingsDialog = lazy(() =>
 );
 
 import { NotificationList } from "@/components/notifications/NotificationList";
-import { useApp } from "@/context/AppContext";
+import { AppProvider, useApp } from "@/context/AppContext";
 import { ShowImagesProvider } from "@/context/ShowImagesContext";
 
 const noop = () => {};
 
-export const Route = createFileRoute("/")({ component: App });
+export const Route = createFileRoute("/")({ component: MainWindow });
+
+function MainWindow() {
+	return (
+		<AppProvider>
+			<App />
+		</AppProvider>
+	);
+}
 
 function App() {
 	const [settingsOpen, setSettingsOpen] = useState(false);
