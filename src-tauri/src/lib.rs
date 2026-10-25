@@ -80,6 +80,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::sync_subscriptions,
         // Update
         commands::check_for_update,
+        commands::get_last_update_check,
         commands::install_update,
         commands::get_app_version,
         commands::get_app_version_display,
