@@ -13,10 +13,13 @@ use crate::models::{
 use crate::services::{ConnectionManager, NtfyClient, SyncService};
 
 /// Tells every window to refetch the settings once a save went through.
-fn changed(app_handle: &AppHandle, saved: Result<(), AppError>) -> Result<(), AppError> {
-    saved?;
+fn emit_settings_changed<T>(
+    app_handle: &AppHandle,
+    saved: Result<T, AppError>,
+) -> Result<T, AppError> {
+    let saved = saved?;
     let _ = app_handle.emit("settings:changed", ());
-    Ok(())
+    Ok(saved)
 }
 
 #[tauri::command]
@@ -70,8 +73,7 @@ pub async fn add_server(
         .ensure_supported(&server.url, server.auth_header().as_deref())
         .await?;
     let (server, warning) = check_credential(server).await?;
-    let url = db.add_server(server)?;
-    let _ = app_handle.emit("settings:changed", ());
+    let url = emit_settings_changed(&app_handle, db.add_server(server))?;
     Ok(SavedServer { url, warning })
 }
 
@@ -85,8 +87,7 @@ pub async fn update_server(
     server: ServerConfig,
 ) -> Result<SavedServer, AppError> {
     let (server, warning) = check_credential(server).await?;
-    db.update_server_credential(&server)?;
-    let _ = app_handle.emit("settings:changed", ());
+    emit_settings_changed(&app_handle, db.update_server_credential(&server))?;
     conn_manager.reconnect_server(&server.url).await;
     // The (possibly new) account's topics come in with an account sync
     let url = server.url.clone();
@@ -124,9 +125,8 @@ pub async fn remove_server(
     url: String,
 ) -> Result<(), AppError> {
     conn_manager.disconnect_server(&url).await;
-    db.remove_server(&url)?;
+    emit_settings_changed(&app_handle, db.remove_server(&url))?;
     let _ = app_handle.emit("settings:server-removed", ServerRemoved { url });
-    let _ = app_handle.emit("settings:changed", ());
     refresh_tray(app_handle);
     Ok(())
 }
@@ -138,7 +138,7 @@ pub fn set_default_server(
     db: State<'_, Database>,
     url: String,
 ) -> Result<(), AppError> {
-    changed(&app_handle, db.set_default_server(&url))
+    emit_settings_changed(&app_handle, db.set_default_server(&url))
 }
 
 #[tauri::command]
@@ -148,7 +148,7 @@ pub fn set_minimize_to_tray(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    changed(
+    emit_settings_changed(
         &app_handle,
         db.set_setting("minimize_to_tray", if enabled { "true" } else { "false" }),
     )
@@ -161,7 +161,7 @@ pub fn set_start_minimized(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    changed(
+    emit_settings_changed(
         &app_handle,
         db.set_setting("start_minimized", if enabled { "true" } else { "false" }),
     )
@@ -178,7 +178,7 @@ pub fn set_notification_method(
         NotificationDisplayMethod::Native => "native",
         NotificationDisplayMethod::WindowsEnhanced => "windows_enhanced",
     };
-    changed(
+    emit_settings_changed(
         &app_handle,
         db.set_setting("notification_method", method_str),
     )
@@ -191,7 +191,7 @@ pub fn set_notification_force_display(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    changed(
+    emit_settings_changed(
         &app_handle,
         db.set_setting(
             "notification_force_display",
@@ -207,7 +207,7 @@ pub fn set_notification_show_actions(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    changed(
+    emit_settings_changed(
         &app_handle,
         db.set_setting(
             "notification_show_actions",
@@ -223,7 +223,7 @@ pub fn set_notification_show_images(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    changed(
+    emit_settings_changed(
         &app_handle,
         db.set_setting(
             "notification_show_images",
@@ -239,7 +239,7 @@ pub fn set_notification_sound(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    changed(
+    emit_settings_changed(
         &app_handle,
         db.set_setting("notification_sound", if enabled { "true" } else { "false" }),
     )
@@ -252,7 +252,7 @@ pub fn set_compact_view(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    changed(
+    emit_settings_changed(
         &app_handle,
         db.set_setting("compact_view", if enabled { "true" } else { "false" }),
     )
@@ -265,7 +265,7 @@ pub fn set_expand_new_messages(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    changed(
+    emit_settings_changed(
         &app_handle,
         db.set_setting(
             "expand_new_messages",
@@ -281,7 +281,7 @@ pub fn set_delete_local_only(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    changed(
+    emit_settings_changed(
         &app_handle,
         db.set_setting("delete_local_only", if enabled { "true" } else { "false" }),
     )
@@ -328,8 +328,10 @@ fn set_retention_limit(
             "Retention {what} must be positive"
         )));
     }
-    db.set_setting(key, &limit.map(|l| l.to_string()).unwrap_or_default())?;
-    let _ = app_handle.emit("settings:changed", ());
+    emit_settings_changed(
+        app_handle,
+        db.set_setting(key, &limit.map(|l| l.to_string()).unwrap_or_default()),
+    )?;
     run_retention(app_handle)
 }
 
@@ -355,7 +357,7 @@ pub fn set_favorites_enabled(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    changed(
+    emit_settings_changed(
         &app_handle,
         db.set_setting("favorites_enabled", if enabled { "true" } else { "false" }),
     )
