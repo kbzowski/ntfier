@@ -1,4 +1,4 @@
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 
 use crate::commands::notifications::refresh_tray;
 use crate::db::Database;
@@ -20,6 +20,7 @@ pub fn add_ignore_rule(
     subscription_id: Option<String>,
 ) -> Result<IgnoreRule, AppError> {
     let rule = db.add_ignore_rule(&pattern, subscription_id.as_deref())?;
+    let _ = app_handle.emit("settings:ignore-rules-changed", ());
     refresh_tray(app_handle);
     Ok(rule)
 }
@@ -32,6 +33,7 @@ pub fn delete_ignore_rule(
     id: String,
 ) -> Result<(), AppError> {
     db.delete_ignore_rule(&id)?;
+    let _ = app_handle.emit("settings:ignore-rules-changed", ());
     refresh_tray(app_handle);
     Ok(())
 }

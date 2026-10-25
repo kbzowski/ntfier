@@ -25,7 +25,6 @@ import {
 	type NotificationDisplayMethod,
 	type ServerConfig,
 	type Subscription,
-	type ThemeMode,
 	type UpdateInfo,
 } from "@/types/bindings";
 import { BackendError } from "./error-classification";
@@ -180,10 +179,6 @@ export const notificationsApi = {
 export const settingsApi = {
 	get: async () => unwrap(await commands.getSettings()),
 
-	setTheme: async (theme: ThemeMode) => {
-		unwrap(await commands.setTheme(theme));
-	},
-
 	addServer: async (server: Omit<ServerConfig, "isDefault">) =>
 		unwrap(
 			await commands.addServer({
@@ -255,6 +250,10 @@ export const settingsApi = {
 	setFavoritesEnabled: async (enabled: boolean) => {
 		unwrap(await commands.setFavoritesEnabled(enabled));
 	},
+
+	openWindow: async (editServerUrl: string | null = null) => {
+		unwrap(await commands.openSettingsWindow(editServerUrl));
+	},
 };
 
 // ===== Sync API =====
@@ -281,6 +280,9 @@ export const updateApi = {
 		const result = await commands.checkForUpdate();
 		return unwrap(result);
 	},
+
+	/** Result of the latest update check, null if none ran or it found no update */
+	getLastCheck: (): Promise<UpdateInfo | null> => commands.getLastUpdateCheck(),
 
 	/** Install the available update */
 	installUpdate: async (): Promise<void> => {

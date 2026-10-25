@@ -24,7 +24,6 @@ export const commands = {
 	addIgnoreRule: (pattern: string, subscriptionId: string | null) => typedError<IgnoreRule, AppError>(__TAURI_INVOKE("add_ignore_rule", { pattern, subscriptionId })),
 	deleteIgnoreRule: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_ignore_rule", { id })),
 	getSettings: () => typedError<AppSettings, AppError>(__TAURI_INVOKE("get_settings")),
-	setTheme: (theme: ThemeMode) => typedError<null, AppError>(__TAURI_INVOKE("set_theme", { theme })),
 	addServer: (server: ServerConfig) => typedError<SavedServer, AppError>(__TAURI_INVOKE("add_server", { server })),
 	/**  Changes a server's login in place and reconnects its subscriptions with it. */
 	updateServer: (server: ServerConfig) => typedError<SavedServer, AppError>(__TAURI_INVOKE("update_server", { server })),
@@ -70,6 +69,21 @@ export const commands = {
 	date: string | null,
 } | null, AppError>(__TAURI_INVOKE("check_for_update")),
 	/**
+	 *  Get the result of the latest update check (startup or `check_for_update`).
+	 * 
+	 *  Returns null if no check has run yet or the latest found no update.
+	 */
+	getLastUpdateCheck: () => __TAURI_INVOKE<{
+	/**  The new version available. */
+	version: string,
+	/**  The current installed version. */
+	current_version: string,
+	/**  Release notes for the update. */
+	body: string | null,
+	/**  Release date. */
+	date: string | null,
+} | null>("get_last_update_check"),
+	/**
 	 *  Download and install an available update.
 	 * 
 	 *  This will download the update and may restart the application.
@@ -83,6 +97,8 @@ export const commands = {
 	 *  Returns "dev" in debug builds, "vX.Y.Z" in release builds.
 	 */
 	getAppVersionDisplay: () => __TAURI_INVOKE<string>("get_app_version_display"),
+	/**  Opens the settings window, or raises it if it's already open. */
+	openSettingsWindow: (editServerUrl: string | null) => typedError<null, AppError>(__TAURI_INVOKE("open_settings_window", { editServerUrl })),
 };
 
 /* Types */
@@ -98,22 +114,20 @@ export type ActionType = "view" | "http" | "copy" | "unknown";
  *  type AppError = { Database: string } | { WebSocket: string } | ...
  *  ```
  */
-export type AppError = ({ Database: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ WebSocket: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never } | ({ Serialization: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ NotFound: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Validation: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; WebSocket?: never } | ({ InvalidUrl: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Connection: string }) & { AccountSync?: never; Auth?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Credential: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never } | 
+export type AppError = ({ Database: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never; Window?: never } | ({ WebSocket: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; Window?: never } | ({ Serialization: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never; Window?: never } | ({ NotFound: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never; Window?: never } | ({ Validation: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; WebSocket?: never; Window?: never } | ({ InvalidUrl: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never; Window?: never } | ({ Connection: string }) & { AccountSync?: never; Auth?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never; Window?: never } | ({ Credential: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never; Window?: never } | 
 /**  401: the server rejected the credential. */
-({ Auth: string }) & { AccountSync?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never } | 
+({ Auth: string }) & { AccountSync?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never; Window?: never } | 
 /**  403: no access to the topic. */
-({ Forbidden: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never } | 
+({ Forbidden: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never; Window?: never } | 
 /**  429: the server rate-limits us. */
-({ RateLimited: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never } | 
+({ RateLimited: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never; Window?: never } | 
 /**  Pushing a change to the user's ntfy account failed. */
-({ AccountSync: string }) & { Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never } | 
+({ AccountSync: string }) & { Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never; Window?: never } | 
 /**  The server runs ntfy older than 2.17 (or its version is unknown). */
-({ UnsupportedServer: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never } | ({ Updater: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Validation?: never; WebSocket?: never };
+({ UnsupportedServer: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; Updater?: never; Validation?: never; WebSocket?: never; Window?: never } | ({ Updater: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Validation?: never; WebSocket?: never; Window?: never } | ({ Window: string }) & { AccountSync?: never; Auth?: never; Connection?: never; Credential?: never; Database?: never; Forbidden?: never; InvalidUrl?: never; NotFound?: never; RateLimited?: never; Serialization?: never; UnsupportedServer?: never; Updater?: never; Validation?: never; WebSocket?: never };
 
 /**  Application-wide settings. */
 export type AppSettings = {
-	/**  Theme mode for the application. */
-	theme: ThemeMode,
 	/**  Configured ntfy servers. */
 	servers: ServerConfig[],
 	/**  URL of the default server for new subscriptions. */
@@ -292,9 +306,6 @@ export type Subscription = {
 	/**  Whether notifications from this subscription are muted. */
 	muted: boolean,
 };
-
-/**  Theme mode for the application. */
-export type ThemeMode = "light" | "dark" | "system";
 
 /**  Information about an available update. */
 export type UpdateInfo = {

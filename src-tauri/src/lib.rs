@@ -24,7 +24,7 @@ mod services;
 use db::Database;
 use services::{ConnectionManager, SyncService, TrayManager};
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     Emitter, Manager,
 };
@@ -56,7 +56,6 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::delete_ignore_rule,
         // Settings
         commands::get_settings,
-        commands::set_theme,
         commands::add_server,
         commands::update_server,
         commands::get_server_statuses,
@@ -81,9 +80,12 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::sync_subscriptions,
         // Update
         commands::check_for_update,
+        commands::get_last_update_check,
         commands::install_update,
         commands::get_app_version,
         commands::get_app_version_display,
+        // Windows
+        commands::open_settings_window,
     ])
 }
 
@@ -164,6 +166,8 @@ pub fn run() {
             let tray_manager = TrayManager::new();
             app.manage(tray_manager);
 
+            app.manage(services::LastUpdateCheck::default());
+
             // Logging in debug mode
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -175,8 +179,10 @@ pub fn run() {
 
             // Tray icon setup
             let show = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
+            let separator = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &quit])?;
+            let menu = Menu::with_items(app, &[&show, &settings, &separator, &quit])?;
 
             let default_icon = app
                 .default_window_icon()
@@ -192,6 +198,15 @@ pub fn run() {
                             let _ = window.show();
                             let _ = window.set_focus();
                         }
+                    }
+                    "settings" => {
+                        // Building a window inside the menu handler deadlocks on Windows
+                        let app = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Err(e) = commands::show_settings_window(&app, None) {
+                                log::error!("Failed to open settings window: {e}");
+                            }
+                        });
                     }
                     "quit" => app.exit(0),
                     _ => {}
@@ -246,6 +261,8 @@ pub fn run() {
                             }
                             // If minimize_to_tray is false, allow normal close
                         }
+                        // Don't leave a process running with only the settings window
+                        tauri::WindowEvent::Destroyed => app_handle.exit(0),
                         tauri::WindowEvent::Resized(_)
                             if minimize_to_tray && win.is_minimized().unwrap_or(false) =>
                         {

@@ -3,9 +3,11 @@
 //! Uses tauri-plugin-updater to check for updates from GitHub releases
 //! and install them with user confirmation.
 
+use std::sync::{Mutex, MutexGuard};
+
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::UpdaterExt;
 
 use crate::error::AppError;
@@ -23,6 +25,16 @@ pub struct UpdateInfo {
     pub date: Option<String>,
 }
 
+/// Managed state: result of the latest successful update check, so a window opened later can show it.
+#[derive(Default)]
+pub struct LastUpdateCheck(Mutex<Option<UpdateInfo>>);
+
+impl LastUpdateCheck {
+    fn slot(&self) -> MutexGuard<'_, Option<UpdateInfo>> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
 /// Service for managing application updates.
 pub struct UpdateService;
 
@@ -30,7 +42,19 @@ impl UpdateService {
     /// Check for available updates.
     ///
     /// Returns `Some(UpdateInfo)` if an update is available, `None` otherwise.
+    /// The result is stored and returned later by [`Self::last_check`].
     pub async fn check_for_update(handle: &AppHandle) -> Result<Option<UpdateInfo>, AppError> {
+        let info = Self::fetch_update(handle).await?;
+        handle.state::<LastUpdateCheck>().slot().clone_from(&info);
+        Ok(info)
+    }
+
+    /// Result of the latest successful update check, `None` if none ran or it found no update.
+    pub fn last_check(handle: &AppHandle) -> Option<UpdateInfo> {
+        handle.state::<LastUpdateCheck>().slot().clone()
+    }
+
+    async fn fetch_update(handle: &AppHandle) -> Result<Option<UpdateInfo>, AppError> {
         let updater = handle
             .updater()
             .map_err(|e| AppError::Updater(e.to_string()))?;
