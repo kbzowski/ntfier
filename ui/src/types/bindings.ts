@@ -24,7 +24,6 @@ export const commands = {
 	addIgnoreRule: (pattern: string, subscriptionId: string | null) => typedError<IgnoreRule, AppError>(__TAURI_INVOKE("add_ignore_rule", { pattern, subscriptionId })),
 	deleteIgnoreRule: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_ignore_rule", { id })),
 	getSettings: () => typedError<AppSettings, AppError>(__TAURI_INVOKE("get_settings")),
-	setTheme: (theme: ThemeMode) => typedError<null, AppError>(__TAURI_INVOKE("set_theme", { theme })),
 	addServer: (server: ServerConfig) => typedError<SavedServer, AppError>(__TAURI_INVOKE("add_server", { server })),
 	/**  Changes a server's login in place and reconnects its subscriptions with it. */
 	updateServer: (server: ServerConfig) => typedError<SavedServer, AppError>(__TAURI_INVOKE("update_server", { server })),
@@ -112,8 +111,6 @@ export type AppError = ({ Database: string }) & { AccountSync?: never; Auth?: ne
 
 /**  Application-wide settings. */
 export type AppSettings = {
-	/**  Theme mode for the application. */
-	theme: ThemeMode,
 	/**  Configured ntfy servers. */
 	servers: ServerConfig[],
 	/**  URL of the default server for new subscriptions. */
@@ -292,9 +289,6 @@ export type Subscription = {
 	/**  Whether notifications from this subscription are muted. */
 	muted: boolean,
 };
-
-/**  Theme mode for the application. */
-export type ThemeMode = "light" | "dark" | "system";
 
 /**  Information about an available update. */
 export type UpdateInfo = {

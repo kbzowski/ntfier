@@ -25,7 +25,6 @@ import {
 	type NotificationDisplayMethod,
 	type ServerConfig,
 	type Subscription,
-	type ThemeMode,
 	type UpdateInfo,
 } from "@/types/bindings";
 import { BackendError } from "./error-classification";
@@ -179,10 +178,6 @@ export const notificationsApi = {
 
 export const settingsApi = {
 	get: async () => unwrap(await commands.getSettings()),
-
-	setTheme: async (theme: ThemeMode) => {
-		unwrap(await commands.setTheme(theme));
-	},
 
 	addServer: async (server: Omit<ServerConfig, "isDefault">) =>
 		unwrap(

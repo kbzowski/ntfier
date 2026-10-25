@@ -7,7 +7,6 @@ export type {
 	NotificationDisplayMethod,
 	ServerConfig,
 	Subscription,
-	ThemeMode,
 	UpdateInfo,
 } from "./bindings";
 

@@ -6,7 +6,7 @@ use crate::db::connection::Database;
 use crate::db::models::SettingRow;
 use crate::db::schema::settings;
 use crate::error::AppError;
-use crate::models::{AppSettings, NotificationDisplayMethod, NotificationSettings, ThemeMode};
+use crate::models::{AppSettings, NotificationDisplayMethod, NotificationSettings};
 
 impl Database {
     /// Gets a string setting with a default fallback.
@@ -94,13 +94,6 @@ impl Database {
 
     /// Gets all application settings.
     pub fn get_settings(&self) -> Result<AppSettings, AppError> {
-        let theme_str = self.get_setting_string("theme", "system")?;
-        let theme = match theme_str.as_str() {
-            "light" => ThemeMode::Light,
-            "dark" => ThemeMode::Dark,
-            _ => ThemeMode::System,
-        };
-
         let minimize_to_tray = self.get_setting_bool("minimize_to_tray", true)?;
         let start_minimized = self.get_setting_bool("start_minimized", false)?;
 
@@ -132,7 +125,6 @@ impl Database {
         let default_server = self.get_default_server_url()?;
 
         Ok(AppSettings {
-            theme,
             servers,
             default_server,
             minimize_to_tray,

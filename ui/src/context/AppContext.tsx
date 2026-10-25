@@ -35,7 +35,6 @@ import type {
 	NotificationDisplayMethod,
 	ServerConfig,
 	Subscription,
-	ThemeMode,
 	UpdateInfo,
 } from "@/types/ntfy";
 
@@ -104,7 +103,6 @@ interface AppActions {
 	getTotalUnread: () => number;
 
 	// Settings
-	setTheme: (theme: ThemeMode) => Promise<void>;
 	addServer: (
 		server: Omit<ServerConfig, "isDefault">,
 	) => Promise<Subscription[]>;
@@ -542,23 +540,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	);
 
 	// Settings actions
-	const setTheme = useCallback(async (theme: ThemeMode) => {
-		if (isTauri()) {
-			try {
-				await settingsApi.setTheme(theme);
-				setSettings((prev) => ({ ...prev, theme }));
-			} catch (err) {
-				const classified = classifyError(err);
-				toast.error(classified.userMessage, {
-					description: "Failed to save theme preference",
-				});
-				console.error("[Settings Error]", err);
-			}
-		} else {
-			setSettings((prev) => ({ ...prev, theme }));
-		}
-	}, []);
-
 	const addServer = useCallback(
 		async (
 			server: Omit<ServerConfig, "isDefault">,
@@ -891,7 +872,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			setNotificationExpanded: notifications.setExpanded,
 			getUnreadCount: notifications.getUnreadCount,
 			getTotalUnread: notifications.getTotalUnread,
-			setTheme,
 			addServer,
 			updateServer,
 			syncServer,
@@ -946,7 +926,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			notifications.setExpanded,
 			notifications.getUnreadCount,
 			notifications.getTotalUnread,
-			setTheme,
 			addServer,
 			updateServer,
 			syncServer,

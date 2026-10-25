@@ -9,7 +9,6 @@ use specta::Type;
 
 use crate::models::{
     canonical_url, AppSettings, NotificationDisplayMethod, ServerConfig, ServerStatusEntry,
-    ThemeMode,
 };
 use crate::services::{ConnectionManager, NtfyClient, SyncService};
 
@@ -17,17 +16,6 @@ use crate::services::{ConnectionManager, NtfyClient, SyncService};
 #[specta::specta]
 pub fn get_settings(db: State<'_, Database>) -> Result<AppSettings, AppError> {
     db.get_settings()
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn set_theme(db: State<'_, Database>, theme: ThemeMode) -> Result<(), AppError> {
-    let theme_str = match theme {
-        ThemeMode::Light => "light",
-        ThemeMode::Dark => "dark",
-        ThemeMode::System => "system",
-    };
-    db.set_setting("theme", theme_str)
 }
 
 /// A saved server's canonical URL, plus a warning when the login wasn't kept.

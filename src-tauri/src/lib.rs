@@ -56,7 +56,6 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::delete_ignore_rule,
         // Settings
         commands::get_settings,
-        commands::set_theme,
         commands::add_server,
         commands::update_server,
         commands::get_server_statuses,

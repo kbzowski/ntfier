@@ -454,7 +454,6 @@ export const mockNotifications: Notification[] = [
 ];
 
 export const mockSettings: AppSettings = {
-	theme: "system",
 	servers: [
 		{
 			url: "https://ntfy.sh",

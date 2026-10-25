@@ -3,16 +3,6 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-/// Theme mode for the application.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, Type)]
-#[serde(rename_all = "lowercase")]
-pub enum ThemeMode {
-    Light,
-    Dark,
-    #[default]
-    System,
-}
-
 /// Notification display method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
@@ -80,8 +70,6 @@ pub struct NotificationSettings {
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
-    /// Theme mode for the application.
-    pub theme: ThemeMode,
     /// Configured ntfy servers.
     pub servers: Vec<ServerConfig>,
     /// URL of the default server for new subscriptions.
@@ -134,7 +122,6 @@ const fn default_true() -> bool {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            theme: ThemeMode::System,
             servers: vec![ServerConfig {
                 url: "https://ntfy.sh".to_string(),
                 username: None,
