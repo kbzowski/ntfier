@@ -18,12 +18,11 @@ export const Route = createFileRoute("/settings")({
 function SettingsWindow() {
 	const { themeId, setThemeId, isSystemMode, setSystemMode, availableThemes } =
 		useTheme();
-	// `n` remounts the content so an open window's tab and form re-init
 	const { editServer } = Route.useSearch();
-	const [edit, setEdit] = useState({ url: editServer, n: 0 });
+	const [edit, setEdit] = useState(editServer ? { url: editServer } : null);
 	useTauriEvent<unknown>("settings:edit-server", (payload) => {
 		const { editServer: url } = validateSettingsSearch({ editServer: payload });
-		if (url) setEdit((e) => ({ url, n: e.n + 1 }));
+		if (url) setEdit({ url });
 	});
 
 	// Read-only, for the subscription count in the server removal confirmation
@@ -62,9 +61,7 @@ function SettingsWindow() {
 	return (
 		<div className="flex h-screen flex-col p-4">
 			<SettingsContent
-				// The server form reads its server once, so mount it after settings load
-				key={s.settingsLoading ? "loading" : edit.n}
-				editServerUrl={edit.url}
+				editServer={edit}
 				themeId={themeId}
 				onThemeChange={setThemeId}
 				isSystemMode={isSystemMode}

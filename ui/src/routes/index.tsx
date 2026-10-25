@@ -50,7 +50,7 @@ function MainWindow() {
 
 function App() {
 	const [settingsOpen, setSettingsOpen] = useState(false);
-	const [editServerUrl, setEditServerUrl] = useState<string | null>(null);
+	const [editServer, setEditServer] = useState<{ url: string } | null>(null);
 	const [addSubscriptionOpen, setAddSubscriptionOpen] = useState(false);
 	const [confirmDialog, setConfirmDialog] = useState<{
 		open: boolean;
@@ -150,14 +150,14 @@ function App() {
 	}, []);
 	const handleSettingsOpenChange = useCallback((open: boolean) => {
 		setSettingsOpen(open);
-		if (!open) setEditServerUrl(null);
+		if (!open) setEditServer(null);
 	}, []);
 	const handleEditServer = useCallback((url: string) => {
 		if (isTauri()) {
 			openSettingsWindow(url);
 			return;
 		}
-		setEditServerUrl(url);
+		setEditServer({ url });
 		setSettingsOpen(true);
 	}, []);
 	const handleOpenAddSubscription = useCallback(
@@ -238,7 +238,7 @@ function App() {
 						servers={settings.servers}
 						onAddServer={addServer}
 						onUpdateServer={updateServer}
-						editServerUrl={editServerUrl}
+						editServer={editServer}
 						onRemoveServer={removeServer}
 						onSyncServer={syncServer}
 						onSetDefaultServer={setDefaultServer}

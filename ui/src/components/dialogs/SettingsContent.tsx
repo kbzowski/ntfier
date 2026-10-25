@@ -35,8 +35,8 @@ export interface SettingsContentProps {
 	onUpdateServer: (
 		server: Omit<ServerConfig, "isDefault">,
 	) => Promise<unknown> | undefined;
-	/** Opens straight on this server's login (Servers tab). */
-	editServerUrl?: string | null;
+	/** Switches to this server's login (Servers tab); a new object switches again. */
+	editServer?: { url: string } | null;
 	/** Called once the user confirms the removal. */
 	onRemoveServer: (url: string) => void;
 	onSyncServer: (url: string) => Promise<void>;
@@ -89,7 +89,7 @@ export function SettingsContent({
 	servers,
 	onAddServer,
 	onUpdateServer,
-	editServerUrl,
+	editServer,
 	onRemoveServer,
 	onSyncServer,
 	onSetDefaultServer,
@@ -138,10 +138,16 @@ export function SettingsContent({
 		commands.getAppVersionDisplay().then(setVersion);
 	}, []);
 
+	const [tab, setTab] = useState(editServer ? "servers" : "appearance");
+	useEffect(() => {
+		if (editServer) setTab("servers");
+	}, [editServer]);
+
 	return (
 		<div className="flex min-h-0 flex-1 flex-col gap-4">
 			<Tabs
-				defaultValue={editServerUrl ? "servers" : "appearance"}
+				value={tab}
+				onValueChange={setTab}
 				className="@container min-h-0 flex-1"
 			>
 				<TabsList
@@ -248,7 +254,7 @@ export function SettingsContent({
 						servers={servers}
 						onAddServer={onAddServer}
 						onUpdateServer={onUpdateServer}
-						editUrl={editServerUrl}
+						editServer={editServer}
 						onRemoveServer={setServerToRemove}
 						onSyncServer={onSyncServer}
 						onSetDefault={onSetDefaultServer}
