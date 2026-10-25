@@ -35,6 +35,15 @@ impl Database {
         Ok(result.map_or(default, |v| v == "true"))
     }
 
+    /// Gets an optional positive limit; `None` (absent, empty or zero) means off.
+    fn get_setting_limit(&self, key: &str) -> Result<Option<u32>, AppError> {
+        Ok(self
+            .get_setting_string(key, "")?
+            .parse()
+            .ok()
+            .filter(|limit| *limit > 0))
+    }
+
     /// Gets notification-specific settings only (does not fetch server credentials).
     /// Use this when displaying notifications to avoid unnecessary credential lookups.
     pub fn get_notification_settings(&self) -> Result<NotificationSettings, AppError> {
@@ -73,22 +82,14 @@ impl Database {
         self.get_setting_bool("delete_local_only", true)
     }
 
-    /// Gets the retention age limit in days; `None` (absent or empty) means off.
+    /// Gets the retention age limit in days; `None` means off.
     pub fn get_retention_max_age_days(&self) -> Result<Option<u32>, AppError> {
-        Ok(self
-            .get_setting_string("retention_max_age_days", "")?
-            .parse()
-            .ok()
-            .filter(|days| *days > 0))
+        self.get_setting_limit("retention_max_age_days")
     }
 
-    /// Gets the retention count limit per subscription; `None` (absent or empty) means off.
+    /// Gets the retention count limit per subscription; `None` means off.
     pub fn get_retention_max_per_subscription(&self) -> Result<Option<u32>, AppError> {
-        Ok(self
-            .get_setting_string("retention_max_per_subscription", "")?
-            .parse()
-            .ok()
-            .filter(|max| *max > 0))
+        self.get_setting_limit("retention_max_per_subscription")
     }
 
     /// Gets all application settings.
