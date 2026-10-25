@@ -47,6 +47,6 @@ pub async fn open_settings_window(
     app: AppHandle,
     edit_server_url: Option<String>,
 ) -> Result<(), AppError> {
-    show_settings_window(&app, edit_server_url.as_deref())?;
-    Ok(())
+    show_settings_window(&app, edit_server_url.as_deref())
+        .map_err(|e| AppError::Window(e.to_string()))
 }

@@ -63,12 +63,6 @@ pub enum AppError {
     Window(String),
 }
 
-impl From<tauri::Error> for AppError {
-    fn from(err: tauri::Error) -> Self {
-        Self::Window(err.to_string())
-    }
-}
-
 // Conversion from Diesel errors — log full detail, return generic message to frontend
 impl From<diesel::result::Error> for AppError {
     fn from(err: diesel::result::Error) -> Self {
