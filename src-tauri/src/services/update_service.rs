@@ -7,7 +7,7 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::UpdaterExt;
 
 use crate::error::AppError;
@@ -25,8 +25,9 @@ pub struct UpdateInfo {
     pub date: Option<String>,
 }
 
-/// Result of the latest successful update check, so a window opened later can show it.
-static LAST_CHECK: Mutex<Option<UpdateInfo>> = Mutex::new(None);
+/// Managed state: result of the latest successful update check, so a window opened later can show it.
+#[derive(Default)]
+pub struct LastUpdateCheck(Mutex<Option<UpdateInfo>>);
 
 /// Service for managing application updates.
 pub struct UpdateService;
@@ -38,7 +39,9 @@ impl UpdateService {
     /// The result is stored and returned later by [`Self::last_check`].
     pub async fn check_for_update(handle: &AppHandle) -> Result<Option<UpdateInfo>, AppError> {
         let info = Self::fetch_update(handle).await?;
-        LAST_CHECK
+        handle
+            .state::<LastUpdateCheck>()
+            .0
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .clone_from(&info);
@@ -46,8 +49,13 @@ impl UpdateService {
     }
 
     /// Result of the latest successful update check, `None` if none ran or it found no update.
-    pub fn last_check() -> Option<UpdateInfo> {
-        LAST_CHECK.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    pub fn last_check(handle: &AppHandle) -> Option<UpdateInfo> {
+        handle
+            .state::<LastUpdateCheck>()
+            .0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     async fn fetch_update(handle: &AppHandle) -> Result<Option<UpdateInfo>, AppError> {

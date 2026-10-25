@@ -166,6 +166,8 @@ pub fn run() {
             let tray_manager = TrayManager::new();
             app.manage(tray_manager);
 
+            app.manage(services::LastUpdateCheck::default());
+
             // Logging in debug mode
             if cfg!(debug_assertions) {
                 app.handle().plugin(

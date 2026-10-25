@@ -19,8 +19,8 @@ pub async fn check_for_update(handle: AppHandle) -> Result<Option<UpdateInfo>, A
 /// Returns null if no check has run yet or the latest found no update.
 #[tauri::command]
 #[specta::specta]
-pub fn get_last_update_check() -> Option<UpdateInfo> {
-    UpdateService::last_check()
+pub fn get_last_update_check(handle: AppHandle) -> Option<UpdateInfo> {
+    UpdateService::last_check(&handle)
 }
 
 /// Download and install an available update.

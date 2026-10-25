@@ -17,4 +17,4 @@ pub use connection_manager::ConnectionManager;
 pub use ntfy_client::NtfyClient;
 pub use sync_service::SyncService;
 pub use tray_manager::TrayManager;
-pub use update_service::{UpdateInfo, UpdateService};
+pub use update_service::{LastUpdateCheck, UpdateInfo, UpdateService};
