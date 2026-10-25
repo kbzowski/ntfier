@@ -28,6 +28,7 @@
     "@radix-ui/react-tooltip": "^1.2.12",
     "@tanstack/react-router": "^1.170.18",
     "@tanstack/react-start": "^1.168.28",
+    "@tanstack/react-virtual": "^3.14.22",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-autostart": "^2.5.1",
     "@tauri-apps/plugin-shell": "^2.3.5",
