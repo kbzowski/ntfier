@@ -15,8 +15,6 @@ export type ServerInput = Omit<ServerConfig, "isDefault">;
 interface UseServerFormOptions {
 	onAdd: (server: ServerInput) => Promise<unknown>;
 	onUpdate: (server: ServerInput) => Promise<unknown>;
-	/** Server whose login the form starts out editing. */
-	initial?: ServerConfig;
 }
 
 /** The URL of the server being edited, or `null` when adding a new one. */
@@ -32,21 +30,13 @@ function authModeOf(server: ServerConfig): AuthMode {
  * Hook for the server form: add a server, or edit the login of an existing one
  * (the URL can't change). One credential per server: password or access token.
  */
-export function useServerForm({
-	onAdd,
-	onUpdate,
-	initial,
-}: UseServerFormOptions) {
-	const [mode, setMode] = useState<FormMode>(
-		initial ? { editing: initial.url } : null,
-	);
-	const [url, setUrl] = useState(initial?.url ?? "");
-	const [authMode, setAuthMode] = useState<AuthMode>(
-		initial ? authModeOf(initial) : "none",
-	);
-	const [username, setUsername] = useState(initial?.username ?? "");
-	const [password, setPassword] = useState(initial?.password ?? "");
-	const [token, setToken] = useState(initial?.token ?? "");
+export function useServerForm({ onAdd, onUpdate }: UseServerFormOptions) {
+	const [mode, setMode] = useState<FormMode>(null);
+	const [url, setUrl] = useState("");
+	const [authMode, setAuthMode] = useState<AuthMode>("none");
+	const [username, setUsername] = useState("");
+	const [password, setPassword] = useState("");
+	const [token, setToken] = useState("");
 	const [showSecret, setShowSecret] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);

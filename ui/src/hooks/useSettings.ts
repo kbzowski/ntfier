@@ -34,7 +34,6 @@ export interface SettingsCallbacks {
 
 export interface SettingsState {
 	settings: AppSettings;
-	settingsLoading: boolean;
 	/** Startup load failure of the settings part */
 	settingsLoadError: string | null;
 	ignoreRules: IgnoreRule[];
@@ -143,7 +142,6 @@ export function useSettings(callbacks: SettingsCallbacks = {}): SettingsState {
 	const [settings, setSettings] = useState<AppSettings>(() =>
 		isTauri() ? emptySettings : mockSettings,
 	);
-	const [settingsLoading, setSettingsLoading] = useState(true);
 	const [settingsLoadError, setSettingsLoadError] = useState<string | null>(
 		null,
 	);
@@ -186,8 +184,6 @@ export function useSettings(callbacks: SettingsCallbacks = {}): SettingsState {
 		} catch (err) {
 			console.error("Failed to load initial data:", err);
 			setSettingsLoadError(classifyError(err).userMessage);
-		} finally {
-			setSettingsLoading(false);
 		}
 	}, []);
 
@@ -489,7 +485,6 @@ export function useSettings(callbacks: SettingsCallbacks = {}): SettingsState {
 	return useMemo(
 		() => ({
 			settings,
-			settingsLoading,
 			settingsLoadError,
 			ignoreRules,
 			autostart,
@@ -510,7 +505,6 @@ export function useSettings(callbacks: SettingsCallbacks = {}): SettingsState {
 		}),
 		[
 			settings,
-			settingsLoading,
 			settingsLoadError,
 			ignoreRules,
 			autostart,
