@@ -313,8 +313,22 @@ impl Database {
         }
 
         if let Some(max) = max_per_subscription {
+            // Ranks visible rows only (same filter as get_notifications_by_subscription);
+            // hidden rows older than the Nth visible one are past the limit too.
             removed += diesel::sql_query(
-                "DELETE FROM notifications WHERE id IN (                      SELECT id FROM (                          SELECT id, ROW_NUMBER() OVER (                              PARTITION BY subscription_id ORDER BY timestamp DESC, rowid DESC) AS n                          FROM notifications WHERE is_favorite = 0)                      WHERE n > ?)",
+                "WITH ranked AS (
+                    SELECT id, subscription_id, timestamp, ROW_NUMBER() OVER (
+                        PARTITION BY subscription_id ORDER BY timestamp DESC, rowid DESC) AS n
+                    FROM notifications
+                    WHERE is_favorite = 0 AND deleted = 0 AND superseded = 0)
+                DELETE FROM notifications
+                WHERE id IN (SELECT id FROM ranked WHERE n > ?1)
+                    OR (is_favorite = 0
+                        AND (deleted != 0 OR superseded != 0)
+                        AND timestamp < (
+                            SELECT r.timestamp FROM ranked r
+                            WHERE r.subscription_id = notifications.subscription_id
+                                AND r.n = ?1))",
             )
             .bind::<diesel::sql_types::BigInt, _>(i64::from(max))
             .execute(&mut *conn)?;
@@ -691,6 +705,20 @@ pub mod tests {
             visible_ids(&db, &sub),
             vec![ids[3].clone(), ids[2].clone(), ids[0].clone()]
         );
+    }
+
+    #[test]
+    fn retention_by_count_keeps_n_visible_despite_hidden_rows() {
+        let (db, sub) = db_with_sub();
+        let ids = insert_at(&db, &sub, &[1, 2, 3, 4, 5]);
+        // Tombstones: the two newest and the oldest
+        for i in [0, 3, 4] {
+            db.delete_notification(&ids[i]).unwrap();
+        }
+
+        // Hidden rows don't use up the limit; the one older than the kept rows goes too
+        assert_eq!(db.apply_retention(None, Some(2)).unwrap(), 1);
+        assert_eq!(visible_ids(&db, &sub), vec![ids[2].clone(), ids[1].clone()]);
     }
 
     #[test]
