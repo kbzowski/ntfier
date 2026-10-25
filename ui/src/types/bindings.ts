@@ -42,6 +42,8 @@ export const commands = {
 	setCompactView: (enabled: boolean) => typedError<null, AppError>(__TAURI_INVOKE("set_compact_view", { enabled })),
 	setExpandNewMessages: (enabled: boolean) => typedError<null, AppError>(__TAURI_INVOKE("set_expand_new_messages", { enabled })),
 	setDeleteLocalOnly: (enabled: boolean) => typedError<null, AppError>(__TAURI_INVOKE("set_delete_local_only", { enabled })),
+	/**  Sets the retention age limit (`None` = off) and applies retention right away. */
+	setRetentionMaxAgeDays: (days: number | null) => typedError<null, AppError>(__TAURI_INVOKE("set_retention_max_age_days", { days })),
 	setFavoritesEnabled: (enabled: boolean) => typedError<null, AppError>(__TAURI_INVOKE("set_favorites_enabled", { enabled })),
 	setNotificationFavorite: (id: string, favorite: boolean) => typedError<null, AppError>(__TAURI_INVOKE("set_notification_favorite", { id, favorite })),
 	getFavoriteNotifications: () => typedError<Notification[], AppError>(__TAURI_INVOKE("get_favorite_notifications")),
@@ -134,6 +136,8 @@ export type AppSettings = {
 	expandNewMessages?: boolean,
 	/**  Delete notifications only locally (when disabled, also deletes from ntfy server). */
 	deleteLocalOnly?: boolean,
+	/**  Retention: remove notifications older than this many days (`None` = off). */
+	retentionMaxAgeDays?: number | null,
 	/**  Enable favorites feature (star icon on notifications). */
 	favoritesEnabled?: boolean,
 };

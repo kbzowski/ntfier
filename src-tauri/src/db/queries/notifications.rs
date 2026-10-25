@@ -291,6 +291,30 @@ impl Database {
         Ok(())
     }
 
+    /// Applies retention: hard-deletes non-favorite notifications past the limits
+    /// (including tombstoned and superseded rows). `None` means the limit is off.
+    /// Returns how many notifications were removed. The subscription cursor is untouched.
+    pub fn apply_retention(
+        &self,
+        max_age_days: Option<u32>,
+        _max_per_subscription: Option<u32>,
+    ) -> Result<usize, AppError> {
+        let Some(days) = max_age_days else {
+            return Ok(0);
+        };
+        let cutoff = chrono::Utc::now().timestamp_millis() - i64::from(days) * 86_400_000;
+
+        let mut conn = self.conn()?;
+        let removed = diesel::delete(
+            notifications::table
+                .filter(notifications::is_favorite.eq(0))
+                .filter(notifications::timestamp.lt(cutoff)),
+        )
+        .execute(&mut *conn)?;
+
+        Ok(removed)
+    }
+
     /// Gets the unread count for a subscription, excluding ignored notifications.
     pub fn get_unread_count(&self, subscription_id: &str) -> Result<i32, AppError> {
         use diesel::dsl::count_star;
@@ -522,5 +546,78 @@ pub mod tests {
         let stored = db.get_notification(&n.id).unwrap().unwrap();
         assert_eq!(stored.message, "long text");
         assert!(stored.attachments.is_empty());
+    }
+
+    fn days_ago(days: i64) -> i64 {
+        chrono::Utc::now().timestamp() - days * 86_400
+    }
+
+    #[test]
+    fn retention_by_age_removes_only_older_notifications() {
+        let (db, sub) = db_with_sub();
+        let old = notification(&sub, days_ago(10));
+        let fresh = notification(&sub, days_ago(1));
+        db.insert_notification_with_ntfy_id(&old, "m1", "m1")
+            .unwrap();
+        db.insert_notification_with_ntfy_id(&fresh, "m2", "m2")
+            .unwrap();
+
+        assert_eq!(db.apply_retention(Some(7), None).unwrap(), 1);
+
+        let visible = db.get_notifications_by_subscription(&sub).unwrap();
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].id, fresh.id);
+    }
+
+    #[test]
+    fn retention_keeps_favorites() {
+        let (db, sub) = db_with_sub();
+        let old = notification(&sub, days_ago(10));
+        db.insert_notification_with_ntfy_id(&old, "m1", "m1")
+            .unwrap();
+        db.set_notification_favorite(&old.id, true).unwrap();
+
+        assert_eq!(db.apply_retention(Some(7), None).unwrap(), 0);
+        assert_eq!(db.get_favorite_notifications().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn retention_off_removes_nothing() {
+        let (db, sub) = db_with_sub();
+        db.insert_notification_with_ntfy_id(&notification(&sub, days_ago(1000)), "m1", "m1")
+            .unwrap();
+
+        assert_eq!(db.apply_retention(None, None).unwrap(), 0);
+        assert_eq!(db.get_notifications_by_subscription(&sub).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn retention_leaves_cursor_unchanged() {
+        let (db, sub) = db_with_sub();
+        let time = days_ago(10);
+        db.insert_notification_with_ntfy_id(&notification(&sub, time), "m1", "m1")
+            .unwrap();
+        db.advance_message_cursor(&sub, time).unwrap();
+
+        db.apply_retention(Some(7), None).unwrap();
+        assert_eq!(db.get_message_cursor(&sub).unwrap(), Some(time));
+    }
+
+    #[test]
+    fn retention_removes_unread_like_read() {
+        let (db, sub) = db_with_sub();
+        let read = notification(&sub, days_ago(10));
+        db.insert_notification_with_ntfy_id(&read, "m1", "m1")
+            .unwrap();
+        db.mark_notification_read(&read.id).unwrap();
+        db.insert_notification_with_ntfy_id(&notification(&sub, days_ago(9)), "m2", "m2")
+            .unwrap();
+
+        assert_eq!(db.apply_retention(Some(7), None).unwrap(), 2);
+        assert_eq!(db.get_unread_count(&sub).unwrap(), 0);
+        assert!(db
+            .get_notifications_by_subscription(&sub)
+            .unwrap()
+            .is_empty());
     }
 }

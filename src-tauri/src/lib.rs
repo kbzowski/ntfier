@@ -72,6 +72,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::set_compact_view,
         commands::set_expand_new_messages,
         commands::set_delete_local_only,
+        commands::set_retention_max_age_days,
         commands::set_favorites_enabled,
         commands::set_notification_favorite,
         commands::get_favorite_notifications,
@@ -256,12 +257,22 @@ pub fn run() {
                 });
             }
 
+            // Hourly housekeeping, first run at startup: old cached images and retention
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let mut hourly = tokio::time::interval(std::time::Duration::from_secs(60 * 60));
+                loop {
+                    hourly.tick().await;
+                    services::image_cache::cleanup_old_images(24 * 60 * 60).await;
+                    if let Err(e) = commands::run_retention(&handle) {
+                        log::warn!("Retention failed: {e}");
+                    }
+                }
+            });
+
             // Sync and connect on startup (deferred)
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                // Clean up old cached images (older than 24 hours)
-                services::image_cache::cleanup_old_images(24 * 60 * 60).await;
-
                 // Set up tray icon with custom icons
                 let tray_manager: tauri::State<TrayManager> = handle.state();
                 tray_manager.set_tray_icon(tray).await;

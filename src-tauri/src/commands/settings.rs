@@ -1,4 +1,4 @@
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::commands::notifications::refresh_tray;
 
@@ -218,6 +218,38 @@ pub fn set_expand_new_messages(db: State<'_, Database>, enabled: bool) -> Result
 #[specta::specta]
 pub fn set_delete_local_only(db: State<'_, Database>, enabled: bool) -> Result<(), AppError> {
     db.set_setting("delete_local_only", if enabled { "true" } else { "false" })
+}
+
+/// Sets the retention age limit (`None` = off) and applies retention right away.
+#[tauri::command]
+#[specta::specta]
+pub fn set_retention_max_age_days(
+    app_handle: AppHandle,
+    db: State<'_, Database>,
+    days: Option<u32>,
+) -> Result<(), AppError> {
+    if days == Some(0) {
+        return Err(AppError::Validation(
+            "Retention days must be positive".into(),
+        ));
+    }
+    db.set_setting(
+        "retention_max_age_days",
+        &days.map(|d| d.to_string()).unwrap_or_default(),
+    )?;
+    run_retention(&app_handle)
+}
+
+/// Applies retention with the stored limits; tells the UI to reload when anything was removed.
+pub fn run_retention(app_handle: &AppHandle) -> Result<(), AppError> {
+    let db: State<Database> = app_handle.state();
+    let removed = db.apply_retention(db.get_retention_max_age_days()?, None)?;
+    if removed > 0 {
+        log::info!("Retention removed {removed} notifications");
+        let _ = app_handle.emit("notifications:retained", ());
+        refresh_tray(app_handle.clone());
+    }
+    Ok(())
 }
 
 #[tauri::command]

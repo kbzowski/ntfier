@@ -73,6 +73,15 @@ impl Database {
         self.get_setting_bool("delete_local_only", true)
     }
 
+    /// Gets the retention age limit in days; `None` (absent or empty) means off.
+    pub fn get_retention_max_age_days(&self) -> Result<Option<u32>, AppError> {
+        Ok(self
+            .get_setting_string("retention_max_age_days", "")?
+            .parse()
+            .ok()
+            .filter(|days| *days > 0))
+    }
+
     /// Gets all application settings.
     pub fn get_settings(&self) -> Result<AppSettings, AppError> {
         let theme_str = self.get_setting_string("theme", "system")?;
@@ -103,6 +112,7 @@ impl Database {
 
         // Deletion settings
         let delete_local_only = self.get_setting_bool("delete_local_only", true)?;
+        let retention_max_age_days = self.get_retention_max_age_days()?;
 
         // Favorites settings
         let favorites_enabled = self.get_setting_bool("favorites_enabled", false)?;
@@ -124,6 +134,7 @@ impl Database {
             compact_view,
             expand_new_messages,
             delete_local_only,
+            retention_max_age_days,
             favorites_enabled,
         })
     }

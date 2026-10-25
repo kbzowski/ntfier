@@ -116,6 +116,9 @@ pub struct AppSettings {
     /// Delete notifications only locally (when disabled, also deletes from ntfy server).
     #[serde(default = "default_true")]
     pub delete_local_only: bool,
+    /// Retention: remove notifications older than this many days (`None` = off).
+    #[serde(default)]
+    pub retention_max_age_days: Option<u32>,
     /// Enable favorites feature (star icon on notifications).
     #[serde(default)]
     pub favorites_enabled: bool,
@@ -147,6 +150,7 @@ impl Default for AppSettings {
             compact_view: false,
             expand_new_messages: true,
             delete_local_only: true,
+            retention_max_age_days: None,
             favorites_enabled: false,
         }
     }
