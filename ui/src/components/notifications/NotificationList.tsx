@@ -1,3 +1,4 @@
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { CheckCheck, Eye, EyeOff, Hash, Inbox, Star } from "lucide-react";
 import {
 	memo,
@@ -198,6 +199,14 @@ export const NotificationList = memo(function NotificationList({
 		[notifications, showIgnored],
 	);
 
+	const virtualizer = useVirtualizer({
+		count: visibleNotifications.length,
+		getScrollElement: () => scrollContainerRef.current,
+		estimateSize: () => 120,
+		overscan: 5,
+		getItemKey: (i) => visibleNotifications[i].id,
+	});
+
 	if (isAllView && subscriptions.length === 0) {
 		return <EmptyState type="no-topic" />;
 	}
@@ -228,35 +237,48 @@ export const NotificationList = memo(function NotificationList({
 					ref={scrollContainerRef}
 					className="flex-1 overflow-y-auto min-h-0"
 				>
-					<div className="p-3 space-y-1.5">
-						{visibleNotifications.map((notification) => (
-							<div
-								key={notification.id}
-								className={cn(
-									deletingIds.has(notification.id) && "notification-deleting",
-									notification.ignored && "opacity-50",
-								)}
-								style={{
-									contentVisibility: "auto",
-									containIntrinsicSize: "auto 80px",
-								}}
-							>
-								<NotificationCard
-									notification={notification}
-									topicName={
-										showTopicName
-											? topicNames.get(notification.topicId)
-											: undefined
-									}
-									onMarkAsRead={onMarkAsRead}
-									onDelete={handleDelete}
-									onToggleFavorite={onToggleFavorite}
-									isCollapsible={compactView}
-									isExpanded={!compactView || notification.isExpanded}
-									onExpandedChange={handleExpandedChange}
-								/>
-							</div>
-						))}
+					<div className="p-3">
+						<div
+							className="relative"
+							style={{ height: virtualizer.getTotalSize() }}
+						>
+							{virtualizer.getVirtualItems().map((item) => {
+								const notification = visibleNotifications[item.index];
+								return (
+									<div
+										key={item.key}
+										data-index={item.index}
+										ref={virtualizer.measureElement}
+										className="absolute top-0 left-0 w-full pb-1.5"
+										style={{ transform: `translateY(${item.start}px)` }}
+									>
+										{/* delete keyframes animate transform, so they can't share the positioned wrapper */}
+										<div
+											className={cn(
+												deletingIds.has(notification.id) &&
+													"notification-deleting",
+												notification.ignored && "opacity-50",
+											)}
+										>
+											<NotificationCard
+												notification={notification}
+												topicName={
+													showTopicName
+														? topicNames.get(notification.topicId)
+														: undefined
+												}
+												onMarkAsRead={onMarkAsRead}
+												onDelete={handleDelete}
+												onToggleFavorite={onToggleFavorite}
+												isCollapsible={compactView}
+												isExpanded={!compactView || notification.isExpanded}
+												onExpandedChange={handleExpandedChange}
+											/>
+										</div>
+									</div>
+								);
+							})}
+						</div>
 					</div>
 				</div>
 			)}
