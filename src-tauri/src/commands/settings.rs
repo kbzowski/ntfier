@@ -240,10 +240,33 @@ pub fn set_retention_max_age_days(
     run_retention(&app_handle)
 }
 
+/// Sets the retention count limit per subscription (`None` = off) and applies retention right away.
+#[tauri::command]
+#[specta::specta]
+pub fn set_retention_max_per_subscription(
+    app_handle: AppHandle,
+    db: State<'_, Database>,
+    max: Option<u32>,
+) -> Result<(), AppError> {
+    if max == Some(0) {
+        return Err(AppError::Validation(
+            "Retention count must be positive".into(),
+        ));
+    }
+    db.set_setting(
+        "retention_max_per_subscription",
+        &max.map(|m| m.to_string()).unwrap_or_default(),
+    )?;
+    run_retention(&app_handle)
+}
+
 /// Applies retention with the stored limits; tells the UI to reload when anything was removed.
 pub fn run_retention(app_handle: &AppHandle) -> Result<(), AppError> {
     let db: State<Database> = app_handle.state();
-    let removed = db.apply_retention(db.get_retention_max_age_days()?, None)?;
+    let removed = db.apply_retention(
+        db.get_retention_max_age_days()?,
+        db.get_retention_max_per_subscription()?,
+    )?;
     if removed > 0 {
         log::info!("Retention removed {removed} notifications");
         let _ = app_handle.emit("notifications:retained", ());

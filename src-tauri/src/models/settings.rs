@@ -119,6 +119,9 @@ pub struct AppSettings {
     /// Retention: remove notifications older than this many days (`None` = off).
     #[serde(default)]
     pub retention_max_age_days: Option<u32>,
+    /// Retention: keep at most this many non-favorite notifications per subscription (`None` = off).
+    #[serde(default)]
+    pub retention_max_per_subscription: Option<u32>,
     /// Enable favorites feature (star icon on notifications).
     #[serde(default)]
     pub favorites_enabled: bool,
@@ -151,6 +154,7 @@ impl Default for AppSettings {
             expand_new_messages: true,
             delete_local_only: true,
             retention_max_age_days: None,
+            retention_max_per_subscription: None,
             favorites_enabled: false,
         }
     }

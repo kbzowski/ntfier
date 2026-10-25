@@ -82,6 +82,15 @@ impl Database {
             .filter(|days| *days > 0))
     }
 
+    /// Gets the retention count limit per subscription; `None` (absent or empty) means off.
+    pub fn get_retention_max_per_subscription(&self) -> Result<Option<u32>, AppError> {
+        Ok(self
+            .get_setting_string("retention_max_per_subscription", "")?
+            .parse()
+            .ok()
+            .filter(|max| *max > 0))
+    }
+
     /// Gets all application settings.
     pub fn get_settings(&self) -> Result<AppSettings, AppError> {
         let theme_str = self.get_setting_string("theme", "system")?;
@@ -113,6 +122,7 @@ impl Database {
         // Deletion settings
         let delete_local_only = self.get_setting_bool("delete_local_only", true)?;
         let retention_max_age_days = self.get_retention_max_age_days()?;
+        let retention_max_per_subscription = self.get_retention_max_per_subscription()?;
 
         // Favorites settings
         let favorites_enabled = self.get_setting_bool("favorites_enabled", false)?;
@@ -135,6 +145,7 @@ impl Database {
             expand_new_messages,
             delete_local_only,
             retention_max_age_days,
+            retention_max_per_subscription,
             favorites_enabled,
         })
     }

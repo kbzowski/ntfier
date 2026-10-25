@@ -73,6 +73,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::set_expand_new_messages,
         commands::set_delete_local_only,
         commands::set_retention_max_age_days,
+        commands::set_retention_max_per_subscription,
         commands::set_favorites_enabled,
         commands::set_notification_favorite,
         commands::get_favorite_notifications,

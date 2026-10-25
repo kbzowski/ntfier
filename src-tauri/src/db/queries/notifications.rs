@@ -297,20 +297,28 @@ impl Database {
     pub fn apply_retention(
         &self,
         max_age_days: Option<u32>,
-        _max_per_subscription: Option<u32>,
+        max_per_subscription: Option<u32>,
     ) -> Result<usize, AppError> {
-        let Some(days) = max_age_days else {
-            return Ok(0);
-        };
-        let cutoff = chrono::Utc::now().timestamp_millis() - i64::from(days) * 86_400_000;
-
         let mut conn = self.conn()?;
-        let removed = diesel::delete(
-            notifications::table
-                .filter(notifications::is_favorite.eq(0))
-                .filter(notifications::timestamp.lt(cutoff)),
-        )
-        .execute(&mut *conn)?;
+        let mut removed = 0;
+
+        if let Some(days) = max_age_days {
+            let cutoff = chrono::Utc::now().timestamp_millis() - i64::from(days) * 86_400_000;
+            removed += diesel::delete(
+                notifications::table
+                    .filter(notifications::is_favorite.eq(0))
+                    .filter(notifications::timestamp.lt(cutoff)),
+            )
+            .execute(&mut *conn)?;
+        }
+
+        if let Some(max) = max_per_subscription {
+            removed += diesel::sql_query(
+                "DELETE FROM notifications WHERE id IN (                      SELECT id FROM (                          SELECT id, ROW_NUMBER() OVER (                              PARTITION BY subscription_id ORDER BY timestamp DESC, rowid DESC) AS n                          FROM notifications WHERE is_favorite = 0)                      WHERE n > ?)",
+            )
+            .bind::<diesel::sql_types::BigInt, _>(i64::from(max))
+            .execute(&mut *conn)?;
+        }
 
         Ok(removed)
     }
@@ -619,5 +627,83 @@ pub mod tests {
             .get_notifications_by_subscription(&sub)
             .unwrap()
             .is_empty());
+    }
+
+    /// Inserts one notification per time (seconds) and returns their ids in that order.
+    fn insert_at(db: &Database, sub: &str, times: &[i64]) -> Vec<String> {
+        times
+            .iter()
+            .map(|&t| {
+                let n = notification(sub, t);
+                let ntfy_id = format!("{sub}-{t}");
+                db.insert_notification_with_ntfy_id(&n, &ntfy_id, &ntfy_id)
+                    .unwrap();
+                n.id
+            })
+            .collect()
+    }
+
+    fn visible_ids(db: &Database, sub: &str) -> Vec<String> {
+        db.get_notifications_by_subscription(sub)
+            .unwrap()
+            .into_iter()
+            .map(|n| n.id)
+            .collect()
+    }
+
+    #[test]
+    fn retention_by_count_keeps_newest_per_subscription() {
+        let (db, busy) = db_with_sub();
+        let quiet = db
+            .create_subscription(CreateSubscription {
+                topic: "quiet".to_string(),
+                server_url: "https://ntfy.sh".to_string(),
+                display_name: None,
+            })
+            .unwrap()
+            .id;
+        // Inserted out of order so "newest" must come from the timestamp
+        let busy_ids = insert_at(&db, &busy, &[3, 5, 1, 4, 2]);
+        let quiet_ids = insert_at(&db, &quiet, &[1, 2]);
+
+        assert_eq!(db.apply_retention(None, Some(2)).unwrap(), 3);
+
+        assert_eq!(
+            visible_ids(&db, &busy),
+            vec![busy_ids[1].clone(), busy_ids[3].clone()]
+        );
+        assert_eq!(
+            visible_ids(&db, &quiet),
+            vec![quiet_ids[1].clone(), quiet_ids[0].clone()]
+        );
+    }
+
+    #[test]
+    fn retention_by_count_ignores_favorites() {
+        let (db, sub) = db_with_sub();
+        let ids = insert_at(&db, &sub, &[1, 2, 3, 4]);
+        db.set_notification_favorite(&ids[0], true).unwrap();
+        db.set_notification_favorite(&ids[3], true).unwrap();
+
+        // Favorites stay and don't use up the limit: the newest non-favorite is kept
+        assert_eq!(db.apply_retention(None, Some(1)).unwrap(), 1);
+        assert_eq!(
+            visible_ids(&db, &sub),
+            vec![ids[3].clone(), ids[2].clone(), ids[0].clone()]
+        );
+    }
+
+    #[test]
+    fn retention_applies_both_limits_together() {
+        let (db, sub) = db_with_sub();
+        let ids = insert_at(
+            &db,
+            &sub,
+            &[days_ago(10), days_ago(3), days_ago(2), days_ago(1)],
+        );
+
+        // Age removes the 10-day-old one, count trims the rest to the newest two
+        assert_eq!(db.apply_retention(Some(7), Some(2)).unwrap(), 2);
+        assert_eq!(visible_ids(&db, &sub), vec![ids[3].clone(), ids[2].clone()]);
     }
 }
