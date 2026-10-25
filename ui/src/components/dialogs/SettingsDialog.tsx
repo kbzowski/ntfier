@@ -70,6 +70,8 @@ interface SettingsDialogProps {
 	onDeleteLocalOnlyChange: (enabled: boolean) => void;
 	retentionMaxAgeDays: number | null;
 	onRetentionMaxAgeDaysChange: (days: number | null) => void;
+	retentionMaxPerSubscription: number | null;
+	onRetentionMaxPerSubscriptionChange: (max: number | null) => void;
 	favoritesEnabled: boolean;
 	onFavoritesEnabledChange: (enabled: boolean) => void;
 }
@@ -115,6 +117,8 @@ export function SettingsDialog({
 	onDeleteLocalOnlyChange,
 	retentionMaxAgeDays,
 	onRetentionMaxAgeDaysChange,
+	retentionMaxPerSubscription,
+	onRetentionMaxPerSubscriptionChange,
 	favoritesEnabled,
 	onFavoritesEnabledChange,
 }: SettingsDialogProps) {
@@ -192,6 +196,10 @@ export function SettingsDialog({
 							onDeleteLocalOnlyChange={onDeleteLocalOnlyChange}
 							retentionMaxAgeDays={retentionMaxAgeDays}
 							onRetentionMaxAgeDaysChange={onRetentionMaxAgeDaysChange}
+							retentionMaxPerSubscription={retentionMaxPerSubscription}
+							onRetentionMaxPerSubscriptionChange={
+								onRetentionMaxPerSubscriptionChange
+							}
 							updateInfo={updateInfo}
 							onUpdateInfoChange={onUpdateInfoChange}
 						/>

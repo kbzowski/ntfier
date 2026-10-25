@@ -130,6 +130,7 @@ interface AppActions {
 	// Deletion settings
 	setDeleteLocalOnly: (enabled: boolean) => Promise<void>;
 	setRetentionMaxAgeDays: (days: number | null) => Promise<void>;
+	setRetentionMaxPerSubscription: (max: number | null) => Promise<void>;
 
 	// Favorites settings
 	setFavoritesEnabled: (enabled: boolean) => Promise<void>;
@@ -790,6 +791,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		}
 	}, []);
 
+	const setRetentionMaxPerSubscription = useCallback(
+		async (max: number | null) => {
+			if (!isTauri()) return;
+			try {
+				await settingsApi.setRetentionMaxPerSubscription(max);
+				setSettings((prev) => ({ ...prev, retentionMaxPerSubscription: max }));
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage);
+				console.error("[Settings Error]", err);
+			}
+		},
+		[],
+	);
+
 	// Derived data
 	const currentNotifications = useMemo(() => {
 		if (currentView === "favorites") {
@@ -885,6 +901,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			setExpandNewMessages,
 			setDeleteLocalOnly,
 			setRetentionMaxAgeDays,
+			setRetentionMaxPerSubscription,
 			setFavoritesEnabled,
 			setUpdateInfo,
 
@@ -939,6 +956,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 			setExpandNewMessages,
 			setDeleteLocalOnly,
 			setRetentionMaxAgeDays,
+			setRetentionMaxPerSubscription,
 			setFavoritesEnabled,
 			currentNotifications,
 			subscriptionsWithUnread,

@@ -76,6 +76,7 @@ function App() {
 		setExpandNewMessages,
 		setDeleteLocalOnly,
 		setRetentionMaxAgeDays,
+		setRetentionMaxPerSubscription,
 		updateInfo,
 		setUpdateInfo,
 		loadError,
@@ -251,6 +252,10 @@ function App() {
 					onDeleteLocalOnlyChange={setDeleteLocalOnly}
 					retentionMaxAgeDays={settings.retentionMaxAgeDays ?? null}
 					onRetentionMaxAgeDaysChange={setRetentionMaxAgeDays}
+					retentionMaxPerSubscription={
+						settings.retentionMaxPerSubscription ?? null
+					}
+					onRetentionMaxPerSubscriptionChange={setRetentionMaxPerSubscription}
 					favoritesEnabled={settings.favoritesEnabled ?? false}
 					onFavoritesEnabledChange={setFavoritesEnabled}
 				/>

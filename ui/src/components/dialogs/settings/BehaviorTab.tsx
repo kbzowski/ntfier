@@ -231,6 +231,8 @@ interface BehaviorTabProps {
 	onDeleteLocalOnlyChange: (enabled: boolean) => void;
 	retentionMaxAgeDays: number | null;
 	onRetentionMaxAgeDaysChange: (days: number | null) => void;
+	retentionMaxPerSubscription: number | null;
+	onRetentionMaxPerSubscriptionChange: (max: number | null) => void;
 	updateInfo: UpdateInfo | null;
 	onUpdateInfoChange: (info: UpdateInfo | null) => void;
 }
@@ -246,6 +248,8 @@ export function BehaviorTab({
 	onDeleteLocalOnlyChange,
 	retentionMaxAgeDays,
 	onRetentionMaxAgeDaysChange,
+	retentionMaxPerSubscription,
+	onRetentionMaxPerSubscriptionChange,
 	updateInfo,
 	onUpdateInfoChange,
 }: BehaviorTabProps) {
@@ -296,6 +300,14 @@ export function BehaviorTab({
 				unit="days"
 				value={retentionMaxAgeDays}
 				onChange={onRetentionMaxAgeDaysChange}
+			/>
+
+			<RetentionField
+				id="retention-max-per-subscription"
+				label="Keep at most"
+				unit="notifications per subscription"
+				value={retentionMaxPerSubscription}
+				onChange={onRetentionMaxPerSubscriptionChange}
 			/>
 
 			<Separator className="my-4" />

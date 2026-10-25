@@ -248,6 +248,9 @@ export const settingsApi = {
 	setRetentionMaxAgeDays: async (days: number | null) => {
 		unwrap(await commands.setRetentionMaxAgeDays(days));
 	},
+	setRetentionMaxPerSubscription: async (max: number | null) => {
+		unwrap(await commands.setRetentionMaxPerSubscription(max));
+	},
 
 	setFavoritesEnabled: async (enabled: boolean) => {
 		unwrap(await commands.setFavoritesEnabled(enabled));
