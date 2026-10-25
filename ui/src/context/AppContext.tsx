@@ -14,7 +14,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { type SettingsState, useSettings } from "@/hooks/useSettings";
 import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { BackendError, classifyError } from "@/lib/error-classification";
-import { applyServerRemoved } from "@/lib/serverTopics";
+import { applyServerRemoved } from "@/lib/serverSubscriptions";
 import { isTauri, notificationsApi, subscriptionsApi } from "@/lib/tauri";
 
 /** Payload of the backend's `subscription:error` event. */

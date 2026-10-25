@@ -1,6 +1,6 @@
 import type { Subscription } from "@/types/bindings";
 
-export function countServerTopics(
+export function countServerSubscriptions(
 	subscriptions: Pick<Subscription, "serverUrl">[],
 	serverUrl: string,
 ): number {

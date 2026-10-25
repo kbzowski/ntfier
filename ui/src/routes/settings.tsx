@@ -25,7 +25,7 @@ function SettingsWindow() {
 		setEdit((e) => ({ url, n: e.n + 1 })),
 	);
 
-	// Read-only, for the topic count in the server removal confirmation
+	// Read-only, for the subscription count in the server removal confirmation
 	const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
 	const refreshSubscriptions = useCallback(async () => {
 		if (!isTauri()) {

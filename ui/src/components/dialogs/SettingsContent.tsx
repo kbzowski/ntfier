@@ -1,7 +1,7 @@
 import { Bell, EyeOff, Palette, Server, Settings2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { countServerTopics } from "@/lib/serverTopics";
+import { countServerSubscriptions } from "@/lib/serverSubscriptions";
 import { isTauri } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { ThemeDefinition } from "@/themes";
@@ -130,8 +130,8 @@ export function SettingsContent({
 }: SettingsContentProps) {
 	const [version, setVersion] = useState<string>("");
 	const [serverToRemove, setServerToRemove] = useState<string | null>(null);
-	const serverToRemoveTopics = serverToRemove
-		? countServerTopics(subscriptions, serverToRemove)
+	const serverToRemoveSubscriptions = serverToRemove
+		? countServerSubscriptions(subscriptions, serverToRemove)
 		: 0;
 
 	useEffect(() => {
@@ -266,7 +266,7 @@ export function SettingsContent({
 					if (!open) setServerToRemove(null);
 				}}
 				title="Remove server?"
-				description={`Its ${serverToRemoveTopics} topic${serverToRemoveTopics === 1 ? "" : "s"} and their messages are deleted.`}
+				description={`Its ${serverToRemoveSubscriptions} topic${serverToRemoveSubscriptions === 1 ? "" : "s"} and their messages are deleted.`}
 				confirmLabel="Remove"
 				variant="destructive"
 				onConfirm={() => {
