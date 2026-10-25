@@ -246,7 +246,6 @@ export function useSettings(callbacks: SettingsCallbacks = {}): SettingsState {
 			if (isTauri()) {
 				try {
 					await ignoreRulesApi.add(pattern, subscriptionId);
-					await refreshIgnoreRules();
 				} catch (err) {
 					const classified = classifyError(err);
 					toast.error(classified.userMessage, {
@@ -256,26 +255,22 @@ export function useSettings(callbacks: SettingsCallbacks = {}): SettingsState {
 				}
 			}
 		},
-		[refreshIgnoreRules],
+		[],
 	);
 
-	const deleteIgnoreRule = useCallback(
-		async (id: string) => {
-			if (isTauri()) {
-				try {
-					await ignoreRulesApi.delete(id);
-					await refreshIgnoreRules();
-				} catch (err) {
-					const classified = classifyError(err);
-					toast.error(classified.userMessage, {
-						description: "Failed to delete ignore rule",
-					});
-					console.error("[Delete ignore rule error]", err);
-				}
+	const deleteIgnoreRule = useCallback(async (id: string) => {
+		if (isTauri()) {
+			try {
+				await ignoreRulesApi.delete(id);
+			} catch (err) {
+				const classified = classifyError(err);
+				toast.error(classified.userMessage, {
+					description: "Failed to delete ignore rule",
+				});
+				console.error("[Delete ignore rule error]", err);
 			}
-		},
-		[refreshIgnoreRules],
-	);
+		}
+	}, []);
 
 	const addServer = useCallback(
 		async (server: Omit<ServerConfig, "isDefault">) => {
@@ -315,7 +310,6 @@ export function useSettings(callbacks: SettingsCallbacks = {}): SettingsState {
 			const saved = await settingsApi.updateServer(server);
 			if (saved.warning) toast.warning(saved.warning);
 			else toast.success("Login updated");
-			setSettings(await settingsApi.get());
 		},
 		[],
 	);
@@ -338,8 +332,6 @@ export function useSettings(callbacks: SettingsCallbacks = {}): SettingsState {
 		if (isTauri()) {
 			try {
 				await settingsApi.removeServer(url);
-				// The default may have moved to another server
-				setSettings(await settingsApi.get());
 				toast.success("Server removed");
 			} catch (err) {
 				const classified = classifyError(err);

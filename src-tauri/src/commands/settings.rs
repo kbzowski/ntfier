@@ -22,6 +22,18 @@ fn emit_settings_changed<T>(
     Ok(saved)
 }
 
+fn save_flag(
+    app_handle: &AppHandle,
+    db: &Database,
+    key: &str,
+    enabled: bool,
+) -> Result<(), AppError> {
+    emit_settings_changed(
+        app_handle,
+        db.set_setting(key, if enabled { "true" } else { "false" }),
+    )
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_settings(db: State<'_, Database>) -> Result<AppSettings, AppError> {
@@ -148,10 +160,7 @@ pub fn set_minimize_to_tray(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    emit_settings_changed(
-        &app_handle,
-        db.set_setting("minimize_to_tray", if enabled { "true" } else { "false" }),
-    )
+    save_flag(&app_handle, &db, "minimize_to_tray", enabled)
 }
 
 #[tauri::command]
@@ -161,10 +170,7 @@ pub fn set_start_minimized(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    emit_settings_changed(
-        &app_handle,
-        db.set_setting("start_minimized", if enabled { "true" } else { "false" }),
-    )
+    save_flag(&app_handle, &db, "start_minimized", enabled)
 }
 
 #[tauri::command]
@@ -191,13 +197,7 @@ pub fn set_notification_force_display(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    emit_settings_changed(
-        &app_handle,
-        db.set_setting(
-            "notification_force_display",
-            if enabled { "true" } else { "false" },
-        ),
-    )
+    save_flag(&app_handle, &db, "notification_force_display", enabled)
 }
 
 #[tauri::command]
@@ -207,13 +207,7 @@ pub fn set_notification_show_actions(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    emit_settings_changed(
-        &app_handle,
-        db.set_setting(
-            "notification_show_actions",
-            if enabled { "true" } else { "false" },
-        ),
-    )
+    save_flag(&app_handle, &db, "notification_show_actions", enabled)
 }
 
 #[tauri::command]
@@ -223,13 +217,7 @@ pub fn set_notification_show_images(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    emit_settings_changed(
-        &app_handle,
-        db.set_setting(
-            "notification_show_images",
-            if enabled { "true" } else { "false" },
-        ),
-    )
+    save_flag(&app_handle, &db, "notification_show_images", enabled)
 }
 
 #[tauri::command]
@@ -239,10 +227,7 @@ pub fn set_notification_sound(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    emit_settings_changed(
-        &app_handle,
-        db.set_setting("notification_sound", if enabled { "true" } else { "false" }),
-    )
+    save_flag(&app_handle, &db, "notification_sound", enabled)
 }
 
 #[tauri::command]
@@ -252,10 +237,7 @@ pub fn set_compact_view(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    emit_settings_changed(
-        &app_handle,
-        db.set_setting("compact_view", if enabled { "true" } else { "false" }),
-    )
+    save_flag(&app_handle, &db, "compact_view", enabled)
 }
 
 #[tauri::command]
@@ -265,13 +247,7 @@ pub fn set_expand_new_messages(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    emit_settings_changed(
-        &app_handle,
-        db.set_setting(
-            "expand_new_messages",
-            if enabled { "true" } else { "false" },
-        ),
-    )
+    save_flag(&app_handle, &db, "expand_new_messages", enabled)
 }
 
 #[tauri::command]
@@ -281,10 +257,7 @@ pub fn set_delete_local_only(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    emit_settings_changed(
-        &app_handle,
-        db.set_setting("delete_local_only", if enabled { "true" } else { "false" }),
-    )
+    save_flag(&app_handle, &db, "delete_local_only", enabled)
 }
 
 /// Sets the retention age limit (`None` = off) and applies retention right away.
@@ -357,8 +330,5 @@ pub fn set_favorites_enabled(
     db: State<'_, Database>,
     enabled: bool,
 ) -> Result<(), AppError> {
-    emit_settings_changed(
-        &app_handle,
-        db.set_setting("favorites_enabled", if enabled { "true" } else { "false" }),
-    )
+    save_flag(&app_handle, &db, "favorites_enabled", enabled)
 }
