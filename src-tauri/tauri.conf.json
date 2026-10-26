@@ -45,7 +45,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERFM0NBNDRGQTYzRjNGNEIKUldSTFB6K21UNlE4M3NUUHY5T2hYMXljKzNKdUNNSTNDa3NLSnZVcGtJc05MMEI4YUs0eGM1a2gK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc5NjBDNkNERkJDQ0YxOTUKUldTVjhjejd6Y1pnZVRzZ05jb05ORkxldFdTL3RwclpQRFgxTnJKQWJtNUx2RWsvVVhHeHEzRVYK",
       "endpoints": [
         "https://github.com/kbzowski/ntfier/releases/latest/download/update.json"
       ],
