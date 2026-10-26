@@ -105,7 +105,8 @@ async function main() {
 	capture("git", ["fetch", "origin"]);
 	if (capture("git", ["rev-parse", "HEAD"]).text !== capture("git", ["rev-parse", "origin/main"]).text)
 		fail("HEAD differs from origin/main (push or pull first)");
-	const confVersion = JSON.parse(fs.readFileSync(path.join(ROOT, "src-tauri", "tauri.conf.json"), "utf8")).version;
+	const conf = JSON.parse(fs.readFileSync(path.join(ROOT, "src-tauri", "tauri.conf.json"), "utf8"));
+	const confVersion = conf.version;
 	if (version !== confVersion) fail(`version ${version} does not match tauri.conf.json (${confVersion}); bump it in a commit first`);
 	if (capture("git", ["rev-parse", "-q", "--verify", `refs/tags/${tag}`], true).ok) fail(`tag ${tag} already exists locally`);
 	if (capture("git", ["ls-remote", "--tags", "origin", `refs/tags/${tag}`]).text) fail(`tag ${tag} already exists on origin`);
@@ -128,8 +129,13 @@ async function main() {
 		env: keyEnv,
 		encoding: "utf8",
 	});
+	const probeSig = keyCheck.status === 0 ? fs.readFileSync(`${probe}.sig`, "utf8") : "";
 	for (const f of [probe, `${probe}.sig`]) fs.rmSync(f, { force: true });
 	if (keyCheck.status !== 0) fail(`minisign key check failed: ${(keyCheck.stderr || keyCheck.stdout).trim()}`);
+	// Bytes 2..10 of a minisign key or signature are the key ID.
+	const keyId = (b64) => Buffer.from(Buffer.from(b64, "base64").toString("utf8").split("\n")[1], "base64").subarray(2, 10).toString("hex");
+	if (keyId(probeSig) !== keyId(conf.plugins.updater.pubkey))
+		fail("the minisign key does not match the updater pubkey in tauri.conf.json; installed apps would reject this release's updates");
 
 	process.on("SIGINT", () => fail("interrupted"));
 	log("starting sign server...");
