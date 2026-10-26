@@ -43,30 +43,14 @@ function stream(cmdLine, env = {}) {
 
 function askHidden(prompt) {
 	if (!process.stdin.isTTY) fail("no terminal for the password prompt; set TAURI_SIGNING_PRIVATE_KEY_PASSWORD");
-	return new Promise((resolve) => {
-		process.stdout.write(prompt);
-		process.stdin.setRawMode(true);
-		process.stdin.setEncoding("utf8");
-		process.stdin.resume();
-		let value = "";
-		const onData = (chunk) => {
-			for (const c of chunk) {
-				if (c === "\u0003") {
-					process.stdout.write("\n");
-					process.exit(130);
-				}
-				if (c === "\r" || c === "\n") {
-					process.stdin.setRawMode(false);
-					process.stdin.pause();
-					process.stdin.off("data", onData);
-					process.stdout.write("\n");
-					return resolve(value);
-				}
-				value = c === "\b" || c === "\u007f" ? value.slice(0, -1) : value + c;
-			}
-		};
-		process.stdin.on("data", onData);
-	});
+	// Read-Host reads the console like Windows does; a raw-mode reader in Node mangled some keys.
+	const r = spawnSync(
+		"pwsh",
+		["-NoProfile", "-Command", `[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); [Net.NetworkCredential]::new('', (Read-Host -AsSecureString '${prompt}')).Password`],
+		{ stdio: ["inherit", "pipe", "inherit"], encoding: "utf8" },
+	);
+	if (r.status !== 0) fail("password prompt cancelled");
+	return r.stdout.replace(/\r?\n$/, "");
 }
 
 function startSignServer(signtool) {
@@ -131,7 +115,7 @@ async function main() {
 	const defaultKey = path.join(os.homedir(), ".tauri", "ntfier.key");
 	const env = { TAURI_SIGNING_PRIVATE_KEY: process.env.TAURI_SIGNING_PRIVATE_KEY || defaultKey };
 	if (!process.env.TAURI_SIGNING_PRIVATE_KEY && !fs.existsSync(defaultKey)) fail(`minisign key not found: ${defaultKey}`);
-	if (!process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD) env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD = await askHidden("Minisign key password: ");
+	if (!process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD) env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD = await askHidden("Minisign key password");
 	// Tauri checks the password only after the whole build, so try it on a scratch file first.
 	const probe = path.join(os.tmpdir(), `ntfier-key-check-${process.pid}`);
 	fs.writeFileSync(probe, "");
