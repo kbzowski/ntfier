@@ -132,6 +132,20 @@ async function main() {
 	const env = { TAURI_SIGNING_PRIVATE_KEY: process.env.TAURI_SIGNING_PRIVATE_KEY || defaultKey };
 	if (!process.env.TAURI_SIGNING_PRIVATE_KEY && !fs.existsSync(defaultKey)) fail(`minisign key not found: ${defaultKey}`);
 	if (!process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD) env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD = await askHidden("Minisign key password: ");
+	// Tauri checks the password only after the whole build, so try it on a scratch file first.
+	const probe = path.join(os.tmpdir(), `ntfier-key-check-${process.pid}`);
+	fs.writeFileSync(probe, "");
+	const keyEnv = { ...process.env, ...env };
+	if (fs.existsSync(keyEnv.TAURI_SIGNING_PRIVATE_KEY)) {
+		keyEnv.TAURI_SIGNING_PRIVATE_KEY_PATH = keyEnv.TAURI_SIGNING_PRIVATE_KEY;
+		delete keyEnv.TAURI_SIGNING_PRIVATE_KEY;
+	}
+	const keyCheck = spawnSync(process.execPath, [path.join(ROOT, "node_modules", "@tauri-apps", "cli", "tauri.js"), "signer", "sign", probe], {
+		env: keyEnv,
+		encoding: "utf8",
+	});
+	for (const f of [probe, `${probe}.sig`]) fs.rmSync(f, { force: true });
+	if (keyCheck.status !== 0) fail(`minisign key check failed: ${(keyCheck.stderr || keyCheck.stdout).trim()}`);
 
 	process.on("SIGINT", () => fail("interrupted"));
 	log("starting sign server...");
