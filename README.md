@@ -69,6 +69,23 @@ pnpm build
 
 Build outputs are located in `src-tauri/target/release/bundle/`.
 
+## Releasing
+
+Releases are built and signed on the author's PC, not in CI. Requirements:
+
+- the Certum token plugged in, with proCertum CardManager in minidriver mode
+- PowerShell 7 (`pwsh`) and `signtool.exe` from the Windows SDK
+- the updater key at `%USERPROFILE%\.tauri\ntfier.key`
+- `gh auth login`
+
+Bump the version in `src-tauri/tauri.conf.json` in its own commit, push `main`, then:
+
+```bash
+pnpm release 1.5.0 [--prerelease] [--dry-run]
+```
+
+The script asks for the updater key password and the token PIN (once), builds and verifies the signed installers, then pushes the tag and creates a draft release. `--dry-run` stops before the tag.
+
 ## Project Structure
 
 ```

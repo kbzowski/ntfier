@@ -158,6 +158,7 @@ vite.config.ts.timestamp-*
 .claude
 /ui/CLAUDE.md
 update.json
+changelog.md
 .agents
 .DS_Store
 .idea/

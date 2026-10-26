@@ -7,7 +7,7 @@
     "types:create": "cd src-tauri && cargo run --bin ntfier -- --export-bindings",
     "build": "pnpm tauri build --no-sign",
     "build:debug": "tauri build --debug --no-sign",
-    "release": "pnpm dotenv -e .env -- tauri build --bundles msi,nsis",
+    "release": "node scripts/release.js",
     "clean": "rimraf src-tauri/target ui/dist",
     "ui:dev": "pnpm --filter ui dev",
     "ui:build": "pnpm --filter ui build",
@@ -19,7 +19,6 @@
   "devDependencies": {
     "@evilmartians/lefthook": "^2.1.10",
     "@tauri-apps/cli": "^2.11.4",
-    "dotenv-cli": "^11.0.0",
     "react-doctor": "^0.7.8",
     "rimraf": "^6.1.3"
   }
