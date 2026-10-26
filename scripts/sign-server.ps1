@@ -14,6 +14,9 @@ function Fail([string]$Message) {
 $cert = Get-Item -LiteralPath "Cert:\CurrentUser\My\$Thumbprint" -ErrorAction SilentlyContinue
 if (-not $cert) { Fail "certificate $Thumbprint not found in Cert:\CurrentUser\My (is the token plugged in?)" }
 if (-not $cert.HasPrivateKey) { Fail "certificate $Thumbprint has no private key (is the token plugged in?)" }
+# The certificate stays in the store after the token is unplugged; opening the key (no PIN needed) fails then.
+try { $null = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert) }
+catch { Fail "cannot open the private key of $Thumbprint (is the token plugged in?): $($_.Exception.InnerException.Message ?? $_.Exception.Message)" }
 
 $signtool = $env:TAURI_WINDOWS_SIGNTOOL_PATH
 if (-not $signtool) {
