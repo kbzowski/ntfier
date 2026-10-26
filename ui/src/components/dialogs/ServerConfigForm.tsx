@@ -8,7 +8,7 @@ import {
 	Server,
 	Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -45,7 +45,7 @@ interface ServerConfigFormProps {
 	onSyncServer: (url: string) => Promise<void>;
 	onSetDefault: (url: string) => void;
 	/** Opens the form on this server's login, e.g. from a "needs credentials" flag. */
-	editUrl?: string | null;
+	editServer?: { url: string } | null;
 }
 
 export function ServerConfigForm({
@@ -55,7 +55,7 @@ export function ServerConfigForm({
 	onRemoveServer,
 	onSyncServer,
 	onSetDefault,
-	editUrl,
+	editServer,
 }: ServerConfigFormProps) {
 	const [syncing, setSyncing] = useState<string | null>(null);
 	const handleSync = async (url: string) => {
@@ -90,8 +90,17 @@ export function ServerConfigForm({
 		onUpdate: async (server) => {
 			await onUpdateServer(server);
 		},
-		initial: servers.find((s) => s.url === editUrl),
 	});
+
+	// Once per request, so a later `servers` refresh doesn't reset the typed login
+	const handledEdit = useRef<typeof editServer>(null);
+	useEffect(() => {
+		if (!editServer || editServer === handledEdit.current) return;
+		const server = servers.find((s) => s.url === editServer.url);
+		if (!server) return;
+		handledEdit.current = editServer;
+		startEditing(server);
+	}, [editServer, servers, startEditing]);
 
 	const secretToggle = (
 		<Button

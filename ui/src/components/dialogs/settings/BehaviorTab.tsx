@@ -35,6 +35,11 @@ function UpdateSection({ updateInfo, onUpdateInfoChange }: UpdateSectionProps) {
 	);
 	const [error, setError] = useState<string | null>(null);
 
+	// The settings window loads the stored check result after mounting
+	useEffect(() => {
+		if (updateInfo) setStatus("available");
+	}, [updateInfo]);
+
 	const handleCheck = async () => {
 		if (!isTauri()) return;
 
