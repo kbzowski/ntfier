@@ -110,7 +110,8 @@ function generateUpdateJson() {
 	// Try v2 format: direct .exe files with .exe.sig
 	if (Object.keys(platforms).length === 0) {
 		console.log("Trying v2 format artifacts (.exe with .exe.sig)");
-		const nsisExes = findFiles(NSIS_DIR, /-setup\.exe$/);
+		// Local builds keep older versions' setups in the target cache.
+		const nsisExes = findFiles(NSIS_DIR, /-setup\.exe$/).filter((f) => f.includes(`_${VERSION}_`));
 
 		for (const exePath of nsisExes) {
 			const exeName = path.basename(exePath);
