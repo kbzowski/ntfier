@@ -18,6 +18,7 @@ mod commands;
 mod config;
 mod db;
 mod error;
+mod events;
 mod models;
 mod services;
 
@@ -26,15 +27,17 @@ use services::{ConnectionManager, SyncService, TrayManager};
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
-    Emitter, Manager,
+    Manager,
 };
+use tauri_specta::Event as _;
 
-/// The single source of truth for the command list.
+/// The single source of truth for the command and event lists.
 ///
 /// Feeds both the Tauri invoke handler and the TypeScript binding export, so a
 /// command can never be registered with one and missing from the other.
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
-    tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
+    let builder = tauri_specta::Builder::<tauri::Wry>::new().events(events::all());
+    builder.commands(tauri_specta::collect_commands![
         // Subscriptions
         commands::get_subscriptions,
         commands::add_subscription,
@@ -133,6 +136,7 @@ pub fn run() {
     export_bindings();
 
     let specta = specta_builder();
+    let invoke_handler = specta.invoke_handler();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -150,7 +154,9 @@ pub fn run() {
         ))
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .setup(|app| {
+        .setup(move |app| {
+            specta.mount_events(app);
+
             // Initialize database
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
@@ -224,7 +230,7 @@ pub fn run() {
                             let _ = window.show();
                             let _ = window.set_focus();
                             // Notify frontend to scroll to top
-                            let _ = app_handle.emit("window:shown", ());
+                            let _ = events::WindowShown.emit(app_handle);
                         }
                     }
                 })
@@ -305,7 +311,7 @@ pub fn run() {
 
                 // Notify frontend that subscriptions are synced
                 log::info!("Emitting subscriptions:synced event");
-                let _ = handle.emit("subscriptions:synced", ());
+                let _ = events::SubscriptionsSynced.emit(&handle);
 
                 // 2. Connect every subscription; each resumes from its cursor, so missed
                 //    messages arrive as catch-up over the WebSocket
@@ -319,13 +325,13 @@ pub fn run() {
                 if let Ok(Some(update_info)) =
                     services::UpdateService::check_for_update(&handle).await
                 {
-                    let _ = handle.emit("update:available", update_info);
+                    let _ = events::UpdateAvailable(update_info).emit(&handle);
                 }
             });
 
             Ok(())
         })
-        .invoke_handler(specta.invoke_handler())
+        .invoke_handler(invoke_handler)
         .run(tauri::generate_context!())
         .expect("error while running Ntfier");
 }

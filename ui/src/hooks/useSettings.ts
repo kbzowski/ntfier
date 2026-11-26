@@ -18,7 +18,11 @@ import {
 	settingsApi,
 	syncApi,
 } from "@/lib/tauri";
-import type { IgnoreRule, ServerStatusEntry } from "@/types/bindings";
+import {
+	events,
+	type IgnoreRule,
+	type ServerStatusEntry,
+} from "@/types/bindings";
 import type {
 	AppSettings,
 	NotificationDisplayMethod,
@@ -192,8 +196,8 @@ export function useSettings(callbacks: SettingsCallbacks = {}): SettingsState {
 		refreshIgnoreRules();
 	}, [reloadSettings, refreshIgnoreRules]);
 
-	useTauriEvent<ServerStatusEntry>(
-		"server:status",
+	useTauriEvent(
+		events.serverStatus,
 		useCallback((entry: ServerStatusEntry) => {
 			setServerStatuses((prev) => [
 				...prev.filter((s) => s.url !== entry.url),
@@ -202,8 +206,8 @@ export function useSettings(callbacks: SettingsCallbacks = {}): SettingsState {
 		}, []),
 	);
 
-	useTauriEvent<void>(
-		"settings:changed",
+	useTauriEvent(
+		events.settingsChanged,
 		useCallback(async () => {
 			try {
 				setSettings(await settingsApi.get());
@@ -213,24 +217,24 @@ export function useSettings(callbacks: SettingsCallbacks = {}): SettingsState {
 		}, []),
 	);
 
-	useTauriEvent<void>(
-		"settings:ignore-rules-changed",
+	useTauriEvent(
+		events.settingsIgnoreRulesChanged,
 		useCallback(async () => {
 			await refreshIgnoreRules();
 			await callbacksRef.current.onIgnoreRulesChanged?.();
 		}, [refreshIgnoreRules]),
 	);
 
-	useTauriEvent<{ url: string }>(
-		"settings:server-removed",
+	useTauriEvent(
+		events.settingsServerRemoved,
 		useCallback(({ url }: { url: string }) => {
 			callbacksRef.current.onServerRemoved?.(url);
 		}, []),
 	);
 
 	// Listen for update:available event (from startup update check)
-	useTauriEvent<UpdateInfo>(
-		"update:available",
+	useTauriEvent(
+		events.updateAvailable,
 		useCallback((info: UpdateInfo) => {
 			console.log("Update available:", info.version);
 			setUpdateInfo(info);

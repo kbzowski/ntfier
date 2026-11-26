@@ -1,8 +1,10 @@
 //! The settings window: one get-or-create shared by the gear, the tray and the banner.
 
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::error::AppError;
+use crate::events::EditServer;
+use tauri_specta::Event as _;
 
 pub const SETTINGS_WINDOW_LABEL: &str = "settings";
 
@@ -17,7 +19,7 @@ pub fn show_settings_window(app: &AppHandle, edit_server_url: Option<&str>) -> t
         window.unminimize()?;
         window.show()?;
         if let Some(url) = edit_server_url {
-            window.emit_to(SETTINGS_WINDOW_LABEL, "settings:edit-server", url)?;
+            EditServer(url.to_string()).emit_to(app, SETTINGS_WINDOW_LABEL)?;
         }
         return window.set_focus();
     }

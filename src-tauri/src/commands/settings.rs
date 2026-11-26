@@ -1,11 +1,13 @@
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Manager, State};
 
 use crate::commands::notifications::refresh_tray;
 
 use crate::db::Database;
 use crate::error::AppError;
+use crate::events::{RetentionApplied, ServerRemoved, SettingsChanged};
 use serde::Serialize;
 use specta::Type;
+use tauri_specta::Event as _;
 
 use crate::models::{
     canonical_url, AppSettings, NotificationDisplayMethod, ServerConfig, ServerStatusEntry,
@@ -18,7 +20,7 @@ fn emit_settings_changed<T>(
     saved: Result<T, AppError>,
 ) -> Result<T, AppError> {
     let saved = saved?;
-    let _ = app_handle.emit("settings:changed", ());
+    let _ = SettingsChanged.emit(app_handle);
     Ok(saved)
 }
 
@@ -123,11 +125,6 @@ pub async fn get_server_statuses(
     Ok(conn_manager.server_statuses().await)
 }
 
-#[derive(Clone, Serialize)]
-struct ServerRemoved {
-    url: String,
-}
-
 #[tauri::command]
 #[specta::specta]
 pub async fn remove_server(
@@ -138,7 +135,7 @@ pub async fn remove_server(
 ) -> Result<(), AppError> {
     conn_manager.disconnect_server(&url).await;
     emit_settings_changed(&app_handle, db.remove_server(&url))?;
-    let _ = app_handle.emit("settings:server-removed", ServerRemoved { url });
+    let _ = ServerRemoved { url }.emit(&app_handle);
     refresh_tray(app_handle);
     Ok(())
 }
@@ -317,7 +314,7 @@ pub fn run_retention(app_handle: &AppHandle) -> Result<(), AppError> {
     )?;
     if removed > 0 {
         log::info!("Retention removed {removed} notifications");
-        let _ = app_handle.emit("notifications:retention-applied", ());
+        let _ = RetentionApplied.emit(app_handle);
         refresh_tray(app_handle.clone());
     }
     Ok(())

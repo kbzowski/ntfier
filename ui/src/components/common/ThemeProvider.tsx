@@ -1,4 +1,3 @@
-import { emit } from "@tauri-apps/api/event";
 import {
 	createContext,
 	type ReactNode,
@@ -18,6 +17,7 @@ import {
 	loadThemePreferences,
 	saveThemePreferences,
 } from "@/themes/utils";
+import { events, type ThemeChanged } from "@/types/bindings";
 
 interface ThemeContextValue {
 	themeId: string;
@@ -26,13 +26,6 @@ interface ThemeContextValue {
 	availableThemes: ThemeDefinition[];
 	isSystemMode: boolean;
 	setSystemMode: (enabled: boolean) => void;
-}
-
-const THEME_CHANGED_EVENT = "settings:theme-changed";
-
-interface ThemeChange {
-	themeId: string;
-	isSystemMode: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
@@ -95,17 +88,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 	}, [themeId, isSystemMode]);
 
 	// Only user-initiated changes emit; received events just set state, so no echo loop.
-	const changeTheme = useCallback((next: ThemeChange) => {
+	const changeTheme = useCallback((next: ThemeChanged) => {
 		setThemeIdState(next.themeId);
 		setSystemModeState(next.isSystemMode);
 		if (isTauri()) {
-			emit(THEME_CHANGED_EVENT, next).catch((err) =>
-				console.error(`Failed to emit ${THEME_CHANGED_EVENT}:`, err),
-			);
+			events.settingsThemeChanged
+				.emit(next)
+				.catch((err) => console.error("Failed to emit the theme change:", err));
 		}
 	}, []);
 
-	useTauriEvent<ThemeChange>(THEME_CHANGED_EVENT, (change) => {
+	useTauriEvent(events.settingsThemeChanged, (change) => {
 		setThemeIdState(change.themeId);
 		setSystemModeState(change.isSystemMode);
 	});

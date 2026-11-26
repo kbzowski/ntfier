@@ -1,6 +1,11 @@
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { EventCallback, UnlistenFn } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
 import { isTauri } from "@/lib/tauri";
+
+/** An entry of `events` in the generated bindings. */
+interface TauriEvent<T> {
+	listen: (cb: EventCallback<T>) => Promise<UnlistenFn>;
+}
 
 /**
  * Subscribes to a Tauri event with automatic cleanup.
@@ -8,16 +13,16 @@ import { isTauri } from "@/lib/tauri";
  * Handles the async nature of Tauri's listen function and ensures
  * proper cleanup when the component unmounts.
  *
- * @param eventName - Name of the Tauri event to listen for
+ * @param event - The event from `events` in the generated bindings
  * @param callback - Handler called when event is received
  *
  * @example
- * useTauriEvent('notification:new', (notification) => {
+ * useTauriEvent(events.notificationNew, (notification) => {
  *   console.log('New notification:', notification);
  * });
  */
 export function useTauriEvent<T>(
-	eventName: string,
+	event: TauriEvent<T>,
 	callback: (payload: T) => void,
 ): void {
 	const callbackRef = useRef(callback);
@@ -33,11 +38,12 @@ export function useTauriEvent<T>(
 		let unlisten: UnlistenFn | undefined;
 		let mounted = true;
 
-		listen<T>(eventName, (event) => {
-			if (mounted) {
-				callbackRef.current(event.payload);
-			}
-		})
+		event
+			.listen(({ payload }) => {
+				if (mounted) {
+					callbackRef.current(payload);
+				}
+			})
 			.then((unlistenFn) => {
 				if (mounted) {
 					unlisten = unlistenFn;
@@ -47,12 +53,12 @@ export function useTauriEvent<T>(
 				}
 			})
 			.catch((err) => {
-				console.error(`Failed to listen to ${eventName}:`, err);
+				console.error("Failed to listen to a Tauri event:", err);
 			});
 
 		return () => {
 			mounted = false;
 			unlisten?.();
 		};
-	}, [eventName]);
+	}, [event]);
 }

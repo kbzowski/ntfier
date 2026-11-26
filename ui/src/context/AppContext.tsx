@@ -16,9 +16,7 @@ import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { BackendError, classifyError } from "@/lib/error-classification";
 import { applyServerRemoved } from "@/lib/serverSubscriptions";
 import { isTauri, notificationsApi, subscriptionsApi } from "@/lib/tauri";
-
-/** Payload of the backend's `subscription:error` event. */
-type SubscriptionError = { id: string; message: string | null };
+import { events, type SubscriptionError } from "@/types/bindings";
 
 import type { Notification, Subscription } from "@/types/ntfy";
 
@@ -169,8 +167,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	]);
 
 	// Listen for new notifications from backend
-	useTauriEvent<Notification>(
-		"notification:new",
+	useTauriEvent(
+		events.notificationNew,
 		useCallback(
 			(notification: Notification) => {
 				// Auto-expand new notifications in compact view if enabled
@@ -191,8 +189,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	);
 
 	// Listen for subscriptions sync completion (backend syncs on startup)
-	useTauriEvent<void>(
-		"subscriptions:synced",
+	useTauriEvent(
+		events.subscriptionsSynced,
 		useCallback(async () => {
 			const subs = await subscriptionsApi.getAll();
 			// Account sync can remove topics: drop their cached messages and selection
@@ -208,8 +206,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	);
 
 	// Retention removed notifications: reload loaded lists and unread counts
-	useTauriEvent<void>(
-		"notifications:retention-applied",
+	useTauriEvent(
+		events.notificationsRetentionApplied,
 		useCallback(async () => {
 			await notifications.reloadLoaded();
 			setSubscriptions(await subscriptionsApi.getAll());
@@ -217,8 +215,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	);
 
 	// Stored messages of a subscription changed in place (update, server delete or clear)
-	useTauriEvent<string>(
-		"subscription:changed",
+	useTauriEvent(
+		events.subscriptionChanged,
 		useCallback(
 			async (subscriptionId: string) => {
 				await notifications.reloadTopic(subscriptionId);
@@ -228,22 +226,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		),
 	);
 
-	useTauriEvent<SubscriptionError>(
-		"subscription:error",
+	useTauriEvent(
+		events.subscriptionError,
 		useCallback(({ id, message }: SubscriptionError) => {
 			setSubscriptionErrors((prev) => {
 				const { [id]: _, ...rest } = prev;
 				return message ? { ...rest, [id]: message } : rest;
 			});
-		}, []),
-	);
-
-	// Listen for navigate:subscription event (from tray icon click)
-	useTauriEvent<string>(
-		"navigate:subscription",
-		useCallback((subscriptionId: string) => {
-			console.log("Navigating to subscription:", subscriptionId);
-			setCurrentTopicId(subscriptionId);
 		}, []),
 	);
 

@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::{
     connect_async,
@@ -23,12 +23,16 @@ use crate::config::connection::{
 };
 use crate::db::Database;
 use crate::error::AppError;
+use crate::events::{
+    NewNotification, ServerStatusChanged, SubscriptionChanged, SubscriptionErrorChanged,
+};
 use crate::models::{
     is_ignored, ActionType, Notification, NotificationDisplayMethod, NotificationSettings,
     NtfyMessage, ServerStatus, ServerStatusEntry, Subscription, SubscriptionError,
 };
 use crate::services::ntfy_client::{VersionCheck, NO_TOPIC_ACCESS, RATE_LIMITED};
 use crate::services::{actions, text_attachment, url_opener, NtfyClient, SyncService, TrayManager};
+use tauri_specta::Event as _;
 
 /// Connection entry storing both the shutdown sender and a unique connection ID.
 /// The ID is used to detect stale connections after a race condition.
@@ -165,7 +169,7 @@ impl ConnectionManager {
             url: url.to_string(),
             status,
         };
-        if let Err(e) = app_handle.emit("server:status", entry) {
+        if let Err(e) = ServerStatusChanged(entry).emit(app_handle) {
             log::error!("Failed to emit server status: {e}");
         }
     }
@@ -215,7 +219,7 @@ impl ConnectionManager {
             id: id.to_string(),
             message,
         };
-        if let Err(e) = app_handle.emit("subscription:error", payload) {
+        if let Err(e) = SubscriptionErrorChanged(payload).emit(app_handle) {
             log::error!("Failed to emit subscription error: {e}");
         }
     }
@@ -747,7 +751,7 @@ impl ConnectionManager {
         if is_update {
             Self::subscription_changed(app_handle, subscription_id).await;
         } else {
-            if let Err(e) = app_handle.emit("notification:new", &notification) {
+            if let Err(e) = NewNotification(notification.clone()).emit(app_handle) {
                 log::error!("Failed to emit notification event: {e}");
             }
             // Update tray icon to show unread badge
@@ -766,7 +770,7 @@ impl ConnectionManager {
 
     /// Tells the UI to reload a subscription whose stored messages changed in place.
     async fn subscription_changed(app_handle: &AppHandle, subscription_id: &str) {
-        if let Err(e) = app_handle.emit("subscription:changed", subscription_id) {
+        if let Err(e) = SubscriptionChanged(subscription_id.to_string()).emit(app_handle) {
             log::error!("Failed to emit subscription change: {e}");
         }
         let tray_manager: tauri::State<TrayManager> = app_handle.state();
