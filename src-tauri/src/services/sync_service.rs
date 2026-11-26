@@ -4,12 +4,14 @@
 //! user's ntfy account. The account is the source of truth, except on the first sync,
 //! which merges local topics up.
 
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 use crate::db::Database;
 use crate::error::AppError;
+use crate::events::SubscriptionsSynced;
 use crate::models::{canonical_url, CreateSubscription, ServerStatus, Subscription};
 use crate::services::{ConnectionManager, NtfyClient, TrayManager};
+use tauri_specta::Event as _;
 
 pub struct SyncService;
 
@@ -140,7 +142,7 @@ impl SyncService {
         }
 
         handle.state::<TrayManager>().refresh_from_db(handle).await;
-        let _ = handle.emit("subscriptions:synced", ());
+        let _ = SubscriptionsSynced.emit(handle);
         Ok(())
     }
 

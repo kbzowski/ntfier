@@ -1,13 +1,15 @@
 //! Runs a message's action buttons, for the in-app button and the toast alike.
 
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
 use crate::db::Database;
 use crate::error::AppError;
+use crate::events::SubscriptionChanged;
 use crate::models::{ActionType, NotificationAction};
 use crate::services::{url_opener, ConnectionManager, TrayManager};
+use tauri_specta::Event as _;
 
 const HTTP_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -46,7 +48,7 @@ pub async fn run_action(
     if action.clear {
         db.mark_notification_read(notification_id)?;
         ConnectionManager::remove_toast(app, &notification.topic_id, notification.toast_tag());
-        let _ = app.emit("subscription:changed", &notification.topic_id);
+        let _ = SubscriptionChanged(notification.topic_id.clone()).emit(app);
         app.state::<TrayManager>().refresh_from_db(app).await;
     }
     Ok(())

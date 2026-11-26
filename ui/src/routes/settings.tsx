@@ -7,7 +7,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { validateSettingsSearch } from "@/lib/settingsSearch";
 import { isTauri, subscriptionsApi, updateApi } from "@/lib/tauri";
-import type { Subscription } from "@/types/bindings";
+import { events, type Subscription } from "@/types/bindings";
 
 export const Route = createFileRoute("/settings")({
 	head: () => ({ meta: [{ title: "Ntfier – Settings" }] }),
@@ -20,7 +20,7 @@ function SettingsWindow() {
 		useTheme();
 	const { editServer } = Route.useSearch();
 	const [edit, setEdit] = useState(editServer ? { url: editServer } : null);
-	useTauriEvent<unknown>("settings:edit-server", (payload) => {
+	useTauriEvent(events.settingsEditServer, (payload) => {
 		const { editServer: url } = validateSettingsSearch({ editServer: payload });
 		if (url) setEdit({ url });
 	});
@@ -41,7 +41,7 @@ function SettingsWindow() {
 	useEffect(() => {
 		refreshSubscriptions();
 	}, [refreshSubscriptions]);
-	useTauriEvent<void>("subscriptions:synced", refreshSubscriptions);
+	useTauriEvent(events.subscriptionsSynced, refreshSubscriptions);
 
 	const s = useSettings({
 		onIgnoreRulesChanged: refreshSubscriptions,

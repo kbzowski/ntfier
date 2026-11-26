@@ -18,6 +18,7 @@ import {
 import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { notificationsApi } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
+import { events } from "@/types/bindings";
 import type {
 	Notification as NotificationType,
 	Subscription,
@@ -137,7 +138,7 @@ export const NotificationList = memo(function NotificationList({
 	const [showIgnored, setShowIgnored] = useState(false);
 
 	// Scroll to top when window is shown (tray icon click)
-	useTauriEvent("window:shown", () => {
+	useTauriEvent(events.windowShown, () => {
 		scrollContainerRef.current?.scrollTo({ top: 0 });
 	});
 
