@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { IgnoreRule, Subscription } from "@/types/bindings";
+import type { IgnoreRule, Subscription } from "@/types/ntfy";
 
 interface IgnoredTabProps {
 	rules: IgnoreRule[];

@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { SettingCheckbox } from "@/components/ui/setting-checkbox";
-import type { NotificationDisplayMethod } from "@/types/bindings";
+import type { NotificationDisplayMethod } from "@/types/ntfy";
 
 const NOTIFICATION_METHODS: {
 	id: NotificationDisplayMethod;

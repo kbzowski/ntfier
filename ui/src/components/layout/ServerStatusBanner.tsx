@@ -1,6 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ServerStatus, ServerStatusEntry } from "@/types/bindings";
+import type { ServerStatus, ServerStatusEntry } from "@/types/ntfy";
 
 function describe(status: ServerStatus): string {
 	switch (status.kind) {

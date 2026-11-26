@@ -7,7 +7,8 @@ import { useSettings } from "@/hooks/useSettings";
 import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { validateSettingsSearch } from "@/lib/settingsSearch";
 import { isTauri, subscriptionsApi, updateApi } from "@/lib/tauri";
-import { events, type Subscription } from "@/types/bindings";
+import { events } from "@/types/bindings";
+import type { Subscription } from "@/types/ntfy";
 
 export const Route = createFileRoute("/settings")({
 	head: () => ({ meta: [{ title: "Ntfier – Settings" }] }),

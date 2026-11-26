@@ -16,9 +16,13 @@ import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { BackendError, classifyError } from "@/lib/error-classification";
 import { applyServerRemoved } from "@/lib/serverSubscriptions";
 import { isTauri, notificationsApi, subscriptionsApi } from "@/lib/tauri";
-import { events, type SubscriptionError } from "@/types/bindings";
+import { events } from "@/types/bindings";
 
-import type { Notification, Subscription } from "@/types/ntfy";
+import type {
+	Notification,
+	Subscription,
+	SubscriptionError,
+} from "@/types/ntfy";
 
 interface AppState {
 	// Subscriptions
