@@ -1,4 +1,4 @@
-import { Copy, ExternalLink, Loader2, Send } from "lucide-react";
+import { Copy, ExternalLink, LoaderCircle, Send } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -76,7 +76,7 @@ export const NotificationActions = memo(function NotificationActions({
 						onClick={(e) => handleClick(e, action)}
 					>
 						{running.has(action.id) ? (
-							<Loader2 className="h-3 w-3 animate-spin" />
+							<LoaderCircle className="h-3 w-3 animate-spin" />
 						) : (
 							<Icon className="h-3 w-3" />
 						)}

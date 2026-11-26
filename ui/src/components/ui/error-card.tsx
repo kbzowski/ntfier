@@ -2,7 +2,7 @@
  * Reusable error card component for displaying errors in sections
  */
 
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { RefreshCw, TriangleExclamationPoint } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -78,7 +78,9 @@ export function ErrorCard({
 			role="alert"
 			aria-live="assertive"
 		>
-			<AlertTriangle className={cn("text-destructive mb-4", iconSize)} />
+			<TriangleExclamationPoint
+				className={cn("text-destructive mb-4", iconSize)}
+			/>
 			<h3 className={cn("font-semibold text-destructive mb-2", titleSize)}>
 				{message}
 			</h3>

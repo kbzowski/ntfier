@@ -1,12 +1,12 @@
 import {
-	AlertCircle,
+	CircleExclamationPoint,
 	Eye,
 	EyeOff,
-	Loader2,
+	LoaderCircle,
 	Pencil,
 	RefreshCw,
 	Server,
-	Trash2,
+	Trash,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -126,7 +126,7 @@ export function ServerConfigForm({
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle className="flex items-center gap-2">
-							<AlertCircle className="h-5 w-5 text-destructive" />
+							<CircleExclamationPoint className="h-5 w-5 text-destructive" />
 							Connection Error
 						</AlertDialogTitle>
 						<AlertDialogDescription className="text-left">
@@ -209,7 +209,7 @@ export function ServerConfigForm({
 										aria-label={`Remove server ${server.url}`}
 										onClick={() => onRemoveServer(server.url)}
 									>
-										<Trash2 className="h-4 w-4" />
+										<Trash className="h-4 w-4" />
 									</Button>
 								)}
 							</div>
@@ -302,7 +302,7 @@ export function ServerConfigForm({
 							<Button type="submit" disabled={!canSubmit}>
 								{isLoading ? (
 									<>
-										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+										<LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
 										Connecting...
 									</>
 								) : editingUrl ? (

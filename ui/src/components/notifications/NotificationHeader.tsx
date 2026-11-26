@@ -1,4 +1,4 @@
-import { ChevronRight, ExternalLink, Star, Trash2 } from "lucide-react";
+import { ChevronRight, ExternalLink, Star, Trash } from "lucide-react";
 import { type MouseEvent, memo, useState } from "react";
 import { toast } from "sonner";
 import { useShowImages } from "@/context/ShowImagesContext";
@@ -131,7 +131,7 @@ export const NotificationHeader = memo(function NotificationHeader({
 						onClick={handleDelete}
 						className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-sm hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
 					>
-						<Trash2 className="h-4 w-4" />
+						<Trash className="h-4 w-4" />
 					</button>
 				)}
 				<PriorityBadge priority={priority} />

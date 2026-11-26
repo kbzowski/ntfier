@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { TriangleExclamationPoint } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ServerStatus, ServerStatusEntry } from "@/types/ntfy";
 
@@ -32,7 +32,7 @@ export function ServerStatusBanner({
 		>
 			{statuses.map(({ url, status }) => (
 				<div key={url} className="flex items-center gap-3 px-4 py-2 text-sm">
-					<AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
+					<TriangleExclamationPoint className="h-4 w-4 shrink-0 text-destructive" />
 					<span
 						className="min-w-0 flex-1 truncate"
 						title={"message" in status ? status.message : undefined}

@@ -1,10 +1,10 @@
 import type { LucideIcon } from "lucide-react";
 import {
-	AlertTriangle,
 	ArrowDown,
 	ArrowDownRight,
 	ArrowUpRight,
 	Minus,
+	TriangleExclamationPoint,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PRIORITY_CONFIG } from "@/lib/constants";
@@ -20,7 +20,7 @@ const PRIORITY_ICONS: Record<number, LucideIcon> = {
 	2: ArrowDownRight,
 	3: Minus,
 	4: ArrowUpRight,
-	5: AlertTriangle,
+	5: TriangleExclamationPoint,
 };
 
 export function PriorityBadge({ priority, className }: PriorityBadgeProps) {

@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Trash } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -81,7 +81,7 @@ export function IgnoredTab({
 								onClick={() => onDelete(rule.id)}
 								aria-label={`Delete rule ${rule.pattern}`}
 							>
-								<Trash2 className="h-4 w-4" />
+								<Trash className="h-4 w-4" />
 							</Button>
 						</li>
 					))}

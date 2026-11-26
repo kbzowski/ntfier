@@ -1,13 +1,13 @@
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-shell";
 import {
-	AlertTriangle,
 	Download,
 	ExternalLink,
 	FileText,
 	Image as ImageIcon,
-	Loader2,
+	LoaderCircle,
 	RefreshCw,
+	TriangleExclamationPoint,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -47,7 +47,7 @@ function isExpired(attachment: Attachment): boolean {
 function UnavailableCard({ name }: { name: string }) {
 	return (
 		<div className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-border bg-muted/20 text-muted-foreground">
-			<AlertTriangle className="h-8 w-8 shrink-0 opacity-50" />
+			<TriangleExclamationPoint className="h-8 w-8 shrink-0 opacity-50" />
 			<div className="flex-1 min-w-0">
 				<p className="text-sm font-medium truncate">{name}</p>
 				<p className="text-xs">Attachment expired</p>
@@ -70,7 +70,7 @@ function ImagePreviewError({
 	return (
 		<div className="flex flex-col gap-3 p-4 rounded-lg border border-destructive bg-destructive/10">
 			<div className="flex items-start gap-3">
-				<AlertTriangle className="h-5 w-5 shrink-0 text-destructive mt-0.5" />
+				<TriangleExclamationPoint className="h-5 w-5 shrink-0 text-destructive mt-0.5" />
 				<div className="flex-1 min-w-0">
 					<p className="text-sm font-medium text-destructive">{name}</p>
 					<p className="text-xs text-muted-foreground mt-1">
@@ -129,7 +129,7 @@ function ImageCard({
 		>
 			{isLoading && (
 				<div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
-					<Loader2 className="h-6 w-6 animate-spin text-primary" />
+					<LoaderCircle className="h-6 w-6 animate-spin text-primary" />
 				</div>
 			)}
 			<img

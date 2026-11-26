@@ -1,10 +1,10 @@
 import {
-	AlertTriangle,
 	Bell,
 	BellOff,
+	Ellipsis,
 	Hash,
-	MoreHorizontal,
-	Trash2,
+	Trash,
+	TriangleExclamationPoint,
 	VolumeX,
 } from "lucide-react";
 import { memo, useCallback } from "react";
@@ -79,12 +79,12 @@ export const SidebarTopicItem = memo(function SidebarTopicItem({
 							{subscription.displayName || subscription.topic}
 						</span>
 						{subscription.error && (
-							<AlertTriangle
+							<TriangleExclamationPoint
 								className="h-3.5 w-3.5 text-destructive shrink-0"
 								aria-label={subscription.error}
 							>
 								<title>{subscription.error}</title>
-							</AlertTriangle>
+							</TriangleExclamationPoint>
 						)}
 						{subscription.muted && (
 							<VolumeX
@@ -114,7 +114,7 @@ export const SidebarTopicItem = memo(function SidebarTopicItem({
 									isSelected ? "opacity-100" : "opacity-0",
 								)}
 							>
-								<MoreHorizontal className="h-4 w-4" />
+								<Ellipsis className="h-4 w-4" />
 							</Button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end">
@@ -126,7 +126,7 @@ export const SidebarTopicItem = memo(function SidebarTopicItem({
 								onClick={handleRemove}
 								className="text-destructive focus:text-destructive"
 							>
-								<Trash2 className="h-4 w-4 mr-2" />
+								<Trash className="h-4 w-4 mr-2" />
 								Unsubscribe
 							</DropdownMenuItem>
 						</DropdownMenuContent>
@@ -139,7 +139,7 @@ export const SidebarTopicItem = memo(function SidebarTopicItem({
 					{muteLabel}
 				</ContextMenuItem>
 				<ContextMenuItem variant="destructive" onClick={handleRemove}>
-					<Trash2 />
+					<Trash />
 					Unsubscribe
 				</ContextMenuItem>
 			</ContextMenuContent>
