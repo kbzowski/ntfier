@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useApp } from "@/context/AppContext";
-import type { Notification } from "@/types/bindings";
+import type { Notification } from "@/types/ntfy";
 
 interface IgnoreRuleDialogProps {
 	notification: Notification;

@@ -3,9 +3,8 @@
  *
  * Tauri backend API bindings.
  *
- * Provides typed wrappers around generated bindings that convert Result pattern
- * to exceptions for easier use in async/await code. Falls back gracefully when
- * not running in Tauri.
+ * Provides typed wrappers around generated bindings that turn backend errors
+ * into `BackendError`. Falls back gracefully when not running in Tauri.
  */
 
 import { isTauri as isTauriCore } from "@tauri-apps/api/core";
@@ -15,18 +14,18 @@ import {
 	isEnabled as autostartIsEnabled,
 } from "@tauri-apps/plugin-autostart";
 
-import {
-	type AppError,
-	type AppSettings,
-	type CreateSubscription,
-	commands,
-	type IgnoreRule,
-	type Notification,
-	type NotificationDisplayMethod,
-	type ServerConfig,
-	type Subscription,
-	type UpdateInfo,
-} from "@/types/bindings";
+import { commands } from "@/types/bindings";
+import type {
+	AppError,
+	AppSettings,
+	CreateSubscription,
+	IgnoreRule,
+	Notification,
+	NotificationDisplayMethod,
+	ServerConfig,
+	Subscription,
+	UpdateInfo,
+} from "@/types/ntfy";
 import { BackendError } from "./error-classification";
 
 // Re-export types for consumers
@@ -77,36 +76,32 @@ export function getErrorMessage(error: unknown): string {
 	return "An unknown error occurred";
 }
 
-// tauri-specta stopped exporting this alias in 2.0.0-rc.25; shape mirrors its `typedError` helper.
-type Result<T, E> = { status: "ok"; data: T } | { status: "error"; error: E };
-
 /**
- * Unwraps a Result from generated bindings, throwing on error.
- *
- * This allows using the Result-based generated commands with try/catch syntax.
+ * Awaits a generated command, rethrowing the `AppError` it rejects with as a `BackendError`.
  */
-function unwrap<T>(result: Result<T, AppError>): T {
-	if (result.status === "ok") {
-		return result.data;
+async function call<T>(command: Promise<T>): Promise<T> {
+	try {
+		return await command;
+	} catch (error) {
+		if (error instanceof Error) throw error;
+		const kind =
+			error && typeof error === "object" ? (Object.keys(error)[0] ?? "") : "";
+		throw new BackendError(getErrorMessage(error), kind);
 	}
-	throw new BackendError(
-		getErrorMessage(result.error),
-		Object.keys(result.error)[0] ?? "",
-	);
 }
 
 // ===== Subscriptions API =====
 
 export const subscriptionsApi = {
-	getAll: async () => unwrap(await commands.getSubscriptions()),
+	getAll: () => call(commands.getSubscriptions()),
 
-	add: async (subscription: {
+	add: (subscription: {
 		topic: string;
 		serverUrl: string;
 		displayName?: string;
 	}) =>
-		unwrap(
-			await commands.addSubscription({
+		call(
+			commands.addSubscription({
 				topic: subscription.topic,
 				serverUrl: subscription.serverUrl,
 				displayName: subscription.displayName ?? null,
@@ -115,144 +110,144 @@ export const subscriptionsApi = {
 
 	/** `localOnly` skips removing it from the ntfy account. */
 	remove: async (id: string, localOnly = false) => {
-		unwrap(await commands.removeSubscription(id, localOnly));
+		await call(commands.removeSubscription(id, localOnly));
 	},
 
-	toggleMute: async (id: string) => unwrap(await commands.toggleMute(id)),
+	toggleMute: (id: string) => call(commands.toggleMute(id)),
 };
 
 // ===== Ignore Rules API =====
 
 export const ignoreRulesApi = {
-	getAll: async () => unwrap(await commands.getIgnoreRules()),
+	getAll: () => call(commands.getIgnoreRules()),
 
-	add: async (pattern: string, subscriptionId: string | null) =>
-		unwrap(await commands.addIgnoreRule(pattern, subscriptionId)),
+	add: (pattern: string, subscriptionId: string | null) =>
+		call(commands.addIgnoreRule(pattern, subscriptionId)),
 
 	delete: async (id: string) => {
-		unwrap(await commands.deleteIgnoreRule(id));
+		await call(commands.deleteIgnoreRule(id));
 	},
 };
 
 // ===== Notifications API =====
 
 export const notificationsApi = {
-	getBySubscription: async (subscriptionId: string) =>
-		unwrap(await commands.getNotifications(subscriptionId)),
+	getBySubscription: (subscriptionId: string) =>
+		call(commands.getNotifications(subscriptionId)),
 
 	markAsRead: async (id: string) => {
-		unwrap(await commands.markAsRead(id));
+		await call(commands.markAsRead(id));
 	},
 
 	markAllAsRead: async (subscriptionId: string) => {
-		unwrap(await commands.markAllAsRead(subscriptionId));
+		await call(commands.markAllAsRead(subscriptionId));
 	},
 
 	delete: async (id: string) => {
-		unwrap(await commands.deleteNotification(id));
+		await call(commands.deleteNotification(id));
 	},
 
 	openUrl: async (url: string) => {
-		unwrap(await commands.openUrl(url));
+		await call(commands.openUrl(url));
 	},
 
 	runAction: async (notificationId: string, actionId: string) => {
-		unwrap(await commands.runAction(notificationId, actionId));
+		await call(commands.runAction(notificationId, actionId));
 	},
 
 	setExpanded: async (id: string, expanded: boolean) => {
-		unwrap(await commands.setNotificationExpanded(id, expanded));
+		await call(commands.setNotificationExpanded(id, expanded));
 	},
 
-	getUnreadCount: async (subscriptionId: string) =>
-		unwrap(await commands.getUnreadCount(subscriptionId)),
+	getUnreadCount: (subscriptionId: string) =>
+		call(commands.getUnreadCount(subscriptionId)),
 
 	setFavorite: async (id: string, favorite: boolean) => {
-		unwrap(await commands.setNotificationFavorite(id, favorite));
+		await call(commands.setNotificationFavorite(id, favorite));
 	},
 
-	getFavorites: async () => unwrap(await commands.getFavoriteNotifications()),
+	getFavorites: () => call(commands.getFavoriteNotifications()),
 };
 
 // ===== Settings API =====
 
 export const settingsApi = {
-	get: async () => unwrap(await commands.getSettings()),
+	get: () => call(commands.getSettings()),
 
-	addServer: async (server: Omit<ServerConfig, "isDefault">) =>
-		unwrap(
-			await commands.addServer({
+	addServer: (server: Omit<ServerConfig, "isDefault">) =>
+		call(
+			commands.addServer({
 				...server,
 				isDefault: false,
 			}),
 		),
 
-	updateServer: async (server: Omit<ServerConfig, "isDefault">) =>
-		unwrap(await commands.updateServer({ ...server, isDefault: false })),
+	updateServer: (server: Omit<ServerConfig, "isDefault">) =>
+		call(commands.updateServer({ ...server, isDefault: false })),
 
-	getServerStatuses: async () => unwrap(await commands.getServerStatuses()),
+	getServerStatuses: () => call(commands.getServerStatuses()),
 
 	removeServer: async (url: string) => {
-		unwrap(await commands.removeServer(url));
+		await call(commands.removeServer(url));
 	},
 
 	setDefaultServer: async (url: string) => {
-		unwrap(await commands.setDefaultServer(url));
+		await call(commands.setDefaultServer(url));
 	},
 
 	setMinimizeToTray: async (enabled: boolean) => {
-		unwrap(await commands.setMinimizeToTray(enabled));
+		await call(commands.setMinimizeToTray(enabled));
 	},
 
 	setStartMinimized: async (enabled: boolean) => {
-		unwrap(await commands.setStartMinimized(enabled));
+		await call(commands.setStartMinimized(enabled));
 	},
 
 	setNotificationMethod: async (method: NotificationDisplayMethod) => {
-		unwrap(await commands.setNotificationMethod(method));
+		await call(commands.setNotificationMethod(method));
 	},
 
 	setNotificationForceDisplay: async (enabled: boolean) => {
-		unwrap(await commands.setNotificationForceDisplay(enabled));
+		await call(commands.setNotificationForceDisplay(enabled));
 	},
 
 	setNotificationShowActions: async (enabled: boolean) => {
-		unwrap(await commands.setNotificationShowActions(enabled));
+		await call(commands.setNotificationShowActions(enabled));
 	},
 
 	setNotificationShowImages: async (enabled: boolean) => {
-		unwrap(await commands.setNotificationShowImages(enabled));
+		await call(commands.setNotificationShowImages(enabled));
 	},
 
 	setNotificationSound: async (enabled: boolean) => {
-		unwrap(await commands.setNotificationSound(enabled));
+		await call(commands.setNotificationSound(enabled));
 	},
 
 	setCompactView: async (enabled: boolean) => {
-		unwrap(await commands.setCompactView(enabled));
+		await call(commands.setCompactView(enabled));
 	},
 
 	setExpandNewMessages: async (enabled: boolean) => {
-		unwrap(await commands.setExpandNewMessages(enabled));
+		await call(commands.setExpandNewMessages(enabled));
 	},
 
 	setDeleteLocalOnly: async (enabled: boolean) => {
-		unwrap(await commands.setDeleteLocalOnly(enabled));
+		await call(commands.setDeleteLocalOnly(enabled));
 	},
 
 	setRetentionMaxAgeDays: async (days: number | null) => {
-		unwrap(await commands.setRetentionMaxAgeDays(days));
+		await call(commands.setRetentionMaxAgeDays(days));
 	},
 	setRetentionMaxPerSubscription: async (max: number | null) => {
-		unwrap(await commands.setRetentionMaxPerSubscription(max));
+		await call(commands.setRetentionMaxPerSubscription(max));
 	},
 
 	setFavoritesEnabled: async (enabled: boolean) => {
-		unwrap(await commands.setFavoritesEnabled(enabled));
+		await call(commands.setFavoritesEnabled(enabled));
 	},
 
 	openWindow: async (editServerUrl: string | null = null) => {
-		unwrap(await commands.openSettingsWindow(editServerUrl));
+		await call(commands.openSettingsWindow(editServerUrl));
 	},
 };
 
@@ -260,8 +255,8 @@ export const settingsApi = {
 
 export const syncApi = {
 	/** Sync subscriptions from a server with credentials */
-	syncSubscriptions: async (serverUrl: string) =>
-		unwrap(await commands.syncSubscriptions(serverUrl)),
+	syncSubscriptions: (serverUrl: string) =>
+		call(commands.syncSubscriptions(serverUrl)),
 };
 
 // ===== Autostart API =====
@@ -276,17 +271,15 @@ export const autostartApi = {
 
 export const updateApi = {
 	/** Check for available updates */
-	checkForUpdate: async (): Promise<UpdateInfo | null> => {
-		const result = await commands.checkForUpdate();
-		return unwrap(result);
-	},
+	checkForUpdate: (): Promise<UpdateInfo | null> =>
+		call(commands.checkForUpdate()),
 
 	/** Result of the latest update check, null if none ran or it found no update */
 	getLastCheck: (): Promise<UpdateInfo | null> => commands.getLastUpdateCheck(),
 
 	/** Install the available update */
 	installUpdate: async (): Promise<void> => {
-		unwrap(await commands.installUpdate());
+		await call(commands.installUpdate());
 	},
 };
 

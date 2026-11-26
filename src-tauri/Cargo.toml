@@ -6,7 +6,7 @@ authors = [""]
 license = ""
 repository = ""
 edition = "2021"
-rust-version = "1.88"
+rust-version = "1.90"
 
 [lib]
 name = "ntfier_lib"
@@ -32,12 +32,12 @@ serde_json = "1"
 serde_repr = "0.1"
 
 # Database (Diesel ORM with SQLite)
-diesel = { version = "2.3", features = ["sqlite"] }
-diesel_migrations = "2.3"
+diesel = { version = "2.4", features = ["sqlite"] }
+diesel_migrations = "2.4"
 # Not imported anywhere: forces the `bundled` feature on diesel's transitive dep.
 # Diesel has no bundled feature of its own (diesel-rs/diesel#3587).
-# Ceiling is 0.37 - diesel 2.3 requires libsqlite3-sys <0.38.
-libsqlite3-sys = { version = "0.37", features = ["bundled"] }
+# Ceiling is 0.40 - diesel 2.4 requires libsqlite3-sys <0.41.
+libsqlite3-sys = { version = "0.40", features = ["bundled"] }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -60,7 +60,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 thiserror = "2"
 url = "2"
 pulldown-cmark = { version = "0.13", default-features = false }
-base64 = "0.22"
+base64 = "0.23"
 # Already in the tree via tauri-plugin-shell; opens click and view URLs from Rust
 open = "5"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
@@ -71,15 +71,15 @@ tauri-plugin-window-state = "2"
 
 # Type-safe bindings between Rust and TypeScript.
 # These three hard-pin each other and must move as a unit.
-specta = "=2.0.0-rc.25"
-tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
-specta-typescript = "0.0.12"
+specta = "=2.0.0-rc.28"
+tauri-specta = { version = "=2.0.0-rc.29", features = ["derive", "typescript"] }
+specta-typescript = "0.0.15"
 
 # Windows-specific enhanced notifications
 [target.'cfg(windows)'.dependencies]
-# Own toasts (Tag/Group for replace and remove). 0.61 is the copy notify-rust already
-# pulls in via tauri-winrt-notification, so this adds no new windows crate.
-windows = { version = "0.61", features = ["Data_Xml_Dom", "Foundation", "UI_Notifications"] }
+# Own toasts (Tag/Group for replace and remove). 0.62 is the copy tauri and
+# tauri-winrt-notification already pull in, so this adds no new windows crate.
+windows = { version = "0.62", features = ["Data_Xml_Dom", "Foundation", "UI_Notifications"] }
 
 # Workspace lints configuration
 [lints.rust]

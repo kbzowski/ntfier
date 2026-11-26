@@ -1,12 +1,12 @@
 import {
-	CheckCircle2,
+	CircleCheck,
 	Download,
-	Loader2,
+	LoaderCircle,
 	Minimize2,
 	PanelBottomClose,
 	Power,
 	RefreshCw,
-	Trash2,
+	Trash,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/dialogs/ConfirmDialog";
@@ -100,7 +100,7 @@ function UpdateSection({ updateInfo, onUpdateInfoChange }: UpdateSectionProps) {
 						>
 							{status === "installing" ? (
 								<>
-									<Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+									<LoaderCircle className="h-4 w-4 mr-1.5 animate-spin" />
 									Installing...
 								</>
 							) : (
@@ -121,7 +121,7 @@ function UpdateSection({ updateInfo, onUpdateInfoChange }: UpdateSectionProps) {
 
 			{status === "up-to-date" && (
 				<div className="flex items-center gap-2 text-sm text-muted-foreground">
-					<CheckCircle2 className="h-4 w-4 text-green-500" />
+					<CircleCheck className="h-4 w-4 text-green-500" />
 					You're running the latest version
 				</div>
 			)}
@@ -137,7 +137,7 @@ function UpdateSection({ updateInfo, onUpdateInfoChange }: UpdateSectionProps) {
 				>
 					{status === "checking" ? (
 						<>
-							<Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+							<LoaderCircle className="h-4 w-4 mr-1.5 animate-spin" />
 							Checking...
 						</>
 					) : (
@@ -302,7 +302,7 @@ export function BehaviorTab({
 				checked={deleteLocalOnly}
 				onCheckedChange={onDeleteLocalOnlyChange}
 				label="Delete only locally"
-				icon={<Trash2 className="h-4 w-4 text-muted-foreground" />}
+				icon={<Trash className="h-4 w-4 text-muted-foreground" />}
 				description="When disabled, deleting a notification also removes it from the ntfy server"
 				className="pt-2"
 			/>

@@ -17,7 +17,8 @@ import {
 	loadThemePreferences,
 	saveThemePreferences,
 } from "@/themes/utils";
-import { events, type ThemeChanged } from "@/types/bindings";
+import { events } from "@/types/bindings";
+import type { ThemeChanged } from "@/types/ntfy";
 
 interface ThemeContextValue {
 	themeId: string;

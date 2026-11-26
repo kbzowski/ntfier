@@ -5,14 +5,14 @@ import { countServerSubscriptions } from "@/lib/serverSubscriptions";
 import { isTauri } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { ThemeDefinition } from "@/themes";
-import {
-	commands,
-	type IgnoreRule,
-	type NotificationDisplayMethod,
-	type Subscription,
-	type UpdateInfo,
-} from "@/types/bindings";
-import type { ServerConfig } from "@/types/ntfy";
+import { commands } from "@/types/bindings";
+import type {
+	IgnoreRule,
+	NotificationDisplayMethod,
+	ServerConfig,
+	Subscription,
+	UpdateInfo,
+} from "@/types/ntfy";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ServerConfigForm } from "./ServerConfigForm";
 import {

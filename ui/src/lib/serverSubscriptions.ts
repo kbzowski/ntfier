@@ -1,4 +1,4 @@
-import type { Subscription } from "@/types/bindings";
+import type { Subscription } from "@/types/ntfy";
 
 export function countServerSubscriptions(
 	subscriptions: Pick<Subscription, "serverUrl">[],

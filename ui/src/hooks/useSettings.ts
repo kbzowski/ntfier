@@ -18,15 +18,13 @@ import {
 	settingsApi,
 	syncApi,
 } from "@/lib/tauri";
-import {
-	events,
-	type IgnoreRule,
-	type ServerStatusEntry,
-} from "@/types/bindings";
+import { events } from "@/types/bindings";
 import type {
 	AppSettings,
+	IgnoreRule,
 	NotificationDisplayMethod,
 	ServerConfig,
+	ServerStatusEntry,
 	UpdateInfo,
 } from "@/types/ntfy";
 
