@@ -6,7 +6,7 @@ authors = [""]
 license = ""
 repository = ""
 edition = "2021"
-rust-version = "1.88"
+rust-version = "1.90"
 
 [lib]
 name = "ntfier_lib"
