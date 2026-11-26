@@ -32,12 +32,12 @@ serde_json = "1"
 serde_repr = "0.1"
 
 # Database (Diesel ORM with SQLite)
-diesel = { version = "2.3", features = ["sqlite"] }
-diesel_migrations = "2.3"
+diesel = { version = "2.4", features = ["sqlite"] }
+diesel_migrations = "2.4"
 # Not imported anywhere: forces the `bundled` feature on diesel's transitive dep.
 # Diesel has no bundled feature of its own (diesel-rs/diesel#3587).
-# Ceiling is 0.37 - diesel 2.3 requires libsqlite3-sys <0.38.
-libsqlite3-sys = { version = "0.37", features = ["bundled"] }
+# Ceiling is 0.40 - diesel 2.4 requires libsqlite3-sys <0.41.
+libsqlite3-sys = { version = "0.40", features = ["bundled"] }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
